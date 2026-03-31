@@ -1,0 +1,84 @@
+{
+	"hash": "d41d8cd98f00b204e9800998ecf8427e",
+	"updated": "2026-01-26T18:28:04-03:00",
+	"installedModules": {
+		"github.com/adrianosantostreina/adrconnection": {
+			"name": "adrconnection",
+			"version": "4.1.7",
+			"hash": "c23c00f1e73c0b4df0a412ad41857fd0",
+			"artifacts": {}
+		},
+		"github.com/bittencourtthulio/horse-etag": {
+			"name": "horse-etag",
+			"version": "1.0.4",
+			"hash": "fcd20ae56ea7907e870b88f4594e64ff",
+			"artifacts": {}
+		},
+		"github.com/gabrielbaltazar/gbjson": {
+			"name": "gbjson",
+			"version": "1.0.11",
+			"hash": "9f3f8d23501e9249638dd6a332a536c0",
+			"artifacts": {}
+		},
+		"github.com/gabrielbaltazar/gbswagger": {
+			"name": "gbswagger",
+			"version": "3.1.0",
+			"hash": "1d45cb3210674c8eca2d9fe24c675c57",
+			"artifacts": {}
+		},
+		"github.com/gabrielbaltazar/gbwinservice": {
+			"name": "gbwinservice",
+			"version": "1.1.1",
+			"hash": "bb0b168ca81b942deb354c37282a3792",
+			"artifacts": {}
+		},
+		"github.com/gabrielbaltazar/rp-nfe": {
+			"name": "rp-nfe",
+			"version": "1.0.6",
+			"hash": "e44133cf14de7463ca7d469cff18cdd3",
+			"artifacts": {}
+		},
+		"github.com/hashload/handle-exception": {
+			"name": "handle-exception",
+			"version": "0.1.8",
+			"hash": "362736186bc6293dd9a716d7f7413455",
+			"artifacts": {}
+		},
+		"github.com/hashload/horse": {
+			"name": "horse",
+			"version": "3.1.3",
+			"hash": "752c3b943782e4910cd0a3ac3beeb4ee",
+			"artifacts": {}
+		},
+		"github.com/hashload/horse-basic-auth": {
+			"name": "horse-basic-auth",
+			"version": "v1.1.8",
+			"hash": "f26d3f7f8236b5099d443ced5ad9fb48",
+			"artifacts": {}
+		},
+		"github.com/hashload/horse-compression": {
+			"name": "horse-compression",
+			"version": "1.1.11",
+			"hash": "d23ea9e74fe0eb9ebf20970c5878f17b",
+			"artifacts": {}
+		},
+		"github.com/hashload/horse-cors": {
+			"name": "horse-cors",
+			"version": "1.0.7",
+			"hash": "d15fed3280e380f2bc6918da71772b7a",
+			"artifacts": {}
+		},
+		"github.com/hashload/horse-octet-stream": {
+			"name": "horse-octet-stream",
+			"version": "1.9.11",
+			"hash": "b12c994839528b3499a2eecea67a5884",
+			"artifacts": {}
+		},
+		"github.com/hashload/jhonson": {
+			"name": "jhonson",
+			"version": "1.1.6",
+			"hash": "6408c0964998a945994d4bf29d2c88c5",
+			"artifacts": {}
+		}
+	}
+}

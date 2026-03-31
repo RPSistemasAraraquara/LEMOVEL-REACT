@@ -1,0 +1,267 @@
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { RootStackParams } from '../navigation/AppNavigator';
+import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
+import { SectionHeader } from '../components/SectionHeader';
+import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
+import { Colors, Radius, Space } from '../theme';
+
+type Route = RouteProp<RootStackParams, 'Couvert'>;
+
+const parseNumber = (value: string) => {
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseInteger = (value: string) => {
+  const parsed = Math.round(parseNumber(value));
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+};
+
+export const CouvertManagerScreen: React.FC = () => {
+  const route = useRoute<Route>();
+  const navigation = useNavigation();
+  const { activeTable, refreshDashboard } = useApp();
+  const [idVenda] = useState<number | undefined>(route.params?.idVenda || undefined);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [numPessoas, setNumPessoas] = useState('0');
+  const [masculino, setMasculino] = useState('0');
+  const [feminino, setFeminino] = useState('0');
+  const vendaAtual = idVenda || activeTable?.idVenda;
+
+  useEffect(() => {
+    if (!vendaAtual) return;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const sale = await api.getSale(vendaAtual, false);
+        if (!sale) return;
+        setNumPessoas(String(sale.numeroPessoas || 0));
+        setMasculino(String(sale.numeroCouvertMasculino || 0));
+        setFeminino(String(sale.numeroCouvertFeminino || 0));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [vendaAtual]);
+
+  const changeInteger = (setter: (value: string) => void, current: string, delta: number) => {
+    const next = Math.max(0, parseInteger(current) + delta);
+    setter(String(next));
+  };
+
+  const save = async () => {
+    if (!vendaAtual) return;
+    setSaving(true);
+    try {
+      await api.updateCouvert(vendaAtual, {
+        numeroPessoas: parseNumber(numPessoas),
+        numeroCouvertMasculino: parseNumber(masculino),
+        numeroCouvertFeminino: parseNumber(feminino)
+      });
+      await refreshDashboard();
+      Alert.alert('Concluído', 'Informações de couvert atualizadas.');
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScreenRouteLabel />
+      <SectionHeader title="Controle de Couvert" subtitle="Pessoas e cobrança de couvert por mesa." />
+
+      {!vendaAtual ? (
+        <View style={styles.card}>
+          <Text style={styles.title}>Fluxo inválido</Text>
+          <Text style={styles.text}>Selecione uma mesa e abra a venda em Mesas para atualizar o couvert.</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Tabs', { screen: 'Mesas' })}>
+            <Text style={styles.primaryBtnText}>Ir para Mesas</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {loading ? (
+            <View style={styles.card}>
+              <Text style={styles.title}>Carregando dados da venda...</Text>
+            </View>
+          ) : null}
+          <View style={styles.card}>
+            <Text style={styles.label}>Venda</Text>
+            <Text style={styles.saleId}>#{vendaAtual}</Text>
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.label}>Número de pessoas</Text>
+            <View style={styles.counterRow}>
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setNumPessoas, numPessoas, -1)}
+              >
+                <Text style={styles.counterText}>-</Text>
+              </Pressable>
+              <TextInput
+                style={[styles.input, styles.counterInput]}
+                keyboardType="numeric"
+                value={numPessoas}
+                onChangeText={setNumPessoas}
+              />
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setNumPessoas, numPessoas, +1)}
+              >
+                <Text style={styles.counterText}>+</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.label}>Couvert Masculino</Text>
+            <View style={styles.counterRow}>
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setMasculino, masculino, -1)}
+              >
+                <Text style={styles.counterText}>-</Text>
+              </Pressable>
+              <TextInput
+                style={[styles.input, styles.counterInput]}
+                keyboardType="numeric"
+                value={masculino}
+                onChangeText={setMasculino}
+              />
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setMasculino, masculino, +1)}
+              >
+                <Text style={styles.counterText}>+</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.label}>Couvert Feminino</Text>
+            <View style={styles.counterRow}>
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setFeminino, feminino, -1)}
+              >
+                <Text style={styles.counterText}>-</Text>
+              </Pressable>
+              <TextInput
+                style={[styles.input, styles.counterInput]}
+                keyboardType="numeric"
+                value={feminino}
+                onChangeText={setFeminino}
+              />
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setFeminino, feminino, +1)}
+              >
+                <Text style={styles.counterText}>+</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.btn} onPress={save} disabled={saving}>
+              <Text style={styles.btnText}>{saving ? 'Salvando...' : 'Salvar couvert'}</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    padding: Space.md
+  },
+  content: {
+    paddingBottom: 160
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    padding: Space.md,
+    marginBottom: Space.md
+  },
+  title: {
+    color: Colors.text,
+    fontWeight: '700',
+    marginBottom: 6
+  },
+  text: {
+    color: Colors.textMuted
+  },
+  primaryBtn: {
+    marginTop: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignSelf: 'flex-start'
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontWeight: '700'
+  },
+  saleId: {
+    color: Colors.primary,
+    fontWeight: '900',
+    fontSize: 22
+  },
+  label: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: Radius.md,
+    padding: 10,
+    color: Colors.text,
+    marginBottom: 12
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginBottom: 12
+  },
+  counterBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.card
+  },
+  counterText: {
+    color: Colors.primary,
+    fontSize: 20,
+    fontWeight: '800'
+  },
+  counterInput: {
+    flex: 1,
+    marginBottom: 0,
+    textAlign: 'center'
+  },
+  btn: {
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary,
+    padding: 12,
+    alignItems: 'center'
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: '700'
+  }
+});

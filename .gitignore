@@ -1,0 +1,80 @@
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- React Native / Node / JS ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Metro / React Native
+.expo/
+.expo-shared/
+*.jks
+*.pem
+
+# Bundles / builds
+android/.gradle/
+android/app/build/
+android/build/
+ios/Pods/
+ios/build/
+
+# --- Vite/Metro cache ---
+.rn-temp/
+.webpack/
+.cache/
+
+# --- Delphi / RAD Studio ---
+*.dcu
+*.dcp
+*.dpk
+*.dproj.local
+*.dproj.user
+*.cfg
+*.ini
+*.identcache
+*.dcu.config
+*.bpl
+*.bpi
+*.so
+*.dll
+*.exe
+*.dres
+*.drc
+*.drcs
+*.o
+*.obj
+*.il?
+*.map
+*.tds
+*.hpp
+*.bak
+*.local
+*.~*
+__history/
+
+# Pastas de compilação do Delphi
+Win32/
+Win64/
+Release/
+Debug/
+__recovery/
+
+# caches/artefatos dentro de modules do Delphi
+API/modules/.bin/
+API/modules/.bpl/
+API/modules/.dcp/
+API/modules/.dcu/
+API/Fontes/Bin/*.exe
+API/Fontes/Bin/*.dll
+API/Fontes/Bin/*.so
+API/Fontes/Bin/**/*.exe
+API/Fontes/Bin/**/*.dll
+API/Fontes/Bin/**/*.so
+API/Fontes/Bin/**/*.dcu
+API/Fontes/Bin/**/*.dcp
+API/Fontes/Bin/**/*.bpl
+/API/Fontes/Bin

@@ -1,0 +1,47 @@
+Correções Finalizada: 
+
+1. Ao abrir uma MESA / COMANDA pelo DESKTOP , não está sincronizando automaticamente quando clica no botão 'ATUALIZAR'. É necessário ir na aba 'LIVRES' depois voltar para a aba 'OCUPADA' para atualizar.
+
+2. Quando está marcado no sistema para cobrar a taxa do garçom , no fechamento de venda pelo APP quando desmarco o botão 'COBRAR TX GARÇOM' para que não cobre naquela venda em específico, não permite a finalização, retornando:
+'Valor Pagamento menor que o valor pendente da venda'
+Obs. Só acontece quando faz o pré fechamento antes.  Ok
+
+3. Ao realizar a remoção do item após ter sido lançado no SERVIDOR não está gravando a data do cancelamento no campo data_cancelamento da vendaitem. 
+O sit_001 é alterado corretamente para 2 , porém não grava a DATA do cancelamento. ok
+
+4. Margem de lucro do produto na tabela vendaitem quando finalizado a venda
+   Obs: Somente no banco local do Le Cheff
+   Gravado no campo custoproduto ,margemlucro
+   
+5. Taxa de garçom na tabela vendaitem . Quando o produto permite que cobre a taxa do garcom
+   gravado no campo vendaitem rateiotaxagarcom.
+   Obs:Somente no banco local ( Le Cheff)
+   
+6. Quando finaliza a venda e existe opcional, damos baixa no opcional e no setor_estoque_opcional
+
+7. Remoção na categoria, lançamento produtos,  produtos lançados as imagens.Ganho de 85% de perfomace.  
+
+8. [Ação Automação] Busca do item por CÓDIGO (mat_004) ser exata, e não parcial. Ex: Se buscar pelo item código 11 , exibir apenas esse item para o lançamento.  Foi feito porem sem configuração, se voce digitar exatamente o texto o sistema buscar a palavra exata.
+
+9. Permissão de cancelamento do produto, mesmo apos lançamento para API.
+
+
+
+
+
+---------------------------********-------------------------------------------------------------------------------------------------------------
+Trocar visual light
+Colocar o trunc no pagseguro
+Finalizar o PagBank
+[Maxximus] Incluir uma flag nas formas de pgto para definir quais deverão ser exibidas no aplicativo RPMOVEL. Igual temos para o RPFOOD
+Verificar a API
+Enviar Stone
+Enviar PagBank
+Enviar para a PlayStore
+
+
+
+
+
+
+

@@ -1,0 +1,1686 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useApp } from '../context/AppContext';
+import { api, MenuItem, ProductOptional, TableOrder } from '../services/api';
+import { Colors, Radius, Space, Typography } from '../theme';
+import { RootStackParams } from '../navigation/AppNavigator';
+
+type LaunchRoute = RouteProp<RootStackParams, 'Lancamento'>;
+type Nav = NativeStackNavigationProp<RootStackParams, 'Lancamento'>;
+
+type SizeOption = {
+  code: string;
+  label: string;
+  value: number;
+};
+type ReturnTarget = 'Inicial' | 'Cardapio' | 'Gestao';
+
+function sanitizeQuantity(value: string): number {
+  const normalized = value.replace(/[^0-9.,-]/g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatDecimal(value: number, decimals = 3): string {
+  const fixed = Number(value.toFixed(decimals));
+  return String(fixed).replace('.', ',');
+}
+
+function normalizeQuantityInputText(raw: string, allowDecimal: boolean): string {
+  const cleaned = raw.replace(/[^0-9.,]/g, '').replace(/\./g, ',');
+  if (!allowDecimal) {
+    return cleaned.replace(/\D/g, '');
+  }
+
+  const hasSeparator = cleaned.includes(',');
+  const [integerPartRaw = '', ...decimalParts] = cleaned.split(',');
+  const integerPart = integerPartRaw.replace(/\D/g, '');
+  const decimalPart = decimalParts.join('').replace(/\D/g, '').slice(0, 3);
+
+  return hasSeparator ? `${integerPart},${decimalPart}` : integerPart;
+}
+
+function formatQuantityInputValue(value: number, allowDecimal: boolean): string {
+  if (allowDecimal) {
+    return formatDecimal(value, 3);
+  }
+  return String(Math.max(1, Math.round(value)));
+}
+
+const normalizeSizeValue = (value: unknown): number => {
+  const asNumber = Number(String(value || 0).replace(',', '.'));
+  return Number.isFinite(asNumber) ? asNumber : 0;
+};
+
+const getPriceBySize = (item: MenuItem, sizeCode: string): number => {
+  if (!item.vendaPorTamanho && !item.permiteFracao) {
+    return Number(item.valorUnitario || item.valorVenda || 0);
+  }
+
+  const candidates: Record<string, unknown> = {
+    P: item.valorTamanhoP,
+    M: item.valorTamanhoM,
+    G: item.valorTamanhoG,
+    GG: item.valorTamanhoGG,
+    E: item.valorTamanhoExtra,
+    EXTRA: item.valorTamanhoExtra
+  };
+
+  const key = String(sizeCode || '').toUpperCase();
+  const direct = normalizeSizeValue(candidates[key]);
+  if (direct > 0) return direct;
+
+  const padrao = String(item.tamanhoPadrao || '').toUpperCase();
+  const fallback = normalizeSizeValue(candidates[padrao]);
+  if (fallback > 0) return fallback;
+
+  return Number(item.valorUnitario || item.valorVenda || 0);
+};
+
+const goToReturnScreen = (navigation: Nav, returnTo: ReturnTarget, returnCategoryId?: number) => {
+  const parent = navigation.getParent();
+  const tabParams =
+    returnTo === 'Cardapio' && typeof returnCategoryId === 'number'
+      ? { screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } }
+      : { screen: returnTo };
+
+  if (returnTo === 'Inicial') {
+    const resetToHome = () => {
+      const action = CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Inicial' } as never]
+      });
+
+      if (parent) {
+        parent.dispatch(action);
+        return;
+      }
+
+      navigation.dispatch(action);
+    };
+
+    if (navigation.canGoBack() || (parent && parent.canGoBack())) {
+      resetToHome();
+      return;
+    }
+    resetToHome();
+    return;
+  }
+
+  const targetReset = {
+    index: 1,
+    routes: [
+      { name: 'Inicial' } as never,
+      { name: 'Tabs', params: tabParams as never } as never
+    ]
+  };
+
+  try {
+    if (parent) {
+      parent.dispatch(CommonActions.reset(targetReset));
+      return;
+    }
+  } catch (error: unknown) {
+    void error;
+  }
+
+  try {
+    navigation.dispatch(CommonActions.reset(targetReset));
+    return;
+  } catch (error: unknown) {
+    void error;
+  }
+
+  navigation.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [{ name: 'Inicial' } as never]
+    })
+  );
+};
+
+const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
+  const tabParams =
+    typeof returnCategoryId === 'number'
+      ? { screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } }
+      : { screen: 'Cardapio' };
+  const targetReset = {
+    index: 1,
+    routes: [
+      { name: 'Inicial' } as never,
+      { name: 'Tabs', params: tabParams as never } as never
+    ]
+  };
+
+  try {
+    navigation.dispatch(CommonActions.reset(targetReset));
+    return;
+  } catch (error: unknown) {
+    void error;
+  }
+
+  const parent = navigation.getParent();
+  if (parent) {
+    try {
+      parent.dispatch(CommonActions.reset(targetReset));
+      return;
+    } catch (error: unknown) {
+      void error;
+    }
+  }
+
+  try {
+    navigation.navigate('Tabs' as never, tabParams as never);
+  } catch (error: unknown) {
+    void error;
+    navigation.navigate('Inicial' as never);
+  }
+};
+
+const goToReturnWithPending = async (
+  navigation: Nav,
+  returnTo: ReturnTarget,
+  returnCategoryId: number | undefined,
+  hasPendingItems: boolean,
+  flushPendingItems: () => Promise<boolean>
+) => {
+  void hasPendingItems;
+  void flushPendingItems;
+  goToReturnScreen(navigation, returnTo, returnCategoryId);
+};
+
+export const ItemLaunchScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<LaunchRoute>();
+  const routeProduct = route.params?.item as MenuItem;
+  const routeProductId = Number(routeProduct?.idProduto || routeProduct?.id || 0);
+  const routeTableId = Number(route.params?.tableId || 0);
+  const routeTableType = route.params?.tableType === 'comanda' ? 'comanda' : 'mesa';
+  const routeTableComandaId = Number(route.params?.tableComandaId || 0);
+  const routeTableName = route.params?.tableName?.trim() || '';
+  const {
+    addToCart,
+    appSettings,
+    activeTable,
+    cart,
+    getLinkedTableId,
+    openTableByCard,
+    products,
+    setActiveTable,
+    flushPendingItems,
+    pauseAutoRefresh,
+    resumeAutoRefresh
+  } = useApp();
+  const isReturningRef = useRef(false);
+  const skipNextQuantityConfirmRef = useRef(false);
+  const quantityFromRoute = Number(route.params?.quantity);
+  const sizeFromRoute = route.params?.size;
+  const [quantidade, setQuantidade] = useState(Math.max(1, Number.isFinite(quantityFromRoute) && quantityFromRoute > 0 ? quantityFromRoute : 1));
+  const [quantidadeInput, setQuantidadeInput] = useState('1');
+  const [flavorCount, setFlavorCount] = useState(1);
+  const [observacao, setObservacao] = useState('');
+  const [fractionSearchByIndex, setFractionSearchByIndex] = useState<Record<number, string>>({});
+  const [selectedOptionalQty, setSelectedOptionalQty] = useState<Record<number, number>>({});
+  const [selectedFractionObservation, setSelectedFractionObservation] = useState<Record<number, string>>({});
+  const [selectedFractionOptionalQty, setSelectedFractionOptionalQty] = useState<Record<string, number>>({});
+  const [loadedProduct, setLoadedProduct] = useState<MenuItem | null>(routeProduct || null);
+  const [loadedFractionProducts, setLoadedFractionProducts] = useState<Record<number, MenuItem>>({});
+  const [fractions, setFractions] = useState<Array<number | null>>([]);
+  const [selectedFractionIndex, setSelectedFractionIndex] = useState<number | null>(null);
+  const loadedFractionProductIdsRef = useRef<Record<number, true>>({});
+  const routeTable = useMemo<TableOrder | null>(() => {
+    if (!routeTableId) return null;
+    return {
+      idMesa: routeTableId,
+      idComanda: routeTableComandaId || undefined,
+      nomeMesaComanda: routeTableName || `${routeTableType === 'comanda' ? 'Comanda' : 'Mesa'} ${routeTableId}`,
+      situacao: 'Aberta',
+      tipo: routeTableType
+    };
+  }, [routeTableId, routeTableComandaId, routeTableName, routeTableType]);
+  const syncedRouteProduct = useMemo<MenuItem | null>(() => {
+    if (!routeProduct) return null;
+
+    const candidates = products.filter(
+      (item) =>
+        item.idProduto === routeProduct.idProduto ||
+        item.id === routeProduct.idProduto ||
+        item.idProduto === routeProduct.id ||
+        item.id === routeProduct.id
+    );
+
+    const withOptionals = candidates.find((item) => Array.isArray(item.opcionais) && item.opcionais.length > 0);
+    return withOptionals || candidates[0] || null;
+  }, [products, routeProduct]);
+  const [activeVenda, setActiveVenda] = useState<TableOrder | null>(activeTable);
+  const [isOpeningSale, setIsOpeningSale] = useState(false);
+  const saleOpenKeyRef = useRef<string>('');
+  const returnTo = route.params?.returnTo || 'Cardapio';
+  const returnCategoryId =
+    typeof route.params?.returnCategoryId === 'number' ? route.params.returnCategoryId : undefined;
+  const product = useMemo<MenuItem | null>(() => {
+    if (!routeProduct) return null;
+    if (!loadedProduct) return routeProduct;
+    return {
+      ...routeProduct,
+      ...loadedProduct,
+      opcionais:
+        loadedProduct.opcionais && loadedProduct.opcionais.length > 0
+          ? loadedProduct.opcionais
+      : routeProduct.opcionais || []
+    };
+  }, [loadedProduct, routeProduct]);
+
+  useEffect(() => {
+    setLoadedProduct(syncedRouteProduct || routeProduct || null);
+  }, [routeProduct, syncedRouteProduct]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!routeProduct?.idProduto) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const hasLocalOptionals =
+      (Array.isArray(routeProduct?.opcionais) && routeProduct.opcionais.length > 0) ||
+      (Array.isArray(syncedRouteProduct?.opcionais) && syncedRouteProduct.opcionais.length > 0);
+
+    if (hasLocalOptionals) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void (async () => {
+      try {
+        const fetchedProduct = await api.getProduct(routeProduct.idProduto, false);
+        if (!active || !fetchedProduct) {
+          return;
+        }
+        setLoadedProduct(fetchedProduct);
+      } catch {
+        // Mantém o produto já carregado no catálogo.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [routeProduct?.idProduto, routeProduct?.opcionais, syncedRouteProduct]);
+  const resolveOptionalSource = useCallback((target: MenuItem | null | undefined) => {
+    const source = target || product;
+    if (!source) return product;
+
+    const candidates = products.filter(
+      (item) =>
+        item.idProduto === source?.idProduto ||
+        item.id === source?.idProduto ||
+        item.idProduto === source?.id ||
+        item.id === source?.id
+    );
+    const withOptionals = candidates.find((item) => Array.isArray(item.opcionais) && item.opcionais.length > 0);
+    return withOptionals || source;
+  }, [product, products]);
+
+  const optionalSource = useMemo(() => resolveOptionalSource(product), [product, resolveOptionalSource]);
+
+  useEffect(() => {
+    if (!routeProduct) {
+      navigation.goBack();
+      return;
+    }
+
+    const nextQuantity = Math.max(1, quantityFromRoute > 0 ? quantityFromRoute : 1);
+
+    setQuantidade(nextQuantity);
+    setQuantidadeInput(formatQuantityInputValue(nextQuantity, Boolean(routeProduct?.usaQuantidadeDecimal)));
+    setFlavorCount(1);
+    setObservacao('');
+    setFractionSearchByIndex({});
+    setSelectedFractionObservation({});
+    setSelectedOptionalQty({});
+    setSelectedFractionOptionalQty({});
+    setLoadedFractionProducts({});
+    loadedFractionProductIdsRef.current = {};
+    setFractions([]);
+    setSelectedFractionIndex(null);
+  }, [navigation, quantityFromRoute, routeProductId]);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const tableSource = activeTable || routeTable;
+      if (!tableSource) return;
+
+      setActiveVenda(tableSource);
+      if (tableSource.idVenda) return;
+
+      const openKey = `${tableSource.tipo || 'mesa'}-${tableSource.idMesa}-${tableSource.idVenda || 0}`;
+      if (saleOpenKeyRef.current === openKey) return;
+
+      saleOpenKeyRef.current = openKey;
+      setIsOpeningSale(true);
+      try {
+        const opened = await openTableByCard(
+          tableSource.idMesa,
+          tableSource.nomeMesaComanda,
+          tableSource.tipo
+        );
+        if (!active) return;
+        setActiveTable(opened);
+        setActiveVenda(opened);
+      } finally {
+        if (active) {
+          setIsOpeningSale(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [activeTable, openTableByCard, routeTable, setActiveTable]);
+
+  useEffect(() => {
+    pauseAutoRefresh();
+    return () => {
+      resumeAutoRefresh();
+    };
+  }, [pauseAutoRefresh, resumeAutoRefresh]);
+
+  useEffect(() => {
+    const handleBack = () => {
+      if (isReturningRef.current) {
+        return true;
+      }
+      isReturningRef.current = true;
+      void goToReturnWithPending(
+        navigation,
+        returnTo,
+        returnCategoryId,
+        cart.length > 0,
+        flushPendingItems
+      ).finally(() => {
+        isReturningRef.current = false;
+      });
+      return true;
+    };
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', handleBack);
+
+      return () => {
+        backSubscription.remove();
+      };
+  }, [navigation, returnTo, returnCategoryId, cart.length, flushPendingItems]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: '',
+      headerTitle: () => null,
+      headerLeftContainerStyle: {
+        paddingLeft: 6,
+        paddingRight: 14
+      },
+      headerLeft: () => (
+        <Pressable
+      onPress={() => {
+        if (isReturningRef.current) {
+          return;
+        }
+        isReturningRef.current = true;
+        void goToReturnWithPending(
+          navigation,
+          returnTo,
+          returnCategoryId,
+          cart.length > 0,
+          flushPendingItems
+        ).finally(() => {
+          isReturningRef.current = false;
+        });
+      }}
+          style={styles.backButton}
+        >
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+      )
+    });
+  }, [navigation, returnTo, returnCategoryId, cart.length, flushPendingItems]);
+
+  const ensureActiveSale = async () => {
+    const seedTable = activeVenda || activeTable || routeTable;
+    if (!seedTable || !seedTable.idMesa) return null;
+
+    if (seedTable.idVenda) {
+      setActiveVenda(seedTable);
+      return seedTable;
+    }
+
+    try {
+      setIsOpeningSale(true);
+      const opened = await openTableByCard(seedTable.idMesa, seedTable.nomeMesaComanda, seedTable.tipo);
+      setActiveTable(opened);
+      setActiveVenda(opened);
+      return opened;
+    } finally {
+      setIsOpeningSale(false);
+    }
+  };
+
+  const sizeOptions = useMemo<SizeOption[]>(() => {
+    const defaultPrice = Number(product.valorVenda || product.valorUnitario || 0);
+    const hasSizeByFlow = product.vendaPorTamanho || product.permiteFracao;
+
+    if (!hasSizeByFlow) {
+      return [{
+        code: product.tamanhoPadrao || 'U',
+        label: product.tamanhoPadrao || 'Único',
+        value: defaultPrice
+      }];
+    }
+
+    const items: SizeOption[] = [
+      { code: 'P', label: String(product.tamanhoP || '').trim(), value: Number(product.valorTamanhoP || 0) },
+      { code: 'M', label: String(product.tamanhoM || '').trim(), value: Number(product.valorTamanhoM || 0) },
+      { code: 'G', label: String(product.tamanhoG || '').trim(), value: Number(product.valorTamanhoG || 0) },
+      { code: 'GG', label: String(product.tamanhoGG || '').trim(), value: Number(product.valorTamanhoGG || 0) },
+      { code: 'E', label: String(product.tamanhoExtra || '').trim(), value: Number(product.valorTamanhoExtra || 0) }
+    ];
+
+    const filtered = items.filter((item) => item.label.length > 0 && item.value > 0);
+    if (filtered.length > 0) {
+      return filtered;
+    }
+
+    return [{ code: product.tamanhoPadrao || 'M', label: product.tamanhoPadrao || 'M', value: defaultPrice }];
+  }, [product]);
+
+  const defaultSelectedSize = useMemo(() => {
+    const routeSize = String(sizeFromRoute || '').toUpperCase();
+    const directMatch = sizeOptions.find((item) => item.code.toUpperCase() === routeSize);
+    if (directMatch) {
+      return directMatch.code;
+    }
+
+    const first = sizeOptions[0]?.code || 'M';
+    const padrao = String(product.tamanhoPadrao || '').toUpperCase();
+    if (!padrao) return first;
+    const match = sizeOptions.find((item) => item.code.toUpperCase() === padrao || item.code.toUpperCase() === padrao.substring(0, 1));
+    return match?.code || first;
+  }, [sizeFromRoute, sizeOptions, product.tamanhoPadrao]);
+
+  const [selectedSize, setSelectedSize] = useState(defaultSelectedSize);
+
+  const selectedSizeLabel = sizeOptions.find((item) => item.code === selectedSize)?.label || '';
+  const selectedPrice = sizeOptions.find((item) => item.code === selectedSize)?.value || 0;
+  const productSupportLabel = product?.descricaoCurta?.trim() || '';
+  const currentObservationLabel = observacao.trim();
+  const currentSizeLabel = selectedSizeLabel || selectedSize || product?.tamanhoPadrao || 'Padrão';
+
+  const getOptionalDisplay = (optional: ProductOptional): string => {
+    if (!product?.vendaPorTamanho) {
+      return String(optional.descricao || '');
+    }
+    if (selectedSize === 'P' && optional.opcionalP) return optional.opcionalP;
+    if (selectedSize === 'M' && optional.opcionalM) return optional.opcionalM;
+    if (selectedSize === 'G' && optional.opcionalG) return optional.opcionalG;
+    if (selectedSize === 'GG' && optional.opcionalGG) return optional.opcionalGG;
+    if ((selectedSize === 'E' || selectedSize === 'EXTRA') && optional.opcionalExtra) return optional.opcionalExtra;
+    return String(optional.descricao || '');
+  };
+
+  const getOptionalPrice = (optional: ProductOptional): number => {
+    if ((selectedSize === 'EXTRA') && optional.valorOpcionalExtra !== undefined) return Number(optional.valorOpcionalExtra);
+    if (selectedSize === 'P' && optional.valorOpcionalP !== undefined) return Number(optional.valorOpcionalP);
+    if (selectedSize === 'M' && optional.valorOpcionalM !== undefined) return Number(optional.valorOpcionalM);
+    if (selectedSize === 'G' && optional.valorOpcionalG !== undefined) return Number(optional.valorOpcionalG);
+    if (selectedSize === 'GG' && optional.valorOpcionalGG !== undefined) return Number(optional.valorOpcionalGG);
+    if ((selectedSize === 'E' || selectedSize === 'EXTRA') && optional.valorOpcionalExtra !== undefined) return Number(optional.valorOpcionalExtra);
+    return Number(optional.valor || 0);
+  };
+
+  const changeOptionalQuantity = (optional: ProductOptional, delta: number) => {
+    setSelectedOptionalQty((prev) => {
+      const current = prev[optional.idOpcional] || 0;
+      const next = Math.max(0, current + delta);
+      if (next <= 0) {
+        const nextMap = { ...prev };
+        delete nextMap[optional.idOpcional];
+        return nextMap;
+      }
+      return {
+        ...prev,
+        [optional.idOpcional]: next
+      };
+    });
+  };
+
+  const changeFractionObservation = (index: number, value: string) => {
+    setSelectedFractionObservation((prev) => ({
+      ...prev,
+      [index]: value
+    }));
+  };
+
+  const getFractionOptionalKey = (index: number, optionalId: number) => `${index}:${optionalId}`;
+
+  const getFractionOptionalQuantity = (index: number, optionalId: number) =>
+    selectedFractionOptionalQty[getFractionOptionalKey(index, optionalId)] || 0;
+
+  const changeFractionOptionalQuantity = (index: number, optional: ProductOptional, delta: number) => {
+    const key = getFractionOptionalKey(index, optional.idOpcional);
+    setSelectedFractionOptionalQty((prev) => {
+      const current = prev[key] || 0;
+      const next = Math.max(0, current + delta);
+      if (next <= 0) {
+        const nextMap = { ...prev };
+        delete nextMap[key];
+        return nextMap;
+      }
+      return {
+        ...prev,
+        [key]: next
+      };
+    });
+  };
+
+  const clearFractionOptionals = (index: number) => {
+    setSelectedFractionOptionalQty((prev) => Object.fromEntries(
+      Object.entries(prev).filter(([key]) => !key.startsWith(`${index}:`))
+    ));
+  };
+
+  const optionalItems = (optionalSource?.opcionais || []).filter(
+    (item) => item.descricao || item.opcionalP || item.opcionalM || item.opcionalG || item.opcionalGG || item.opcionalExtra
+  );
+  const selectedOptionals = optionalItems.filter((item) => (selectedOptionalQty[item.idOpcional] || 0) > 0);
+  const optionalsTotalQuantity = selectedOptionals.reduce((acc, optional) => acc + (selectedOptionalQty[optional.idOpcional] || 0), 0);
+
+  const optionalTotal = selectedOptionals.reduce((acc, optional) => {
+    const value = getOptionalPrice(optional);
+    const optionalQty = selectedOptionalQty[optional.idOpcional] || 0;
+    if (!Number.isFinite(value) || value < 0 || optionalQty <= 0) return acc;
+    return acc + value * optionalQty * quantidade;
+  }, 0);
+
+  const lineTotal = (selectedPrice * quantidade + optionalTotal);
+  const shouldShowFlavorCount = Boolean(product?.permiteFracao);
+  const selectedFlavorCount = shouldShowFlavorCount ? flavorCount : 1;
+  const fractionMode = shouldShowFlavorCount && selectedFlavorCount > 1;
+  const shouldShowSize = sizeOptions.length > 1 || product?.vendaPorTamanho;
+
+  useEffect(() => {
+    if (!fractionMode) {
+      setFractions([]);
+      setSelectedFractionIndex(null);
+      setSelectedFractionOptionalQty({});
+      return;
+    }
+
+    setFractions((prev) => {
+      const next = Array.from({ length: selectedFlavorCount }, (_, index) => prev[index] ?? null);
+      if (!next[0]) {
+        next[0] = product.idProduto;
+      }
+      return next;
+    });
+  }, [fractionMode, product.idProduto, selectedFlavorCount]);
+
+  const availableById = useMemo(() => {
+    const candidates = products.length > 0 ? products : [product];
+    const byCategory = candidates.filter((item) => {
+      if (!item || item.b_venda_mobile === false) return false;
+      if (item.idProduto <= 0) return false;
+      if (!appSettings.utilizaCategorias) return true;
+      if (!item.idCategoria || !product.idCategoria) return true;
+      return item.idCategoria === product.idCategoria;
+    });
+    const filteredBySize = byCategory.filter((item) => {
+      if (!product.vendaPorTamanho) return true;
+      return getPriceBySize(item, selectedSize) > 0;
+    });
+
+    const map = new Map<number, MenuItem>();
+    filteredBySize.forEach((item) => {
+      if (!map.has(item.idProduto)) {
+        map.set(item.idProduto, item);
+      }
+    });
+    if (!map.has(product.idProduto)) {
+      map.set(product.idProduto, product);
+    }
+    return map;
+  }, [appSettings.utilizaCategorias, product, products, selectedSize]);
+
+  const mergeFractionProductDetails = useCallback((nextProduct: MenuItem) => {
+    setLoadedFractionProducts((prev) => {
+      const current = prev[nextProduct.idProduto];
+      const baseProduct = availableById.get(nextProduct.idProduto);
+      return {
+        ...prev,
+        [nextProduct.idProduto]: {
+          ...(baseProduct || {}),
+          ...(current || {}),
+          ...nextProduct,
+          opcionais:
+            nextProduct.opcionais && nextProduct.opcionais.length > 0
+              ? nextProduct.opcionais
+              : current?.opcionais || baseProduct?.opcionais || []
+        }
+      };
+    });
+  }, [availableById]);
+
+  const loadFractionProductDetails = useCallback(async (idProduto: number) => {
+    if (loadedFractionProductIdsRef.current[idProduto]) {
+      return;
+    }
+
+    const cached = loadedFractionProducts[idProduto];
+    if (cached?.opcionais && cached.opcionais.length > 0) {
+      loadedFractionProductIdsRef.current[idProduto] = true;
+      return;
+    }
+
+    const baseProduct = availableById.get(idProduto);
+    if (baseProduct?.opcionais && baseProduct.opcionais.length > 0) {
+      loadedFractionProductIdsRef.current[idProduto] = true;
+      mergeFractionProductDetails(baseProduct);
+      return;
+    }
+
+    loadedFractionProductIdsRef.current[idProduto] = true;
+
+    try {
+      const fetchedProduct = await api.getProduct(idProduto, false);
+      if (fetchedProduct) {
+        mergeFractionProductDetails(fetchedProduct);
+      }
+    } catch {
+      // Mantém o melhor dado já disponível para a fração.
+    }
+  }, [availableById, loadedFractionProducts, mergeFractionProductDetails]);
+
+  useEffect(() => {
+    const selectedIds = fractions.filter((id): id is number => id !== null && id !== product.idProduto);
+    selectedIds.forEach((id) => {
+      void loadFractionProductDetails(id);
+    });
+  }, [fractions, loadFractionProductDetails, product.idProduto]);
+
+  const availableFractionOptions = useMemo(() => {
+    return Array.from(availableById.values());
+  }, [availableById]);
+
+  const fractionItems = useMemo(
+    () => fractions.map((value) => (value ? availableById.get(value) : undefined)),
+    [availableById, fractions]
+  );
+  const fractionOptionalItemsByIndex = fractionItems.map((item) => {
+    const source = item ? loadedFractionProducts[item.idProduto] || resolveOptionalSource(item) : null;
+    return (source?.opcionais || []).filter(
+      (optional) =>
+        optional.descricao ||
+        optional.opcionalP ||
+        optional.opcionalM ||
+        optional.opcionalG ||
+        optional.opcionalGG ||
+        optional.opcionalExtra
+    );
+  });
+  const hasDuplicateFractions = useMemo(() => {
+    const values = fractions.filter((item): item is number => item !== null);
+    return values.length !== new Set(values).size;
+  }, [fractions]);
+  const fractionQuantity = selectedFlavorCount > 0 ? Number((quantidade / selectedFlavorCount).toFixed(3)) : 0;
+  const fractionOptionalsTotalQuantity = fractionOptionalItemsByIndex.reduce((acc, optionals, index) => {
+    return acc + optionals.reduce((subtotal, optional) => subtotal + getFractionOptionalQuantity(index, optional.idOpcional), 0);
+  }, 0);
+  const fractionOptionalTotal = fractionOptionalItemsByIndex.reduce((acc, optionals, index) => {
+    return acc + optionals.reduce((subtotal, optional) => {
+      const value = getOptionalPrice(optional);
+      const optionalQty = getFractionOptionalQuantity(index, optional.idOpcional);
+      if (!Number.isFinite(value) || value < 0 || optionalQty <= 0) return subtotal;
+      return subtotal + value * optionalQty * fractionQuantity;
+    }, 0);
+  }, 0);
+  const maxFractionUnitPrice = useMemo(() => {
+    const values = fractionItems
+      .map((item) => getPriceBySize(item || product, selectedSize))
+      .filter((price) => Number.isFinite(price) && price > 0);
+    if (!values.length) return getPriceBySize(product, selectedSize);
+    return Math.max(...values);
+  }, [fractionItems, product, selectedSize]);
+  const fractionEstimatedTotal = useMemo(() => {
+    if (!fractionMode) return lineTotal;
+    const total = fractionItems.reduce((acc, item) => {
+      if (!item) return acc;
+      const baseUnit = getPriceBySize(item, selectedSize);
+      const unit = appSettings.cobrarMaiorValorFracionado ? maxFractionUnitPrice : baseUnit;
+      return acc + unit * fractionQuantity;
+    }, 0);
+    return total + fractionOptionalTotal;
+  }, [appSettings.cobrarMaiorValorFracionado, fractionItems, fractionMode, fractionOptionalTotal, fractionQuantity, lineTotal, maxFractionUnitPrice, selectedSize]);
+
+  const buildOptionalsPayload = (items: ProductOptional[], getQuantity: (optionalId: number) => number) => {
+    return items.flatMap((optional) => {
+      const optionalQty = getQuantity(optional.idOpcional);
+      if (optionalQty <= 0) return [] as Array<{
+        idOpcional: number;
+        descricao: string;
+        valor: number;
+        gratis: boolean;
+      }>;
+      return Array.from({ length: optionalQty }, () => ({
+        idOpcional: optional.idOpcional,
+        descricao: getOptionalDisplay(optional) || optional.descricao,
+        valor: getOptionalPrice(optional),
+        gratis: Boolean(optional.gratis)
+      }));
+    });
+  };
+
+  const onSelectFractionFlavor = (index: number, idProduto: number) => {
+    if (index === 0) {
+      return;
+    }
+
+    const next = [...fractions];
+    const currentValue = next[index] ?? null;
+    const duplicateIndex = next.findIndex((value, currentIndex) => currentIndex !== index && value === idProduto);
+
+    if (duplicateIndex === 0) {
+      return;
+    }
+
+    next[index] = idProduto;
+    if (duplicateIndex >= 0) {
+      next[duplicateIndex] = currentValue;
+    }
+
+    setFractions(next);
+    void loadFractionProductDetails(idProduto);
+    if (duplicateIndex >= 0 && currentValue && currentValue !== product.idProduto) {
+      void loadFractionProductDetails(currentValue);
+    }
+    clearFractionOptionals(index);
+    if (duplicateIndex >= 0) {
+      clearFractionOptionals(duplicateIndex);
+    }
+    setFractionSearchByIndex((prev) => {
+      const nextSearch = { ...prev };
+      delete nextSearch[index];
+      if (duplicateIndex >= 0) {
+        delete nextSearch[duplicateIndex];
+      }
+      return nextSearch;
+    });
+    setSelectedFractionIndex(null);
+  };
+
+  const clearFractionFlavor = (index: number) => {
+    setFractions((prev) => {
+      const next = [...prev];
+      next[index] = index === 0 ? product.idProduto : null;
+      return next;
+    });
+    clearFractionOptionals(index);
+    setFractionSearchByIndex((prev) => {
+      const nextSearch = { ...prev };
+      delete nextSearch[index];
+      return nextSearch;
+    });
+  };
+
+  const allowDecimalQuantity = Boolean(product?.usaQuantidadeDecimal);
+  const step = allowDecimalQuantity ? 0.25 : 1;
+
+  const changeQuantity = (next: number) => {
+    if (allowDecimalQuantity) {
+      const normalized = Math.max(step, Number(next.toFixed(3)));
+      setQuantidade(normalized);
+      setQuantidadeInput(formatQuantityInputValue(normalized, true));
+      return;
+    }
+
+    const normalized = Math.max(1, Math.round(next));
+    setQuantidade(normalized);
+    setQuantidadeInput(String(Math.max(1, Math.round(next))));
+  };
+
+  const changeQuantityByStep = (delta: number) => {
+    skipNextQuantityConfirmRef.current = true;
+    changeQuantity(quantidade + delta);
+  };
+
+  const setQuantityByText = (raw: string) => {
+    const normalizedInput = normalizeQuantityInputText(raw, allowDecimalQuantity);
+    setQuantidadeInput(normalizedInput);
+    const next = sanitizeQuantity(normalizedInput);
+    const lower = allowDecimalQuantity ? next : Math.max(1, Math.floor(next));
+    const normalized = allowDecimalQuantity ? Number(lower.toFixed(3)) : Math.max(1, Math.round(lower));
+    setQuantidade(normalized <= 0 ? (allowDecimalQuantity ? step : 1) : normalized);
+  };
+
+  const confirmQuantity = () => {
+    if (skipNextQuantityConfirmRef.current) {
+      skipNextQuantityConfirmRef.current = false;
+      return;
+    }
+    if (allowDecimalQuantity) {
+      const next = sanitizeQuantity(quantidadeInput);
+      changeQuantity(Math.max(step, next || step));
+      return;
+    }
+    const next = parseInt(quantidadeInput, 10);
+    changeQuantity(Number.isFinite(next) ? next : 1);
+  };
+
+  const onAdd = async () => {
+    try {
+      const opened = await ensureActiveSale();
+      const tableSource = opened || activeVenda || activeTable || routeTable;
+      const tableId = getLinkedTableId(tableSource);
+
+      if (!tableSource || !tableSource.idMesa) {
+        Alert.alert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens.');
+        return;
+      }
+
+      if (!tableId) {
+        Alert.alert('Fluxo inválido', 'Mesa ativa inválida.');
+        return;
+      }
+
+      const opc = buildOptionalsPayload(selectedOptionals, (optionalId) => selectedOptionalQty[optionalId] || 0);
+
+      const shouldLaunchFraction = shouldShowFlavorCount &&
+        selectedFlavorCount > 1 &&
+        Number.isInteger(selectedFlavorCount) &&
+        (product?.vendaPorTamanho || product?.permiteFracao);
+      if (shouldLaunchFraction) {
+        if (
+          fractions.length !== selectedFlavorCount ||
+          fractions.some((id) => id === null) ||
+          hasDuplicateFractions
+        ) {
+          Alert.alert('Campos pendentes', 'Selecione um sabor para cada fração antes de adicionar.');
+          return;
+        }
+
+        const fractionQty = Number((quantidade / selectedFlavorCount).toFixed(3));
+        const fractionQtyLabel = fractionQty.toFixed(3);
+        const maxUnitPrice = Math.max(
+          ...fractions.map((id) => {
+            const selected = id ? availableById.get(id) : undefined;
+            return getPriceBySize(selected || product, selectedSize);
+          })
+        );
+
+        const fractionGroupId = `frac-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        for (let index = 0; index < fractions.length; index += 1) {
+          const selectedId = fractions[index];
+          if (!selectedId) continue;
+          const selectedProduct = availableById.get(selectedId) || product;
+          const baseUnit = getPriceBySize(selectedProduct, selectedSize);
+          const unitPrice = appSettings.cobrarMaiorValorFracionado ? maxUnitPrice : baseUnit;
+          const fractionOpc = buildOptionalsPayload(
+            fractionOptionalItemsByIndex[index] || [],
+            (optionalId) => getFractionOptionalQuantity(index, optionalId)
+          );
+          const fractionObservation = (selectedFractionObservation[index] || '').trim();
+
+          addToCart({
+            ...selectedProduct,
+            quantidade: fractionQty,
+            descricaoTamanho: `${selectedSizeLabel || selectedSize} (${index + 1}/${selectedFlavorCount})`,
+            tamanho: selectedSize,
+            desconto: 0,
+            acrescimo: 0,
+            observacao: fractionObservation || `Fracionado ${fractionQtyLabel} de ${product.descricao}`,
+            idMesaVinculada: 0,
+            fractionGroupId,
+            valorUnitario: unitPrice,
+            opcionais: fractionOpc
+          });
+        }
+
+        setFractions([]);
+        setSelectedFractionIndex(null);
+        setFlavorCount(1);
+        setFractionSearchByIndex({});
+        goToProducts(navigation, returnCategoryId);
+        return;
+      }
+
+      addToCart({
+        ...product,
+        quantidade,
+        descricaoTamanho: selectedSizeLabel || selectedSize,
+        tamanho: selectedSize,
+        desconto: 0,
+        acrescimo: 0,
+        observacao,
+        idMesaVinculada: 0,
+        valorUnitario: selectedPrice,
+        opcionais: opc
+      });
+
+      goToProducts(navigation, returnCategoryId);
+    } catch (error: unknown) {
+      Alert.alert('Erro', error instanceof Error ? error.message : 'Não foi possível adicionar o item.');
+    }
+  };
+
+  const priceLineItems = useMemo(() => {
+    const totalOptionals = fractionMode ? fractionOptionalTotal : optionalTotal;
+    const totalOptionalsQty = fractionMode ? fractionOptionalsTotalQuantity : optionalsTotalQuantity;
+    return [
+      { label: 'Preço unitário', value: selectedPrice },
+      { label: `Qtd. ${quantidade}`, value: selectedPrice * quantidade },
+      { label: `Opcionais (${totalOptionalsQty})`, value: totalOptionals }
+    ];
+  }, [selectedPrice, quantidade, fractionMode, optionalTotal, optionalsTotalQuantity, fractionOptionalTotal, fractionOptionalsTotalQuantity]);
+
+
+  const hasActiveSale = Boolean(activeVenda?.idVenda) || Boolean(activeTable?.idVenda);
+  if (!product) return null;
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+      <View style={styles.topCard}>
+        <Text style={styles.productName}>{product.descricao}</Text>
+        {productSupportLabel ? <Text style={styles.productDesc}>{productSupportLabel}</Text> : null}
+        {currentObservationLabel ? (
+          <View style={styles.productPreviewBox}>
+            <Text style={styles.productPreviewLabel}>Observação atual</Text>
+            <Text style={styles.productPreviewValue}>{currentObservationLabel}</Text>
+          </View>
+        ) : null}
+        <View style={styles.productPreviewRow}>
+          <View style={styles.productPreviewPill}>
+            <Text style={styles.productPreviewLabel}>Tamanho base</Text>
+            <Text style={styles.productPreviewValue}>{currentSizeLabel}</Text>
+          </View>
+          <View style={styles.productPreviewPill}>
+            <Text style={styles.productPreviewLabel}>Valor de lista</Text>
+            <Text style={styles.productPreviewValue}>R$ {selectedPrice.toFixed(2)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {activeTable && (
+        <View style={styles.tableCard}>
+          <Text style={styles.tableTitle}>Mesa vinculada</Text>
+        <Text style={styles.tableValue}>
+          {activeTable.nomeMesaComanda || `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`}
+          {activeTable.idVenda ? ` | Venda ${activeTable.idVenda}` : ''}
+        </Text>
+        </View>
+      )}
+
+      {!hasActiveSale && isOpeningSale ? (
+        <View style={styles.tableCard}>
+          <Text style={styles.tableTitle}>Abrindo venda</Text>
+          <Text style={styles.tableValue}>Aguarde, iniciando venda da mesa...</Text>
+        </View>
+      ) : null}
+
+      {shouldShowSize && (
+        <>
+          <Text style={styles.section}>{fractionMode ? 'Tamanho do sabor principal' : 'Escolha o tamanho'}</Text>
+          {fractionMode ? <Text style={styles.summaryTextMuted}>As demais frações usam o mesmo tamanho do principal.</Text> : null}
+          {sizeOptions.map((size) => {
+            const active = size.code === selectedSize;
+            return (
+              <Pressable
+                key={size.code}
+                style={[styles.option, active && styles.optionActive]}
+                onPress={() => setSelectedSize(size.code)}
+              >
+                <Text style={[styles.optionText, active && styles.optionTextActive]}>{size.label}</Text>
+                <Text style={[styles.optionText, active && styles.optionTextActive]}>R$ {size.value.toFixed(2)}</Text>
+              </Pressable>
+            );
+          })}
+        </>
+      )}
+
+      <Text style={styles.section}>Quantidade</Text>
+      <View style={styles.quantityWrap}>
+        <Pressable style={styles.qtyBtn} onPress={() => changeQuantityByStep(-step)}>
+          <Text style={styles.qtyBtnText}>-</Text>
+        </Pressable>
+        <TextInput
+          value={quantidadeInput}
+          onChangeText={setQuantityByText}
+          onEndEditing={confirmQuantity}
+          onBlur={confirmQuantity}
+          keyboardType={allowDecimalQuantity ? 'decimal-pad' : 'number-pad'}
+          style={styles.qtyInput}
+        />
+        <Pressable style={styles.qtyBtn} onPress={() => changeQuantityByStep(step)}>
+          <Text style={styles.qtyBtnText}>+</Text>
+        </Pressable>
+      </View>
+
+      {!fractionMode ? (
+        <>
+          <Text style={styles.section}>Observação</Text>
+          <TextInput
+            value={observacao}
+            onChangeText={setObservacao}
+            placeholder="Sem cebola, sem molho..."
+            multiline
+            style={styles.textarea}
+          />
+        </>
+      ) : null}
+
+      {!fractionMode && optionalItems.length > 0 && (
+        <>
+          <Text style={styles.section}>Opcionais</Text>
+          {optionalItems.map((optional) => {
+            const optionalQty = selectedOptionalQty[optional.idOpcional] || 0;
+            return (
+              <View key={optional.idOpcional} style={styles.optionalRow}>
+                <View>
+                  <Text style={styles.optionalLabel}>{getOptionalDisplay(optional) || optional.descricao}</Text>
+                  <Text style={styles.optionalPrice}>R$ {getOptionalPrice(optional).toFixed(2)}</Text>
+                </View>
+                <View style={styles.qtyControl}>
+                  <Pressable style={styles.qtyBtnSmall} onPress={() => changeOptionalQuantity(optional, -1)}>
+                    <Text style={styles.qtyBtnSmallText}>-</Text>
+                  </Pressable>
+                  <Text style={styles.optionalQty}>{optionalQty}</Text>
+                  <Pressable style={styles.qtyBtnSmall} onPress={() => changeOptionalQuantity(optional, 1)}>
+                    <Text style={styles.qtyBtnSmallText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </>
+      )}
+
+      {shouldShowFlavorCount && (
+        <>
+          <Text style={styles.section}>Quantos sabores?</Text>
+          <View style={styles.flavorCountWrap}>
+            {Array.from({ length: 4 }).map((_, index) => {
+              const value = index + 1;
+              const active = value === flavorCount;
+              return (
+                <Pressable
+                  key={`flavor-${value}`}
+                  style={[styles.flavorOption, active && styles.flavorOptionActive]}
+                  onPress={() => setFlavorCount(value)}
+                >
+                  <Text style={[styles.flavorOptionText, active && styles.flavorOptionTextActive]}>{value}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {fractionMode && (
+        <>
+          <Text style={styles.section}>Selecione os sabores por fração</Text>
+          <View style={styles.fractionWrap}>
+            {fractions.map((fraction, index) => {
+              const selectedFlavor = fractionItems[index];
+              const isPrincipalFraction = index === 0;
+              const showFlavorOptions = !isPrincipalFraction && selectedFractionIndex === index;
+              const fractionSearch = fractionSearchByIndex[index] || '';
+              const fractionOptions = availableFractionOptions.filter((option) => {
+                if (option.idProduto === product.idProduto) {
+                  return false;
+                }
+                const query = fractionSearch.trim().toLowerCase();
+                if (!query) {
+                  return true;
+                }
+                const descricao = option.descricao?.toLowerCase() || '';
+                return descricao.includes(query);
+              });
+              const baseUnit = getPriceBySize(selectedFlavor || product, selectedSize);
+              const chargedUnit = appSettings.cobrarMaiorValorFracionado ? maxFractionUnitPrice : baseUnit;
+              const fractionTotal = chargedUnit * fractionQuantity;
+              const fractionOptionals = fractionOptionalItemsByIndex[index] || [];
+              const fractionObservation = selectedFractionObservation[index] || '';
+
+              return (
+                <View key={`fraction-${index}`} style={styles.fractionCard}>
+                  <Pressable
+                    style={styles.fractionHeader}
+                    disabled
+                  >
+                    <Text style={styles.fractionTitle}>
+                      {isPrincipalFraction ? `Fração ${index + 1}/${selectedFlavorCount} • Principal` : `Fração ${index + 1}/${selectedFlavorCount}`}
+                    </Text>
+                    <Text style={styles.fractionValue}>
+                      {selectedFlavor ? `R$ ${fractionTotal.toFixed(2)}` : 'Selecionar sabor'}
+                    </Text>
+                  </Pressable>
+
+                  <Text style={styles.fractionFlavor}>
+                    {selectedFlavor ? selectedFlavor.descricao : 'Sem sabor definido'}
+                  </Text>
+
+                  {!isPrincipalFraction ? (
+                    <Pressable
+                      style={styles.fractionClearBtn}
+                      onPress={() => {
+                        setSelectedFractionIndex((current) => current === index ? null : index);
+                      }}
+                    >
+                      <Text style={styles.fractionClearText}>
+                        {showFlavorOptions ? 'Fechar sabores' : selectedFlavor ? 'Trocar sabor' : 'Selecionar sabor'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {showFlavorOptions && (
+                    <View style={styles.fractionOptionsWrap}>
+                      <View style={styles.fractionSearchWrap}>
+                        <Text style={styles.fractionSearchIcon}>⌕</Text>
+                        <TextInput
+                          value={fractionSearch}
+                          onChangeText={(value) =>
+                            setFractionSearchByIndex((prev) => ({
+                              ...prev,
+                              [index]: value
+                            }))
+                          }
+                          placeholder="Pesquisar sabor pelo nome"
+                          placeholderTextColor={Colors.textMuted}
+                          style={styles.fractionSearchInput}
+                        />
+                      </View>
+                      {fractionOptions.map((option) => (
+                        <Pressable
+                          key={`fraction-option-${index}-${option.idProduto}`}
+                          style={[
+                            styles.fractionOption,
+                            fraction === option.idProduto ? styles.fractionOptionActive : null
+                          ]}
+                          onPress={() => onSelectFractionFlavor(index, option.idProduto)}
+                        >
+                          <Text style={styles.fractionOptionText}>{option.descricao}</Text>
+                          <Text style={styles.fractionOptionPrice}>R$ {getPriceBySize(option, selectedSize).toFixed(2)}</Text>
+                        </Pressable>
+                      ))}
+                      {fractionOptions.length === 0 ? (
+                        <Text style={styles.fractionEmptyText}>Nenhum sabor encontrado.</Text>
+                      ) : null}
+                      {index > 0 ? (
+                        <Pressable style={styles.fractionClearBtn} onPress={() => clearFractionFlavor(index)}>
+                          <Text style={styles.fractionClearText}>Limpar</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  )}
+
+                  {fractionOptionals.length > 0 ? (
+                    <>
+                      <Text style={styles.summaryTextMuted}>Opcionais desta fração</Text>
+                      {fractionOptionals.map((optional) => {
+                        const optionalQty = getFractionOptionalQuantity(index, optional.idOpcional);
+                        return (
+                          <View key={`fraction-optional-${index}-${optional.idOpcional}`} style={styles.optionalRow}>
+                            <View>
+                              <Text style={styles.optionalLabel}>{getOptionalDisplay(optional) || optional.descricao}</Text>
+                              <Text style={styles.optionalPrice}>R$ {(getOptionalPrice(optional) * fractionQuantity).toFixed(2)}</Text>
+                            </View>
+                            <View style={styles.qtyControl}>
+                              <Pressable style={styles.qtyBtnSmall} onPress={() => changeFractionOptionalQuantity(index, optional, -1)}>
+                                <Text style={styles.qtyBtnSmallText}>-</Text>
+                              </Pressable>
+                              <Text style={styles.optionalQty}>{optionalQty}</Text>
+                              <Pressable style={styles.qtyBtnSmall} onPress={() => changeFractionOptionalQuantity(index, optional, 1)}>
+                                <Text style={styles.qtyBtnSmallText}>+</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </>
+                  ) : null}
+
+                  <Text style={styles.summaryTextMuted}>Observação da fração</Text>
+                  <TextInput
+                    value={fractionObservation}
+                    onChangeText={(value) => changeFractionObservation(index, value)}
+                    placeholder="Sem cebola, sem molho..."
+                    multiline
+                    style={styles.textarea}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {fractionMode && fractionOptionalsTotalQuantity > 0 ? (
+        <Text style={styles.summaryTextMuted}>Opcionais selecionados nas frações: {fractionOptionalsTotalQuantity}</Text>
+      ) : null}
+
+          <View style={styles.summary}>
+            <Text style={styles.summaryText}>Subtotal: R$ {(fractionMode ? fractionEstimatedTotal : lineTotal).toFixed(2)}</Text>
+            <Text style={styles.summaryTextMuted}>Valor unitário: R$ {selectedPrice.toFixed(2)}</Text>
+            {priceLineItems.map((item) => (
+              <View key={item.label} style={styles.summaryRow}>
+                <Text style={styles.summaryTextMuted}>{item.label}</Text>
+                <Text style={styles.summaryTextMuted}>R$ {item.value.toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+
+      <Pressable onPress={onAdd} style={styles.primaryBtn}>
+        <Text style={styles.primaryText}>Adicionar ao carrinho</Text>
+      </Pressable>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: Space.md,
+    backgroundColor: Colors.background
+  },
+  topCard: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Space.md,
+    marginBottom: Space.md
+  },
+  backButton: {
+    marginLeft: 4,
+    marginRight: 10,
+    marginBottom: 0,
+    alignSelf: 'flex-start',
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  backText: {
+    color: Colors.primary,
+    fontSize: 34,
+    lineHeight: 34,
+    fontWeight: '800'
+  },
+  productName: {
+    fontSize: Typography.subtitle,
+    color: Colors.text,
+    fontWeight: '900'
+  },
+  productDesc: {
+    color: Colors.textMuted,
+    marginTop: 4,
+    marginBottom: 14
+  },
+  productPreviewBox: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: Radius.sm,
+    padding: 10
+  },
+  productPreviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+    marginTop: Space.sm
+  },
+  productPreviewPill: {
+    flexGrow: 1,
+    minWidth: 150,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: Radius.sm,
+    padding: 10
+  },
+  productPreviewLabel: {
+    color: Colors.textMuted,
+    fontSize: Typography.caption,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase'
+  },
+  productPreviewValue: {
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  tableCard: {
+    borderRadius: Radius.md,
+    padding: Space.md,
+    borderWidth: 1,
+    borderColor: Colors.primarySoft,
+    backgroundColor: Colors.primarySoft,
+    marginBottom: Space.md
+  },
+  tableTitle: {
+    color: Colors.text,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+    letterSpacing: 0.3
+  },
+  tableValue: {
+    color: Colors.text,
+    marginTop: 4,
+    fontWeight: '700'
+  },
+  section: {
+    marginTop: 12,
+    marginBottom: 8,
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  option: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  optionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primarySoft
+  },
+  optionText: {
+    color: Colors.text
+  },
+  optionTextActive: {
+    color: Colors.primary,
+    fontWeight: '700'
+  },
+  quantityWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14
+  },
+  qtyBtn: {
+    width: 42,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.card
+  },
+  qtyBtnText: {
+    color: Colors.text,
+    fontWeight: '700',
+    fontSize: 18
+  },
+  qtyValue: {
+    minWidth: 72,
+    textAlign: 'center',
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  qtyInput: {
+    flex: 1,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    color: Colors.text,
+    borderRadius: Radius.md,
+    marginHorizontal: 8,
+    fontWeight: '700',
+    paddingVertical: 10
+  },
+  textarea: {
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: 12,
+    minHeight: 80,
+    color: Colors.text
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: 10,
+    color: Colors.text
+  },
+  optionalRow: {
+    borderWidth: 1,
+    borderColor: '#F0CFA4',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: 10,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  optionalLabel: {
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  optionalPrice: {
+    color: Colors.textMuted,
+    marginTop: 4,
+    fontSize: 12
+  },
+  optionalCounter: {
+    color: Colors.textMuted,
+    marginTop: 4,
+    fontSize: 11
+  },
+  flavorCountWrap: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+    flexWrap: 'nowrap'
+  },
+  flavorOption: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  flavorOptionActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary
+  },
+  flavorOptionText: {
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  flavorOptionTextActive: {
+    color: '#fff'
+  },
+  fractionWrap: {
+    gap: 10,
+    marginBottom: 8
+  },
+  fractionSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    paddingHorizontal: 12,
+    marginBottom: 12
+  },
+  fractionSearchIcon: {
+    fontSize: 18,
+    color: Colors.primary,
+    marginRight: 8
+  },
+  fractionSearchInput: {
+    flex: 1,
+    color: Colors.text,
+    paddingVertical: 11
+  },
+  fractionCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    padding: 12
+  },
+  fractionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  fractionTitle: {
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  fractionValue: {
+    color: Colors.textMuted,
+    fontWeight: '700',
+    fontSize: 12
+  },
+  fractionFlavor: {
+    marginTop: 6,
+    color: Colors.textMuted
+  },
+  fractionOptionsWrap: {
+    marginTop: 10,
+    gap: 6
+  },
+  fractionEmptyText: {
+    color: Colors.textMuted,
+    fontSize: 13
+  },
+  fractionOption: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.cardSoft,
+    padding: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10
+  },
+  fractionOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primarySoft
+  },
+  fractionOptionText: {
+    color: Colors.text,
+    fontWeight: '700',
+    flex: 1
+  },
+  fractionOptionPrice: {
+    color: Colors.textMuted,
+    fontSize: 12
+  },
+  fractionClearBtn: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    borderRadius: Radius.sm,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: Colors.warning + '15'
+  },
+  fractionClearText: {
+    color: Colors.warning,
+    fontWeight: '700'
+  },
+  summary: {
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#F0CFA4',
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    padding: 12,
+    gap: 4
+  },
+  summaryText: {
+    color: Colors.text,
+    fontWeight: '700',
+    fontSize: 18
+  },
+  summaryTextMuted: {
+    color: Colors.textMuted,
+    fontSize: 12
+  },
+  primaryBtn: {
+    marginTop: 14,
+    marginBottom: 0,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    padding: 14,
+    alignItems: 'center'
+  },
+  primaryText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 20
+  },
+  summaryRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#F5DEC0',
+    marginTop: 6,
+    paddingTop: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  qtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  qtyBtnSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0CFA4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.card
+  },
+  qtyBtnSmallText: {
+    color: Colors.text,
+    fontWeight: '700',
+    fontSize: 18
+  },
+  optionalQty: {
+    minWidth: 20,
+    textAlign: 'center',
+    color: Colors.text,
+    fontWeight: '700'
+  }
+});
+

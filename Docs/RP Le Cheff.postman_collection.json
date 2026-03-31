@@ -1,0 +1,1906 @@
+{
+	"info": {
+		"_postman_id": "2a09f146-1a9a-4da6-9431-b7c09081b1e9",
+		"name": "RP Le Cheff",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "10059643"
+	},
+	"item": [
+		{
+			"name": "Empresa",
+			"item": [
+				{
+					"name": "Listar",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Empresa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Configuracao Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/configuracaoMesa",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"configuracaoMesa"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Configuracao Comanda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/configuracaoComanda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"configuracaoComanda"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Usuário",
+			"item": [
+				{
+					"name": "Listar Usuarios",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/usuario",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"usuario"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar pelo Login",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/usuario/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"usuario",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"login\": \"adm\",\r\n    \"senha\": \"18021950\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/usuario/login",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"usuario",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Mesa",
+			"item": [
+				{
+					"name": "Listar Mesas",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Mesas Por situacao",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa?situacaoVenda=svDigitacao",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa"
+							],
+							"query": [
+								{
+									"key": "situacaoVenda",
+									"value": "svDigitacao"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/3",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"3"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancelar Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"motivo\": \"teste\",\r\n    \"terminal\": \"postman\",\r\n    \"idUsuario\": 9\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/13",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"13"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Abertura de Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "idUsuario",
+								"value": "{{idUsuario}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"terminal\": \"postman\"\r\n    \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/8/abertura",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"8",
+								"abertura"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transferência de Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "text/plain",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/6/transferencia/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"6",
+								"transferencia",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Itens da Mesa",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"idProduto\": 138,\r\n  \"terminalLancamento\": \"postman\",\r\n  \"idUsuarioLancamento\": 9,\r\n  \"quantidade\": 3,\r\n  \"valorUnitario\": 3,\r\n  \"desconto\": 2,\r\n  \"acrescimo\": 1,\r\n  \"vendaPorTamanho\": false,\r\n  \"tamanho\": \"\",\r\n  \"utilizar70Porcento\": false,\r\n  \"mesaVinculada\": \"\",\r\n  \"observacaoMaterial\": \"teste\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/11/item",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"11",
+								"item"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancelar Item da Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"motivo\": \"teste cancelamento item\",\r\n    \"terminal\": \"postman\",\r\n    \"idUsuario\": 9\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/22/item/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"22",
+								"item",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transferencia de Item da Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"idDestino\": 10,\r\n    \"idUsuario\": 9,\r\n    \"terminal\": \"postman\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/11/item/8/transferencia",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"11",
+								"item",
+								"8",
+								"transferencia"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Comanda",
+			"item": [
+				{
+					"name": "Listar Comanda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Comanda PrePago",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "prePago",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Comandas Por situacao",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda?situacaoVenda=svPendente",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda"
+							],
+							"query": [
+								{
+									"key": "situacaoVenda",
+									"value": "svPendente"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Comanda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancelar Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"motivo\": \"teste\",\r\n    \"terminal\": \"postman\",\r\n    \"idUsuario\": 9\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/13",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"13"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Abertura de Comanda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "idUsuario",
+								"value": "{{idUsuario}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"terminal\": \"postman\"\r\n    \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda/3/abertura",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda",
+								"3",
+								"abertura"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transferência de Comanda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "text/plain",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/comanda/2/transferencia/6",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"comanda",
+								"2",
+								"transferencia",
+								"6"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Itens da Mesa",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"idProduto\": 138,\r\n  \"terminalLancamento\": \"postman\",\r\n  \"idUsuarioLancamento\": 9,\r\n  \"quantidade\": 3,\r\n  \"valorUnitario\": 3,\r\n  \"desconto\": 2,\r\n  \"acrescimo\": 1,\r\n  \"vendaPorTamanho\": false,\r\n  \"tamanho\": \"\",\r\n  \"utilizar70Porcento\": false,\r\n  \"mesaVinculada\": \"\",\r\n  \"observacaoMaterial\": \"teste\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/11/item",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"11",
+								"item"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancelar Item da Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"motivo\": \"teste cancelamento item\",\r\n    \"terminal\": \"postman\",\r\n    \"idUsuario\": 9\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/22/item/1",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"22",
+								"item",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Transferencia de Item da Mesa",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"idDestino\": 10,\r\n    \"idUsuario\": 9,\r\n    \"terminal\": \"postman\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/mesa/11/item/8/transferencia",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"mesa",
+								"11",
+								"item",
+								"8",
+								"transferencia"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Categoria",
+			"item": [
+				{
+					"name": "Listar Categorias",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/categoria",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"categoria"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Forma de Pagamento",
+			"item": [
+				{
+					"name": "Listar Formas de Pagamento",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/formaPagamento",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"formaPagamento"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Produto",
+			"item": [
+				{
+					"name": "Listar Produtos",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "If-None-Match",
+								"value": "E49C92BC4194C6E8A05269F93DB68A93",
+								"type": "text",
+								"disabled": true
+							},
+							{
+								"key": "If-None-Match",
+								"value": "",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/produto",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"produto"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Imagem",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "image/png",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/produto/48/imagem",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"produto",
+								"48",
+								"imagem"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Produtos por Categoria",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/categoria/4/produto",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"categoria",
+								"4",
+								"produto"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Venda",
+			"item": [
+				{
+					"name": "Consultar Venda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "listarItens",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674429"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Pre Pago",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Impressao Venda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							},
+							{
+								"key": "NumeroColunas",
+								"value": "48",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674429"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Atualiza Couvert",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"numeroPessoas\": 1,\r\n    \"numeroCouvertMasculino\": 2,\r\n    \"numeroCouvertFeminino\": 1\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/674379/couvert",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								"674379",
+								"couvert"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Itens da Venda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda/item",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda",
+								"item"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674422"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Pagamentos Antecipados",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda/pagamentoAntecipado",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda",
+								"pagamentoAntecipado"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674417"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lançar Item",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "idUsuario",
+								"value": "{{idUsuario}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"_id\": \"c45ea49b-7be7-492c-b180-ff96ca7d577c\",\r\n    \"idEmpresa\": 1,\r\n    \"idVenda\": 674433,\r\n    \"idProduto\": 78,\r\n    \"valorUnitario\": 4.99,\r\n    \"quantidade\": 3,\r\n    \"tamanho\": \"M\"\r\n    \r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda/item",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda",
+								"item"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674433"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancelar Item",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"justificativa\": \"teste postamn\",\r\n    \"idUsuario\": 2\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda/item/:numeroItem",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda",
+								"item",
+								":numeroItem"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674325"
+								},
+								{
+									"key": "numeroItem",
+									"value": "4"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "PreFechamento",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"numeroPessoas\": 1,\r\n    \"numeroCouvertMasculino\": 2,\r\n    \"numeroCouvertFeminino\": 3,\r\n    \"imprimirPreFechamentoMobile\": true,\r\n    \"idUsuario\": 5\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/674324/preFechamento",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								"674324",
+								"preFechamento"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Finalizar Venda",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							},
+							{
+								"key": "numeroColunas",
+								"value": "42"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"numeroCouvertFeminino\": 1,\r\n    \"imprimirPreFechamentoMobile\": true,\r\n    \"idUsuario\": 5,\r\n    \"pagamentos\": [ \r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{server}}/rpCheff/v1/empresa/1/venda/:idVenda/fechamento",
+							"host": [
+								"{{server}}"
+							],
+							"path": [
+								"rpCheff",
+								"v1",
+								"empresa",
+								"1",
+								"venda",
+								":idVenda",
+								"fechamento"
+							],
+							"variable": [
+								{
+									"key": "idVenda",
+									"value": "674417"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "server",
+			"value": "http://localhost:9000",
+			"type": "string"
+		},
+		{
+			"key": "username",
+			"value": "RP515TEMAS_CH3FF",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "RP515TEMAS",
+			"type": "string"
+		},
+		{
+			"key": "idUsuario",
+			"value": "2",
+			"type": "string"
+		}
+	]
+}

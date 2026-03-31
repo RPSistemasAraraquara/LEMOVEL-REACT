@@ -1,0 +1,34 @@
+* Impressão Ficha Individual * [ Impressão 32 colunas, ex: impressora acoplada Stone ]
+
+> Os itens serão impressões individualmente. Ex: Pedido de 2 pizzas nordestinas, a impressão da ficha sairá. 
+  1. Pizza Nordestina 
+  1. Pizza Nordestina 
+
+Obs. Impressão da Ficha Individual somente sairá se a venda tiver sido FINALIZADA ( FECHADA )
+Obs 2. Caso o item seja adicionado com quantidade agrupada, não sairá impresso a quantidade correta na ficha,
+é necessário adicionar informar item por item, individualmente.
+---
+
+* Configuração para impressão da Ficha Individual na Stone *
+
+1. No cadastro de produtos, precisa que a flag 'Imprimir Ficha Individual' [ Aba: Configuração Impressão ]
+2. Nas configurações do App, na aba 'Bluethooh', habilitar a flag 'Utiliza Impressora Interna'
+3. Ainda nas configurações do App, na aba 'Maquininhas', precisa estar selecionado 'Stone'. [ Lembrando que é necessário liberar a integração Stone no Portal da Revenda ]
+4. Com essas configurações à cima, a configuração de impressão na API de conexão do APP será desconsiderada, pois respeitará a configuração da Stone. 
+---
+* Configuração para impressão de Pré Fechamento e Fechamento na Stone *
+
+1. Nas configurações do App, na aba 'Bluethooh', habilitar a flag 'Utiliza Impressora Interna'
+2. Ainda nas configurações do App, na aba 'Maquininhas', precisa estar selecionado 'Stone'. [ Lembrando que é necessário liberar a integração Stone no Portal da Revenda ]
+3. Para impressões na Mesa: Habilite nas opções do App a flag: 'Mesa- Impressao apenas fechamento' 
+4. Para impressões na Comanda: Habilite nas opções do App a flag: 'Comanda- Impressao apenas fechamento'
+
+--------
+
+Impressora 32 colunas: M250 
+Configuração para Imp. M250 👇
+
+EscPosP2
+Porta pc852
+Coluna 32  Espaco 0 Linha Pulo 4
+

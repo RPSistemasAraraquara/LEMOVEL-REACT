@@ -1,0 +1,5 @@
+Configuração de Impressao M250
+
+EscPosP2
+Porta pc852
+Coluna 32  Espaco 0 Linha Pulo 4

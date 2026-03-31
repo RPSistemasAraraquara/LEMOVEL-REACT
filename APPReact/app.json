@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "RPCheff RN",
+    "slug": "rpcheff-rn",
+    "version": "158.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "br.com.sistemalechef.lemovel",
+      "versionCode": 105800
+    },
+    "plugins": [
+      "./plugins/with-rpcheff-plugpag"
+    ]
+  }
+}

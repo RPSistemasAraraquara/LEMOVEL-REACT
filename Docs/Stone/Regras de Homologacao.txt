@@ -1,0 +1,86 @@
+Homologação Stone   
+
+No Manifest  
+
+            <meta-data android:name="android.app.lib_name"
+                android:value="%libNameValue%" />
+            <intent-filter>  
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+           <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="pay-response"
+                    android:scheme="stone-DTDemo1" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="cancel"
+                    android:scheme="stone-DTDemo1" />
+            </intent-filter>
+			<intent-filter>
+			<action android:name="android.intent.action.VIEW" />
+			<category android:name="android.intent.category.DEFAULT" />
+			<category android:name="android.intent.category.BROWSABLE" />
+			<data
+				android:host="print"
+				android:scheme="stone-DTDemo1" />
+		    </intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data
+					android:host="reprint"
+					android:scheme="stone-DTDemo1" />
+			</intent-filter>
+
+        </activity>
+
+        <receiver android:name="com.embarcadero.rtl.notifications.NotificationAlarm" />
+
+    </application>
+</manifest>
+<!-- END_INCLUDE(manifest) -->
+
+
+-----------------------------------------------------
+Nossa integração é Deeplink que nada mais é intent
+
+
+o ATK é muito importante para colocar o numero fo cupom - e o numero da venda da stone.
+
+SDK Minimo 22 e maximo 34
+
+adb devices
+lista os celulares
+
+
+Na unit  
+procedure TStoneTEF.startPayment(transactionType, amount, editable_amount,
+  installment_type, installment_count, order_id: string);
+  
+  
+o campo  installment_count seria quantidade de parcelas
+
+
+
+
+
+adb -s PB09217174334 shell pm list packages
+
+desinstala
+adb -s PB09217174334 shell pm uninstall br.com.sistemalechef.rpmobile
+adb -s PB09217174334 shell pm uninstall  com.embarcadero.RPCheffGarcom
+
+c shell pm list packages
+
+
+
+

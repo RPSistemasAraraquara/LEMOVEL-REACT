@@ -1,0 +1,166 @@
+	if venda_nfce then
+    begin
+      //tenta emitir uma vez, se falhar, tenta de novo em contingencia se configurado
+      try
+          bDuplicidadeNFCE:= false;
+          FGerarNFCe := GerarNFCe.Create;
+        try
+          erro_nfce := false;
+          //se for marcado para emitir em contingencia, já cria nfce dessa forma de uma vez...
+          if nfce_contingencia then
+          begin
+            //Verifica no BD se tem o numero_cupom já lançado pois contingencia não valida a duplicidade
+            while not bVerificaNFCE do
+            begin
+              if not b_nfce_terminal then //NFCE Geral
+              begin
+                qrAuxiliar.Close;
+                qrAuxiliar.SQL.Text:= 'select coalesce(numero_nfce,0)+1 as NUMERO_NFCE from empresas where emp_001 = :emp';
+                qrAuxiliar.ParamByName('emp').AsInteger:= RecProj.iEmp;
+                qrAuxiliar.Open;
+
+                iProximoNFCE:= qrAuxiliar.FieldByName('NUMERO_NFCE').AsInteger;
+
+                qrAuxiliar.Close;
+                qrAuxiliar.SQL.Text:= 'select numero_cupom from venda where tipofiscal = ''NFCE'' and numero_cupom = :cupom';
+                qrAuxiliar.ParamByName('cupom').AsInteger:= iProximoNFCE;
+                qrAuxiliar.Open;
+
+                if qrAuxiliar.RecordCount = 0 then
+                  bVerificaNFCE:= true
+                else //Incrementa
+                  ExecutaComandoSQL('update empresas set numero_nfce = coalesce(numero_nfce, 0)+1 where emp_001=:emp_001', VarArrayOf([recproj.iEmp]));
+              end
+              else //NFCE Terminal
+              begin
+                iProximoNFCE:= LerIntegerConfig('ULTIMA_NFCE_TERMINAL',frmmenu.cdsCFG.FileName) + 1;
+                iSerieNFCE:= LerIntegerConfig('SERIE_NFCE_TERMINAL',frmmenu.cdsCFG.FileName);
+
+                qrAuxiliar.Close;
+                qrAuxiliar.SQL.Text:= 'select numero_cupom from venda where tipofiscal = ''NFCE'' and numero_cupom = :cupom and serie_cupom = :serie';
+                qrAuxiliar.ParamByName('cupom').AsInteger:= iProximoNFCE;
+                qrAuxiliar.ParamByName('serie').AsInteger:= iSerieNFCE;
+                qrAuxiliar.Open;
+
+                if qrAuxiliar.RecordCount = 0 then
+                  bVerificaNFCE:= true
+                else //Incrementa
+                  GravaIntegerConfig('ULTIMA_NFCE_TERMINAL', iProximoNFCE, frmMenu.cdsCFG.FileName);
+              end;
+            end;
+
+            //Se o numero_cupom não foi encontrado... Autoriza
+            if bVerificaNFCE then
+              finaliza_venda := FGerarNFCe.Autorizar(id_venda, RecProj.iEmp, true, bImprimeFiscal);
+          end
+          else
+            finaliza_venda := FGerarNFCe.Autorizar(id_venda, RecProj.iEmp, false, bImprimeFiscal);
+
+
+        finally
+           FreeAndNil(FGerarNFCe);
+        end;
+
+        if not finaliza_venda then
+        begin
+          erro_nfce := true;
+          if nfce_contingencia or (not sugerir_nfce_contingencia) then
+             Application.MessageBox(pchar( 'Código erro NFCe: '+ IntToStr(FGerarNFCe.codigoRet) + #13#10 + FGerarNFCe.mensagem), 'Atenção', MB_ICONWARNING);
+        end;
+      except
+        on E : Exception do
+        begin
+          finaliza_venda := false;
+          erro_nfce := true;
+          str_aux := E.Message;
+
+          if AnsiContainsStr(str_aux, 'Duplicidade de NF-e') then
+          begin
+            bDuplicidadeNFCE:= true;
+            sMensagemDuplicidade:= str_aux;
+          end;
+
+          if not bDuplicidadeNFCE then
+          begin
+            //exibe a mensagem de erro se for em contingência.. senão, vai tentar de novo mais a frente...
+            if nfce_contingencia or (not sugerir_nfce_contingencia) then
+              Application.MessageBox(pchar('Problema ao gerar NFCe. Detalhes do erro:'+ slinebreak +str_aux),'Atenção', mb_iconerror );
+          end;
+        end;
+      end;
+
+      //se houver erro, tenta enviar agora em contingência se configurado para sugerir
+      if not bDuplicidadeNFCE then
+      begin
+        if erro_nfce and sugerir_nfce_contingencia and (not nfce_contingencia) then
+        begin
+          str_aux := 'Problema ao gerar NFCe. Gostaria de tentar emitir em contingência?'+slinebreak + slinebreak +
+                     'Se emitida em contingência, a NFCe deve ser enviada a SEFAZ em até 24 horas, certifique se que este tipo de erro não ocorrerá no envio definitivo. ' +
+                     'Detalhes do erro:' + slinebreak + slinebreak + str_aux + slinebreak + slinebreak+
+                     'Emitir em contingência?';
+          if application.MessageBox(pchar(str_aux), 'Atenção', mb_iconwarning + MB_YESNO )=mryes then
+          begin
+            try
+              FGerarNFCe := GerarNFCe.Create;
+              try
+              //Verifica no BD se tem o numero_cupom já lançado pois contingencia não valida a duplicidade
+                while not bVerificaNFCE do
+                begin
+                  if not b_nfce_terminal then //NFCE Geral
+                  begin
+                    qrAuxiliar.Close;
+                    qrAuxiliar.SQL.Text:= 'select coalesce(numero_nfce,0)+1 as NUMERO_NFCE from empresas where emp_001 = :emp';
+                    qrAuxiliar.ParamByName('emp').AsInteger:= RecProj.iEmp;
+                    qrAuxiliar.Open;
+
+                    iProximoNFCE:= qrAuxiliar.FieldByName('NUMERO_NFCE').AsInteger;
+
+                    qrAuxiliar.Close;
+                    qrAuxiliar.SQL.Text:= 'select numero_cupom from venda where tipofiscal = ''NFCE'' and numero_cupom = :cupom';
+                    qrAuxiliar.ParamByName('cupom').AsInteger:= iProximoNFCE;
+                    qrAuxiliar.Open;
+
+                    if qrAuxiliar.RecordCount = 0 then
+                      bVerificaNFCE:= true
+                    else //Incrementa
+                      ExecutaComandoSQL('update empresas set numero_nfce = coalesce(numero_nfce, 0)+1 where emp_001=:emp_001', VarArrayOf([recproj.iEmp]));
+                  end
+                  else //NFCE Terminal
+                  begin
+                    iProximoNFCE:= LerIntegerConfig('ULTIMA_NFCE_TERMINAL',frmmenu.cdsCFG.FileName) + 1;
+                    iSerieNFCE:= LerIntegerConfig('SERIE_NFCE_TERMINAL',frmmenu.cdsCFG.FileName);
+
+                    qrAuxiliar.Close;
+                    qrAuxiliar.SQL.Text:= 'select numero_cupom from venda where tipofiscal = ''NFCE'' and numero_cupom = :cupom and serie_cupom = :serie';
+                    qrAuxiliar.ParamByName('cupom').AsInteger:= iProximoNFCE;
+                    qrAuxiliar.ParamByName('serie').AsInteger:= iSerieNFCE;
+                    qrAuxiliar.Open;
+
+                    if qrAuxiliar.RecordCount = 0 then
+                      bVerificaNFCE:= true
+                    else //Incrementa
+                      GravaIntegerConfig('ULTIMA_NFCE_TERMINAL', iProximoNFCE, frmMenu.cdsCFG.FileName);
+                  end;
+                end;
+                           //Se o numero_cupom não foi encontrado... Autoriza
+                if bVerificaNFCE then
+                finaliza_venda := FGerarNFCe.Autorizar(id_venda, RecProj.iEmp, true, bImprimeFiscal);
+
+                if not finaliza_venda then
+                  Application.MessageBox(pchar( 'Código erro NFCe: '+ IntToStr(FGerarNFCe.codigoRet) + #13#10 + FGerarNFCe.mensagem), 'Atenção', MB_ICONWARNING);
+
+              finally
+                FreeAndNil(FGerarNFCe);
+              end;
+
+            except
+              on E : Exception do
+              begin
+                finaliza_venda := false;
+                Application.MessageBox(pchar('Problema ao gerar NFCe. Detalhes do erro:'+#13#10+E.Message),'Atenção', mb_iconerror );
+              end;
+            end;
+          end;
+        end;
+      end;
+    end;
