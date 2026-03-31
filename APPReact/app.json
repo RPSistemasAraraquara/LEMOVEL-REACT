@@ -1,12 +1,17 @@
 {
   "expo": {
-    "name": "RPCheff RN",
+    "name": "RPMOVEL",
     "slug": "rpcheff-rn",
-    "version": "158.0.0",
+    "version": "8.0.0.1",
+    "icon": "./assets/Logo.png",
     "orientation": "portrait",
     "android": {
       "package": "br.com.sistemalechef.lemovel",
-      "versionCode": 105800
+      "versionCode": 105801,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/Logo.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "plugins": [
       "./plugins/with-rpcheff-plugpag"

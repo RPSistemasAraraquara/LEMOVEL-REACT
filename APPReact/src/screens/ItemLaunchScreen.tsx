@@ -500,6 +500,22 @@ export const ItemLaunchScreen: React.FC = () => {
     return [{ code: product.tamanhoPadrao || 'M', label: product.tamanhoPadrao || 'M', value: defaultPrice }];
   }, [product]);
 
+  const hasConfiguredSizeOptions = useMemo(() => {
+    if (!(product.vendaPorTamanho || product.permiteFracao)) {
+      return false;
+    }
+
+    const items = [
+      { label: String(product.tamanhoP || '').trim(), value: Number(product.valorTamanhoP || 0) },
+      { label: String(product.tamanhoM || '').trim(), value: Number(product.valorTamanhoM || 0) },
+      { label: String(product.tamanhoG || '').trim(), value: Number(product.valorTamanhoG || 0) },
+      { label: String(product.tamanhoGG || '').trim(), value: Number(product.valorTamanhoGG || 0) },
+      { label: String(product.tamanhoExtra || '').trim(), value: Number(product.valorTamanhoExtra || 0) }
+    ];
+
+    return items.some((item) => item.label.length > 0 && item.value > 0);
+  }, [product]);
+
   const defaultSelectedSize = useMemo(() => {
     const routeSize = String(sizeFromRoute || '').toUpperCase();
     const directMatch = sizeOptions.find((item) => item.code.toUpperCase() === routeSize);
@@ -520,7 +536,10 @@ export const ItemLaunchScreen: React.FC = () => {
   const selectedPrice = sizeOptions.find((item) => item.code === selectedSize)?.value || 0;
   const productSupportLabel = product?.descricaoCurta?.trim() || '';
   const currentObservationLabel = observacao.trim();
-  const currentSizeLabel = selectedSizeLabel || selectedSize || product?.tamanhoPadrao || 'Padrão';
+  const shouldShowSize = hasConfiguredSizeOptions;
+  const currentSizeLabel = shouldShowSize ? selectedSizeLabel || selectedSize || product?.tamanhoPadrao || 'Padrão' : '';
+  const sizePayloadLabel = shouldShowSize ? selectedSizeLabel || selectedSize : '';
+  const sizePayloadCode = shouldShowSize ? selectedSize : '';
 
   const getOptionalDisplay = (optional: ProductOptional): string => {
     if (!product?.vendaPorTamanho) {
@@ -612,7 +631,6 @@ export const ItemLaunchScreen: React.FC = () => {
   const shouldShowFlavorCount = Boolean(product?.permiteFracao);
   const selectedFlavorCount = shouldShowFlavorCount ? flavorCount : 1;
   const fractionMode = shouldShowFlavorCount && selectedFlavorCount > 1;
-  const shouldShowSize = sizeOptions.length > 1 || product?.vendaPorTamanho;
 
   useEffect(() => {
     if (!fractionMode) {
@@ -938,8 +956,8 @@ export const ItemLaunchScreen: React.FC = () => {
           addToCart({
             ...selectedProduct,
             quantidade: fractionQty,
-            descricaoTamanho: `${selectedSizeLabel || selectedSize} (${index + 1}/${selectedFlavorCount})`,
-            tamanho: selectedSize,
+            descricaoTamanho: sizePayloadLabel ? `${sizePayloadLabel} (${index + 1}/${selectedFlavorCount})` : '',
+            tamanho: sizePayloadCode,
             desconto: 0,
             acrescimo: 0,
             observacao: fractionObservation || `Fracionado ${fractionQtyLabel} de ${product.descricao}`,
@@ -961,8 +979,8 @@ export const ItemLaunchScreen: React.FC = () => {
       addToCart({
         ...product,
         quantidade,
-        descricaoTamanho: selectedSizeLabel || selectedSize,
-        tamanho: selectedSize,
+        descricaoTamanho: sizePayloadLabel,
+        tamanho: sizePayloadCode,
         desconto: 0,
         acrescimo: 0,
         observacao,
@@ -1003,10 +1021,12 @@ export const ItemLaunchScreen: React.FC = () => {
           </View>
         ) : null}
         <View style={styles.productPreviewRow}>
-          <View style={styles.productPreviewPill}>
-            <Text style={styles.productPreviewLabel}>Tamanho base</Text>
-            <Text style={styles.productPreviewValue}>{currentSizeLabel}</Text>
-          </View>
+          {shouldShowSize ? (
+            <View style={styles.productPreviewPill}>
+              <Text style={styles.productPreviewLabel}>Tamanho base</Text>
+              <Text style={styles.productPreviewValue}>{currentSizeLabel}</Text>
+            </View>
+          ) : null}
           <View style={styles.productPreviewPill}>
             <Text style={styles.productPreviewLabel}>Valor de lista</Text>
             <Text style={styles.productPreviewValue}>R$ {selectedPrice.toFixed(2)}</Text>

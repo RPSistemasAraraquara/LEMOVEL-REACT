@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { Colors, Radius, Space, Typography } from '../theme';
-import { getProductImageSource, MenuItem } from '../services/api';
+import { getProductImageSource, MenuItem, resolveImageUri } from '../services/api';
 
 export const FoodCard: React.FC<{
   item: MenuItem;
@@ -12,9 +12,12 @@ export const FoodCard: React.FC<{
   const label = item.descricaoCurta?.trim() || '';
   const price = item.valorVenda || item.valorUnitario || 0;
   const showImageSlot = appSettings.exibirImagem;
+  const localImageUri = resolveImageUri(item.imagemLocalPath || item.imagem || item.imagem_db);
   const imageSource =
     appSettings.exibirImagem && item.possuiImagem
-      ? getProductImageSource(appSettings.baseUrl, appSettings.empresaId, item.idProduto || item.id)
+      ? localImageUri
+        ? { uri: localImageUri }
+        : getProductImageSource(appSettings.baseUrl, appSettings.empresaId, item.idProduto || item.id)
       : undefined;
 
   return (
@@ -58,6 +61,9 @@ export const MemoFoodCard = React.memo(
     prev.item.valorVenda === next.item.valorVenda &&
     prev.item.valorUnitario === next.item.valorUnitario &&
     prev.item.possuiImagem === next.item.possuiImagem &&
+    (prev.item.imagem?.length || 0) === (next.item.imagem?.length || 0) &&
+    (prev.item.imagem_db?.length || 0) === (next.item.imagem_db?.length || 0) &&
+    (prev.item.imagemLocalPath?.length || 0) === (next.item.imagemLocalPath?.length || 0) &&
     prev.item.idCategoria === next.item.idCategoria
 );
 

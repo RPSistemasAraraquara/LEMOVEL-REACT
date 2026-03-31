@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import { NativeModules, Platform } from 'react-native';
 
 export type MenuItem = {
@@ -7,6 +8,8 @@ export type MenuItem = {
   descricao: string;
   descricaoCurta?: string;
   imagem?: string;
+  imagem_db?: string;
+  imagemLocalPath?: string;
   possuiImagem?: boolean;
   valorVenda: number;
   valorUnitario?: number;
@@ -118,6 +121,7 @@ export type SaleLine = {
   nomeGarcom?: string;
   tamanho: string;
   descricaoTamanho?: string;
+  dataHora?: string;
   observacao?: string;
   vendaPorTamanho: boolean;
   idMesaVinculada?: number;
@@ -425,6 +429,35 @@ export const defaultMobileSettings: MobileAppSettings = {
 };
 
 const STORAGE_KEY = '@rpcheff:mobile-settings';
+const CATALOG_STORAGE_VERSION = 3;
+
+function buildCatalogStoragePrefix(baseUrl: string, empresaId: number): string {
+  const normalizedBaseUrl = String(baseUrl || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\/+$/, '');
+  const baseToken = normalizedBaseUrl
+    ? normalizedBaseUrl.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')
+    : 'default';
+  return `@rpcheff:catalog:v${CATALOG_STORAGE_VERSION}:${empresaId}:${baseToken}`;
+}
+
+function buildCatalogImageDirectory(baseUrl: string, empresaId: number): string | null {
+  const rootDirectory = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+  if (!rootDirectory) {
+    return null;
+  }
+
+  const normalizedBaseUrl = String(baseUrl || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\/+$/, '');
+  const baseToken = normalizedBaseUrl
+    ? normalizedBaseUrl.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')
+    : 'default';
+
+  return `${rootDirectory}rpcheff-catalog/${empresaId}/${baseToken}/`;
+}
 
 const fallbackPaymentMethods: PaymentMethod[] = [
   { codigo: 1, descricao: 'Dinheiro', sfiCodigo: 1 },
@@ -887,6 +920,150 @@ export const saveMobileSettings = async (payload: MobileAppSettings): Promise<vo
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 };
 
+type StoredMenuItem = Omit<MenuItem, 'imagem' | 'imagemLocalPath'> & {
+  imagem_db?: string;
+  imagem_local_path?: string;
+};
+
+function extractStoredImagePayload(image?: string): string | undefined {
+  const trimmed = String(image || '').trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^(https?:\/\/|file:\/\/|content:\/\/)/i.test(trimmed)) {
+    return undefined;
+  }
+
+  const dataUriPrefixMatch = trimmed.match(/^data:image\/[^;]+;base64,/i);
+  if (dataUriPrefixMatch) {
+    const payload = trimmed.slice(dataUriPrefixMatch[0].length).replace(/\s+/g, '');
+    return payload || undefined;
+  }
+
+  const normalizedPayload = trimmed.replace(/\s+/g, '');
+  return normalizedPayload || undefined;
+}
+
+function extractStoredImageLocalPath(image?: string): string | undefined {
+  const trimmed = String(image || '').trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return /^(file:\/\/|content:\/\/)/i.test(trimmed) ? trimmed : undefined;
+}
+
+function getImageFileExtensionFromPayload(imagePayload?: string): string {
+  const mimeType = detectImageMimeTypeFromBase64(String(imagePayload || '').trim());
+  if (mimeType === 'image/png') {
+    return 'png';
+  }
+  if (mimeType === 'image/gif') {
+    return 'gif';
+  }
+  if (mimeType === 'image/webp') {
+    return 'webp';
+  }
+  return 'jpg';
+}
+
+function estimateBase64DecodedSize(imagePayload?: string): number {
+  const normalizedPayload = String(imagePayload || '').replace(/\s+/g, '');
+  if (!normalizedPayload) {
+    return 0;
+  }
+
+  let padding = 0;
+  if (normalizedPayload.endsWith('==')) {
+    padding = 2;
+  } else if (normalizedPayload.endsWith('=')) {
+    padding = 1;
+  }
+
+  return Math.max(0, Math.floor((normalizedPayload.length * 3) / 4) - padding);
+}
+
+function toStoredMenuItem(item: MenuItem): StoredMenuItem {
+  const { imagem, imagemLocalPath, ...rest } = item;
+  const storedImage = extractStoredImagePayload(item.imagem_db || imagem);
+  return {
+    ...rest,
+    ...(storedImage ? { imagem_db: storedImage } : {}),
+    ...(imagemLocalPath ? { imagem_local_path: imagemLocalPath } : {})
+  };
+}
+
+function mergeProductWithCachedImage(product: MenuItem, cached?: MenuItem): MenuItem {
+  const cachedLocalImagePath = extractStoredImageLocalPath(cached?.imagemLocalPath || cached?.imagem);
+  const cachedInlineImage = resolveImageUri(cached?.imagem);
+  const cachedImagePayload = cached?.imagem_db;
+  const hasCachedImage = Boolean(cachedLocalImagePath || cachedInlineImage || cachedImagePayload);
+
+  if (product.possuiImagem === false) {
+    if (!product.imagem && !product.imagem_db && !product.imagemLocalPath && hasCachedImage) {
+      return {
+        ...product,
+        imagem: cachedLocalImagePath || cachedInlineImage,
+        imagem_db: cachedImagePayload,
+        imagemLocalPath: cachedLocalImagePath,
+        possuiImagem: true
+      };
+    }
+
+    return {
+      ...product,
+      imagem: undefined,
+      imagem_db: undefined,
+      imagemLocalPath: undefined,
+      possuiImagem: false
+    };
+  }
+
+  const currentLocalImagePath = extractStoredImageLocalPath(product.imagemLocalPath || product.imagem);
+  const mergedLocalImagePath = currentLocalImagePath || cachedLocalImagePath;
+  const mergedImagePayload = extractStoredImagePayload(product.imagem_db || product.imagem) || cachedImagePayload;
+  const mergedInlineImage = resolveImageUri(product.imagem) || cachedInlineImage;
+
+  if (product.imagem || product.imagem_db || product.imagemLocalPath) {
+    return {
+      ...product,
+      imagem: mergedLocalImagePath || mergedInlineImage,
+      imagem_db: mergedImagePayload,
+      imagemLocalPath: mergedLocalImagePath,
+      possuiImagem: Boolean(mergedLocalImagePath || mergedInlineImage || mergedImagePayload || product.possuiImagem)
+    };
+  }
+
+  if (!cached?.imagem && !cached?.imagem_db && !cached?.imagemLocalPath) {
+    return product;
+  }
+
+  return {
+    ...product,
+    imagem: mergedLocalImagePath || mergedInlineImage,
+    imagem_db: mergedImagePayload,
+    imagemLocalPath: mergedLocalImagePath,
+    possuiImagem: true
+  };
+}
+
+function mergeProductsWithCachedImages(products: MenuItem[], cachedProducts: MenuItem[]): MenuItem[] {
+  if (!cachedProducts.length) {
+    return products;
+  }
+
+  const cachedById = new Map<number, MenuItem>();
+  cachedProducts.forEach((item) => {
+    const id = Number(item.idProduto || item.id || 0);
+    if (id > 0) {
+      cachedById.set(id, item);
+    }
+  });
+
+  return products.map((item) => mergeProductWithCachedImage(item, cachedById.get(Number(item.idProduto || item.id || 0))));
+}
+
 function parseOptional(value: any): ProductOptional {
   const baseValue = parseNumber(resolveField(value, ['valor', 'valorOpcional', 'valor_opcional']), 0);
   return {
@@ -908,7 +1085,11 @@ function parseOptional(value: any): ProductOptional {
 }
 
 function parseMenuItem(value: any): MenuItem {
+  const normalizedLocalImage = normalizeImageValue(resolveField(value, ['imagemLocalPath', 'imagem_local_path']));
   const normalizedImage = normalizeImageValue(resolveField(value, ['imagem', 'imagem_db', 'imagemDb']));
+  const storedImagePayload = extractStoredImagePayload(
+    normalizeImageValue(resolveField(value, ['imagem_db', 'imagemDb'])) || normalizedImage
+  );
   const rawOptionals = resolveField(value, [
     'opcionais',
     'opcionaisProduto',
@@ -927,10 +1108,12 @@ function parseMenuItem(value: any): MenuItem {
     idProduto: parseNumber(resolveField(value, ['idProduto', 'id']), 0),
     descricao: String(value?.descricao ?? ''),
     descricaoCurta: value?.descricaoCurta ? String(value.descricaoCurta) : undefined,
-    imagem: normalizedImage,
+    imagem: normalizedLocalImage || normalizedImage,
+    imagem_db: storedImagePayload,
+    imagemLocalPath: normalizedLocalImage,
     possuiImagem: parseBoolean(
       resolveField(value, ['possuiImagem', 'possui_imagem', 'temImagem', 'tem_imagem']),
-      Boolean(normalizedImage)
+      Boolean(normalizedLocalImage || normalizedImage)
     ),
     idCategoria: (() => {
       const rawCategory = resolveField(value, ['idCategoria', 'idcategoria']);
@@ -1244,6 +1427,9 @@ function parseSaleLine(value: any): SaleLine {
     nomeGarcom: nomeGarcom || undefined,
     tamanho: String(value?.tamanho ?? 'U'),
     descricaoTamanho: value?.descricaoTamanho ? String(value.descricaoTamanho) : undefined,
+    dataHora: resolveField(value, ['dataHora', 'data_hora', 'dataLancamento', 'data_lancamento'])
+      ? String(resolveField(value, ['dataHora', 'data_hora', 'dataLancamento', 'data_lancamento']))
+      : undefined,
     observacao: value?.observacao ? String(value.observacao) : undefined,
     vendaPorTamanho: parseBoolean(value?.vendaPorTamanho, false),
     idMesaVinculada: parseNumber(value?.idMesaVinculada, 0),
@@ -1562,6 +1748,9 @@ const extractApiErrorMessage = (payload: unknown, fallback: string): string => {
 export class ApiClient {
   private readonly getCache: GetRequestCache = {};
   private readonly inFlightGet: Map<string, Promise<unknown>> = new Map();
+  private cachedCatalogCategories: Category[] | null = null;
+  private cachedCatalogProducts: MenuItem[] | null = null;
+  private catalogSchemaReadyKey: string | null = null;
 
   constructor(private baseUrl: string, private idEmpresa = 1) {}
 
@@ -1569,12 +1758,14 @@ export class ApiClient {
     this.baseUrl = value;
     this.clearAllGetCache();
     this.inFlightGet.clear();
+    this.clearCatalogMemoryCache();
   }
 
   setEmpresa(value: number) {
     this.idEmpresa = value;
     this.clearAllGetCache();
     this.inFlightGet.clear();
+    this.clearCatalogMemoryCache();
   }
 
   private async resolveTerminalName(): Promise<string> {
@@ -1655,6 +1846,298 @@ export class ApiClient {
   private clearMenuGetCache() {
     this.clearGetCacheByPrefix(`/empresa/${this.idEmpresa}/categoria`);
     this.clearGetCacheByPrefix(`/empresa/${this.idEmpresa}/produto`);
+  }
+
+  private clearCatalogMemoryCache() {
+    this.cachedCatalogCategories = null;
+    this.cachedCatalogProducts = null;
+    this.catalogSchemaReadyKey = null;
+  }
+
+  private async materializeProductImages(products: MenuItem[], previousProducts: MenuItem[]): Promise<MenuItem[]> {
+    if (!products.length) {
+      return products;
+    }
+
+    const imageDirectory = buildCatalogImageDirectory(this.baseUrl, this.idEmpresa);
+    if (!imageDirectory) {
+      return products;
+    }
+
+    const previousProductsById = new Map<number, MenuItem>();
+    previousProducts.forEach((item) => {
+      const id = Number(item.idProduto || item.id || 0);
+      if (id > 0) {
+        previousProductsById.set(id, item);
+      }
+    });
+
+    const hasAnyImagePayload = products.some((item) => Boolean(extractStoredImagePayload(item.imagem_db || item.imagem)));
+    if (hasAnyImagePayload) {
+      try {
+        await FileSystem.makeDirectoryAsync(imageDirectory, { intermediates: true });
+      } catch {
+        return products;
+      }
+    }
+
+    const resolvedProducts: MenuItem[] = [];
+    for (const product of products) {
+      const productId = Number(product.idProduto || product.id || 0);
+      const previousProduct = previousProductsById.get(productId);
+      const imagePayload = extractStoredImagePayload(product.imagem_db || product.imagem);
+      const knownLocalPath =
+        extractStoredImageLocalPath(product.imagemLocalPath || product.imagem) ||
+        extractStoredImageLocalPath(previousProduct?.imagemLocalPath || previousProduct?.imagem);
+
+      if (!imagePayload) {
+        if (knownLocalPath) {
+          try {
+            const info = await FileSystem.getInfoAsync(knownLocalPath);
+            if (info.exists) {
+              resolvedProducts.push({
+                ...product,
+                imagem: knownLocalPath,
+                imagemLocalPath: knownLocalPath
+              });
+              continue;
+            }
+          } catch {}
+        }
+
+        resolvedProducts.push({
+          ...product,
+          imagemLocalPath: undefined
+        });
+        continue;
+      }
+
+      if (knownLocalPath && previousProduct?.imagem_db === imagePayload) {
+        try {
+          const info = await FileSystem.getInfoAsync(knownLocalPath);
+          const expectedImageSize = estimateBase64DecodedSize(imagePayload);
+          const currentImageSize = typeof info.size === 'number' ? info.size : 0;
+          if (
+            info.exists &&
+            (!expectedImageSize || !currentImageSize || Math.abs(currentImageSize - expectedImageSize) <= 2)
+          ) {
+            resolvedProducts.push({
+              ...product,
+              imagem: knownLocalPath,
+              imagem_db: imagePayload,
+              imagemLocalPath: knownLocalPath,
+              possuiImagem: true
+            });
+            continue;
+          }
+        } catch {}
+      }
+
+      const imageExtension = getImageFileExtensionFromPayload(imagePayload);
+      const imagePath = `${imageDirectory}${productId || resolvedProducts.length + 1}.${imageExtension}`;
+
+      try {
+        await FileSystem.writeAsStringAsync(imagePath, imagePayload, {
+          encoding: FileSystem.EncodingType.Base64
+        });
+        resolvedProducts.push({
+          ...product,
+          imagem: imagePath,
+          imagem_db: imagePayload,
+          imagemLocalPath: imagePath,
+          possuiImagem: true
+        });
+      } catch {
+        resolvedProducts.push({
+          ...product,
+          imagem_db: imagePayload
+        });
+      }
+    }
+
+    return resolvedProducts;
+  }
+
+  private getCatalogStoragePrefix() {
+    return buildCatalogStoragePrefix(this.baseUrl, this.idEmpresa);
+  }
+
+  private getCatalogSchemaKey() {
+    return `${this.getCatalogStoragePrefix()}:schema`;
+  }
+
+  private getCatalogCategoriesKey() {
+    return `${this.getCatalogStoragePrefix()}:categories`;
+  }
+
+  private getCatalogProductIdsKey() {
+    return `${this.getCatalogStoragePrefix()}:product_ids`;
+  }
+
+  private getCatalogProductKey(idProduto: number) {
+    return `${this.getCatalogStoragePrefix()}:product:${Math.trunc(idProduto)}`;
+  }
+
+  private async readCachedProductIds() {
+    try {
+      const raw = await AsyncStorage.getItem(this.getCatalogProductIdsKey());
+      if (!raw) {
+        return [] as number[];
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [] as number[];
+      }
+
+      return parsed
+        .map((item) => Number(item || 0))
+        .filter((item, index, list) => Number.isFinite(item) && item > 0 && list.indexOf(item) === index);
+    } catch {
+      return [] as number[];
+    }
+  }
+
+  private async ensureCatalogStorageSchema() {
+    const schemaKey = this.getCatalogSchemaKey();
+    if (this.catalogSchemaReadyKey === schemaKey) {
+      return;
+    }
+
+    const storedVersion = Number((await AsyncStorage.getItem(schemaKey)) || 0);
+    if (storedVersion !== CATALOG_STORAGE_VERSION) {
+      const existingIds = await this.readCachedProductIds();
+      const keysToRemove = [
+        this.getCatalogCategoriesKey(),
+        this.getCatalogProductIdsKey(),
+        ...existingIds.map((id) => this.getCatalogProductKey(id))
+      ];
+      if (keysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
+      await AsyncStorage.setItem(schemaKey, String(CATALOG_STORAGE_VERSION));
+    }
+
+    this.catalogSchemaReadyKey = schemaKey;
+  }
+
+  private async loadCachedCategories(): Promise<Category[]> {
+    if (this.cachedCatalogCategories) {
+      return this.cachedCatalogCategories;
+    }
+
+    await this.ensureCatalogStorageSchema();
+
+    try {
+      const raw = await AsyncStorage.getItem(this.getCatalogCategoriesKey());
+      if (!raw) {
+        this.cachedCatalogCategories = [];
+        return this.cachedCatalogCategories;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        this.cachedCatalogCategories = [];
+        return this.cachedCatalogCategories;
+      }
+
+      this.cachedCatalogCategories = parsed
+        .map((item) => ({
+          id: parseNumber(resolveField(item, ['idCategoria', 'id']), 0),
+          descricao: sanitizeText(resolveField(item, ['descricao']), '')
+        }))
+        .filter((item) => item.id > 0 && item.descricao);
+      return this.cachedCatalogCategories;
+    } catch {
+      this.cachedCatalogCategories = [];
+      return this.cachedCatalogCategories;
+    }
+  }
+
+  private async saveCachedCategories(categories: Category[]) {
+    await this.ensureCatalogStorageSchema();
+
+    const normalized = [...categories]
+      .filter((item) => Number(item.id || 0) > 0)
+      .sort((a, b) => a.id - b.id)
+      .map((item) => ({
+        id: Number(item.id || 0),
+        descricao: String(item.descricao || '').trim()
+      }));
+
+    this.cachedCatalogCategories = normalized;
+    await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
+  }
+
+  private async loadCachedProducts(): Promise<MenuItem[]> {
+    if (this.cachedCatalogProducts) {
+      return this.cachedCatalogProducts;
+    }
+
+    await this.ensureCatalogStorageSchema();
+
+    try {
+      const ids = await this.readCachedProductIds();
+      if (!ids.length) {
+        this.cachedCatalogProducts = [];
+        return this.cachedCatalogProducts;
+      }
+
+      const entries = await AsyncStorage.multiGet(ids.map((id) => this.getCatalogProductKey(id)));
+      this.cachedCatalogProducts = entries
+        .map(([, raw]) => {
+          if (!raw) {
+            return null;
+          }
+
+          try {
+            return parseMenuItem(JSON.parse(raw));
+          } catch {
+            return null;
+          }
+        })
+        .filter((item): item is MenuItem => Boolean(item));
+
+      return this.cachedCatalogProducts;
+    } catch {
+      this.cachedCatalogProducts = [];
+      return this.cachedCatalogProducts;
+    }
+  }
+
+  private async saveCachedProducts(products: MenuItem[]) {
+    await this.ensureCatalogStorageSchema();
+
+    const uniqueById = new Map<number, MenuItem>();
+    products.forEach((item) => {
+      const id = Number(item.idProduto || item.id || 0);
+      if (id > 0) {
+        uniqueById.set(id, {
+          ...item,
+          imagem_db: extractStoredImagePayload(item.imagem_db || item.imagem)
+        });
+      }
+    });
+
+    const normalized = [...uniqueById.values()].sort((a, b) => (a.idProduto || a.id) - (b.idProduto || b.id));
+    const nextIds = normalized.map((item) => Number(item.idProduto || item.id || 0)).filter((item) => item > 0);
+    const previousIds = await this.readCachedProductIds();
+    const nextIdSet = new Set(nextIds);
+    const staleKeys = previousIds.filter((id) => !nextIdSet.has(id)).map((id) => this.getCatalogProductKey(id));
+    const pairs: [string, string][] = [
+      [this.getCatalogProductIdsKey(), JSON.stringify(nextIds)],
+      ...normalized.map((item) => [
+        this.getCatalogProductKey(Number(item.idProduto || item.id || 0)),
+        JSON.stringify(toStoredMenuItem(item))
+      ])
+    ];
+
+    await AsyncStorage.multiSet(pairs);
+    if (staleKeys.length > 0) {
+      await AsyncStorage.multiRemove(staleKeys);
+    }
+
+    this.cachedCatalogProducts = normalized;
   }
 
   private shouldCacheGet(path: string, init: RequestInit = {}): boolean {
@@ -2003,7 +2486,7 @@ export class ApiClient {
     try {
       if (taskCode === 'catalogo' || taskCode === 'produtos' || taskCode === 'categorias') {
         this.clearMenuGetCache();
-        const [categories, products] = await Promise.all([this.listCategories(), this.listProducts(false)]);
+        const [categories, products] = await Promise.all([this.listCategories(), this.listProducts(true)]);
         return {
           key: task,
           status: categories.length > 0 || products.length > 0 ? 'ok' : 'skip',
@@ -2096,32 +2579,42 @@ export class ApiClient {
   }
 
   async listCategories(): Promise<Category[]> {
+    const cachedCategories = await this.loadCachedCategories();
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/categoria`);
       if (!Array.isArray(payload)) throw new Error('Erro na API');
-      return payload.map((value: any) => ({
+      const categories = payload.map((value: any) => ({
         id: parseNumber((value as any)?.idCategoria, parseNumber((value as any)?.id, 0)),
         descricao: sanitizeText((value as any)?.descricao, `Categoria ${parseNumber((value as any)?.idCategoria, 0)}`),
         PermiteVendaAPP: parseBoolean((value as any)?.PermiteVendaAPP, true)
       }));
+      await this.saveCachedCategories(categories);
+      return categories;
     } catch {
-      return fallbackCategories;
+      return cachedCategories.length ? cachedCategories : fallbackCategories;
     }
   }
 
   async listProducts(exibirImagem = true): Promise<MenuItem[]> {
+    const cachedProducts = await this.loadCachedProducts();
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=${exibirImagem ? 'true' : 'false'}`, {
         timeoutMs: 60000
       });
       if (!Array.isArray(payload)) throw new Error('Erro na API');
-      return payload.map(parseMenuItem);
+      const remoteProducts = payload.map(parseMenuItem);
+      const mergedProducts = exibirImagem ? remoteProducts : mergeProductsWithCachedImages(remoteProducts, cachedProducts);
+      const products = await this.materializeProductImages(mergedProducts, cachedProducts);
+      await this.saveCachedProducts(products);
+      return products;
     } catch {
-      return fallbackProducts;
+      return cachedProducts.length ? cachedProducts : fallbackProducts;
     }
   }
 
   async getProduct(idProduto: number, exibirImagem = true): Promise<MenuItem | null> {
+    const cachedProducts = await this.loadCachedProducts();
+    const cachedProduct = cachedProducts.find((item) => Number(item.idProduto || item.id || 0) === Number(idProduto || 0)) || null;
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/produto/${idProduto}?exibirImagem=${exibirImagem ? 'true' : 'false'}`,
       {
@@ -2130,9 +2623,9 @@ export class ApiClient {
       }
     );
     if (!response.ok || !payload || typeof payload !== 'object') {
-      return null;
+      return cachedProduct;
     }
-    return parseMenuItem(payload);
+    return mergeProductWithCachedImage(parseMenuItem(payload), cachedProduct || undefined);
   }
 
   async listTables(): Promise<TableOrder[]> {

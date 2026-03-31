@@ -114,7 +114,7 @@ export const LoginScreen: React.FC = () => {
       <ScreenRouteLabel />
       <View style={styles.card}>
         <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.title}>RP CHEFF</Text>
+        <Text style={styles.title}>RP MOVEL</Text>
 
         <Text style={styles.label}>Usuário</Text>
         <TextInput
@@ -155,7 +155,7 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.configButtonLabel}>Configuração</Text>
         </Pressable>
 
-        <Text style={styles.versionLabel}>Versão 8.0.0.1</Text>
+        <Text style={styles.versionLabel}>Versão 8.0.0.2</Text>
       </View>
     </KeyboardAvoidingView>
   );

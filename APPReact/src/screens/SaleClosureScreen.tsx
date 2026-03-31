@@ -368,9 +368,9 @@ export const SaleClosureScreen: React.FC = () => {
     : tableType === 'comanda'
       ? Boolean(appSettings.imprimirComandaAposFechamento)
       : false;
-  const shouldPrintPreClosure = !printOnlyAtClose;
-  const preClosureInternalPrint = (appSettings.utilizaImpressoraInterna || usePagBankPrinter) && shouldPrintPreClosure;
-  const closeInternalPrint = (appSettings.utilizaImpressoraInterna || usePagBankPrinter) && printOnlyAtClose;
+  const shouldPrintPreClosure = printOnlyAtClose;
+  const preClosureInternalPrint = Boolean(appSettings.utilizaImpressoraInterna) && shouldPrintPreClosure;
+  const closeInternalPrint = Boolean(appSettings.utilizaImpressoraInterna) && printOnlyAtClose;
 
   const statusText = normalizeSaleStatus(sale?.situacao || '');
   const hasSaleItems = (sale?.itens?.length || 0) > 0;
@@ -732,7 +732,7 @@ export const SaleClosureScreen: React.FC = () => {
       }
 
       const previewRequested = previewBeforePrint && shouldPrintPreClosure;
-      const shouldUseLocalPagBankPrint = usePagBankPrinter && preClosureInternalPrint && !previewRequested;
+      const shouldUseLocalPagBankPrint = usePagBankPrinter && shouldPrintPreClosure && !previewRequested;
       const shouldUseLocalStoneOrCieloPrint = useStoneOrCieloPrinter && shouldPrintPreClosure && !previewRequested;
       const shouldUseLocalTerminalPrint = shouldUseLocalPagBankPrint || shouldUseLocalStoneOrCieloPrint;
       const shouldRequestPreClosePrintContent = previewRequested || shouldUseLocalTerminalPrint;
@@ -819,7 +819,8 @@ export const SaleClosureScreen: React.FC = () => {
         }
 
         if (previewBeforePrint && !shouldPrintPreClosure) {
-          printPreviewMessage = '\nPré-visualização desativada pela configuração "imprimir apenas no fechamento".';
+          printPreviewMessage =
+            '\nPré-visualização desativada porque a impressão está desligada para este tipo de atendimento.';
         }
 
         refreshDashboard().catch(() => null);
@@ -952,7 +953,9 @@ export const SaleClosureScreen: React.FC = () => {
       const valorTaxaServico = Number(sale?.valorTaxaServico || 0);
       const cobrarTaxaGarcom = valorTaxaServico > 0;
 
-      const shouldRequestClosePrintContent = usePagBankPrinter && closePrintInternal;
+      const shouldUseLocalCloseTerminalPrint =
+        (usePagBankPrinter || useStoneOrCieloPrinter) && printOnlyAtClose;
+      const shouldRequestClosePrintContent = shouldUseLocalCloseTerminalPrint;
       const closeResponse = await api.closeSale({
         idVenda,
         idUsuario,
@@ -973,7 +976,7 @@ export const SaleClosureScreen: React.FC = () => {
       });
 
       let closePrintMessage = '';
-      if (closePrintInternal && usePagBankPrinter) {
+      if (shouldUseLocalCloseTerminalPrint) {
         let printContent = typeof closeResponse === 'string' ? closeResponse : '';
         if (!printContent || !printContent.trim()) {
           try {

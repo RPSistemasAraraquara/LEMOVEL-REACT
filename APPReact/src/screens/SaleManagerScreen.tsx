@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
@@ -11,6 +11,13 @@ import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SafeMaterialCommunityIcons } from '../components/SafeExpoIcons';
 
 type StackNav = NativeStackNavigationProp<RootStackParams>;
+type VisibleItemGroup = {
+  key: string;
+  lines: SaleLine[];
+  primaryLine: SaleLine;
+  isFractionGroup: boolean;
+  total: number;
+};
 
 const toNumber = (value: string): number => {
   const parsed = Number(value.replace(',', '.'));
@@ -52,6 +59,216 @@ const getLineSizeLabel = (line: SaleLine): string | null => {
   return sizeLabel;
 };
 
+const formatLineLaunchDateTime = (value?: string): string | null => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const year = parsed.getFullYear();
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+
+const resolveSafeImageUri = (value?: string): string | undefined => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  const dataUriPrefixMatch = raw.match(/^data:image\/[^;]+;base64,/i);
+  if (dataUriPrefixMatch) {
+    const payload = raw.slice(dataUriPrefixMatch[0].length).replace(/\s+/g, '');
+    if (!payload) {
+      return undefined;
+    }
+
+    return `${dataUriPrefixMatch[0]}${payload}`;
+  }
+
+  if (/^(https?:\/\/|file:\/\/|content:\/\/)/i.test(raw)) {
+    return raw;
+  }
+
+  return resolveImageUri(raw.replace(/\s+/g, ''));
+};
+
+const getGroupLaunchDateTime = (lines: SaleLine[]): string | null => {
+  for (const line of lines) {
+    const formatted = formatLineLaunchDateTime(line.dataHora);
+    if (formatted) {
+      return formatted;
+    }
+  }
+
+  return null;
+};
+
+const toItemNumber = (value: unknown): number => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getFractionGroupItemNumbers = (targetLine: SaleLine, items: SaleLine[]): number[] => {
+  const visited = new Set<number>();
+  const queue = [toItemNumber(targetLine.numeroItem), toItemNumber(targetLine.itemFracionado)];
+
+  while (queue.length > 0) {
+    const current = queue.shift() || 0;
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+
+    items.forEach((item) => {
+      const itemNumber = toItemNumber(item.numeroItem);
+      const parentNumber = toItemNumber(item.itemFracionado);
+
+      if (itemNumber === current || parentNumber === current) {
+        if (itemNumber > 0 && !visited.has(itemNumber)) {
+          queue.push(itemNumber);
+        }
+        if (parentNumber > 0 && !visited.has(parentNumber)) {
+          queue.push(parentNumber);
+        }
+      }
+    });
+  }
+
+  if (visited.size === 0) {
+    const currentItemNumber = toItemNumber(targetLine.numeroItem);
+    if (currentItemNumber > 0) {
+      visited.add(currentItemNumber);
+    }
+  }
+
+  return Array.from(visited).sort((a, b) => a - b);
+};
+
+const getFractionRootItemNumber = (targetLine: SaleLine, items: SaleLine[]): number => {
+  const groupNumbers = getFractionGroupItemNumbers(targetLine, items);
+  const groupSet = new Set(groupNumbers);
+  const groupItems = items.filter((item) => groupSet.has(toItemNumber(item.numeroItem)));
+
+  const selfParentItem = groupItems.find((item) => {
+    const itemNumber = toItemNumber(item.numeroItem);
+    return itemNumber > 0 && toItemNumber(item.itemFracionado) === itemNumber;
+  });
+  if (selfParentItem) {
+    return toItemNumber(selfParentItem.numeroItem);
+  }
+
+  const rootCandidate = groupItems.find((item) => {
+    const parentNumber = toItemNumber(item.itemFracionado);
+    return parentNumber === 0 || !groupSet.has(parentNumber);
+  });
+  if (rootCandidate) {
+    return toItemNumber(rootCandidate.numeroItem);
+  }
+
+  return groupNumbers[0] || toItemNumber(targetLine.numeroItem);
+};
+
+const FRACTION_OBSERVATION_PATTERN = /^Fracionado\s+\d+(?:[.,]\d+)?\s+de\s+(.+)$/i;
+
+const getFractionObservationDescriptor = (value?: string): string | null => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const match = raw.match(FRACTION_OBSERVATION_PATTERN);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return match[1].trim().toUpperCase();
+};
+
+const getVisibleLineObservation = (line: SaleLine): string | null => {
+  const raw = String(line.observacao || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  if (getFractionObservationDescriptor(raw)) {
+    return null;
+  }
+
+  return raw;
+};
+
+const getFractionFallbackGroupKey = (line: SaleLine): string | null => {
+  const descriptor = getFractionObservationDescriptor(line.observacao);
+  if (!descriptor) {
+    return null;
+  }
+
+  const launchKey = String(line.dataHora || '').trim();
+  const waiterKey = String(line.idGarcom || line.nomeGarcom || '').trim();
+  const sizeKey = String(line.descricaoTamanho || line.tamanho || '').trim();
+  const linkedTableKey = String(line.idMesaVinculada || '').trim();
+
+  return [descriptor, launchKey, waiterKey, sizeKey, linkedTableKey].join('|');
+};
+
+const getFractionGroupLines = (targetLine: SaleLine, items: SaleLine[]): SaleLine[] => {
+  const explicitNumbers = getFractionGroupItemNumbers(targetLine, items);
+  const explicitSet = new Set(explicitNumbers);
+  const explicitLines = items.filter((item) => explicitSet.has(toItemNumber(item.numeroItem)));
+  if (explicitLines.length > 1) {
+    return explicitLines;
+  }
+
+  const fallbackKey = getFractionFallbackGroupKey(targetLine);
+  if (!fallbackKey) {
+    return explicitLines.length ? explicitLines : [targetLine];
+  }
+
+  const fallbackLines = items.filter((item) => getFractionFallbackGroupKey(item) === fallbackKey);
+  if (fallbackLines.length > 1) {
+    return fallbackLines;
+  }
+
+  return explicitLines.length ? explicitLines : [targetLine];
+};
+
+const getFractionPrimaryLine = (targetLine: SaleLine, lines: SaleLine[]): SaleLine => {
+  const explicitNumbers = lines
+    .map((item) => toItemNumber(item.numeroItem))
+    .filter((itemNumber) => itemNumber > 0);
+  const explicitSet = new Set(explicitNumbers);
+
+  const selfParentItem = lines.find((item) => {
+    const itemNumber = toItemNumber(item.numeroItem);
+    return itemNumber > 0 && toItemNumber(item.itemFracionado) === itemNumber;
+  });
+  if (selfParentItem) {
+    return selfParentItem;
+  }
+
+  const rootCandidate = lines.find((item) => {
+    const parentNumber = toItemNumber(item.itemFracionado);
+    return parentNumber === 0 || !explicitSet.has(parentNumber);
+  });
+  if (rootCandidate) {
+    return rootCandidate;
+  }
+
+  return lines[0] || targetLine;
+};
+
 export const SaleManagerScreen: React.FC = () => {
   const navigation = useNavigation<StackNav>();
   const { activeTable, user, refreshDashboard, getLinkedTableId, products, appSettings } = useApp();
@@ -75,10 +292,34 @@ export const SaleManagerScreen: React.FC = () => {
     type: 'warning'
   });
 
+  const productImageUriById = useMemo(() => {
+    const map = new Map<number, string>();
+    products.forEach((product) => {
+      const id = Number(product.idProduto || product.id || 0);
+      const imageUri =
+        resolveSafeImageUri(product.imagem_db) ||
+        resolveSafeImageUri(product.imagemLocalPath || product.imagem);
+      if (id > 0 && imageUri) {
+        map.set(id, imageUri);
+      }
+    });
+    return map;
+  }, [products]);
+
   const productHasImageById = useMemo(() => {
     const map = new Map<number, boolean>();
     products.forEach((product) => {
-      map.set(product.idProduto || product.id, product.possuiImagem !== false);
+      const id = Number(product.idProduto || product.id || 0);
+      if (id > 0) {
+        map.set(
+          id,
+          Boolean(
+            resolveSafeImageUri(product.imagem_db) ||
+            resolveSafeImageUri(product.imagemLocalPath || product.imagem)
+          ) ||
+            product.possuiImagem !== false
+        );
+      }
     });
     return map;
   }, [products]);
@@ -119,7 +360,12 @@ export const SaleManagerScreen: React.FC = () => {
       return undefined;
     }
 
-    const inlineImageUri = resolveImageUri(line.imagem);
+    const cachedProductImageUri = productImageUriById.get(line.idProduto);
+    if (cachedProductImageUri) {
+      return { uri: cachedProductImageUri };
+    }
+
+    const inlineImageUri = resolveSafeImageUri(line.imagem);
     if (inlineImageUri) {
       return { uri: inlineImageUri };
     }
@@ -232,10 +478,17 @@ export const SaleManagerScreen: React.FC = () => {
       showPermissionDenied('Só é permitido remover produto quando a mesa estiver pendente.');
       return;
     }
-    const rootItemNumber = line.itemFracionado > 0 ? line.itemFracionado : line.numeroItem;
+    const saleItems = sale?.itens || [];
+    const groupLines = getFractionGroupLines(line, saleItems);
+    const groupItemNumbers = Array.from(
+      new Set(groupLines.map((item) => toItemNumber(item.numeroItem)).filter((itemNumber) => itemNumber > 0))
+    );
+    const groupItemNumbersSet = new Set(groupItemNumbers);
+    const rootItemNumber = getFractionRootItemNumber(line, saleItems);
+    const isFractionGroup = groupLines.length > 1;
     const cancelMessage =
-      line.itemFracionado > 0
-        ? `Item ${rootItemNumber} será removido com todas as frações.`
+      isFractionGroup
+        ? 'O item fracionado será removido com todas as frações.'
         : `Item ${rootItemNumber} será removido.`;
     Alert.alert('Cancelar item', cancelMessage , [
       { text: 'Voltar', style: 'cancel' },
@@ -244,17 +497,43 @@ export const SaleManagerScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.cancelSaleItem(idVenda, rootItemNumber, user?.idUsuario || 0);
+            const cancelTargets = isFractionGroup
+              ? [...groupItemNumbers].sort((a, b) => b - a)
+              : [rootItemNumber];
+            const idUsuario = user?.idUsuario || 0;
+            let cancelledCount = 0;
+
+            for (const itemNumber of cancelTargets) {
+              try {
+                await api.cancelSaleItem(idVenda, itemNumber, idUsuario);
+                cancelledCount += 1;
+              } catch (error: any) {
+                const message = String(error?.message || '').toLowerCase();
+                const canIgnore =
+                  cancelledCount > 0 &&
+                  (
+                    message.includes('já cancel') ||
+                    message.includes('ja cancel') ||
+                    message.includes('não encontrado') ||
+                    message.includes('nao encontrado') ||
+                    message.includes('not found') ||
+                    message.includes('inexistente')
+                  );
+
+                if (!canIgnore) {
+                  throw error;
+                }
+              }
+            }
+
             setSale((prev) => {
               if (!prev) return prev;
-              const removedItems = (prev.itens || []).filter(
-                (item) => item.numeroItem === rootItemNumber || item.itemFracionado === rootItemNumber
-              );
-              const removedTotal = removedItems.reduce((acc, item) => acc + Number(item.valorTotal || 0), 0);
               const nextItems = (prev.itens || []).filter(
-                (item) => item.numeroItem !== rootItemNumber && item.itemFracionado !== rootItemNumber
+                (item) =>
+                  !groupItemNumbersSet.has(toItemNumber(item.numeroItem)) &&
+                  !groupItemNumbersSet.has(toItemNumber(item.itemFracionado))
               );
-              const nextTotal = Math.max(0, Number(prev.valorTotal ?? prev.valor ?? 0) - removedTotal);
+              const nextTotal = nextItems.reduce((acc, item) => acc + Number(item.valorTotal || 0), 0);
               return {
                 ...prev,
                 itens: nextItems,
@@ -264,7 +543,7 @@ export const SaleManagerScreen: React.FC = () => {
             });
             refreshDashboard().catch(() => null);
             loadSale().catch(() => null);
-            Alert.alert('Sucesso', 'Item cancelado.');
+            Alert.alert('Sucesso', isFractionGroup ? 'Itens fracionados cancelados.' : 'Item cancelado.');
           } catch (error: any) {
             Alert.alert('Erro', error?.message || 'Não foi possível cancelar.');
           }
@@ -280,6 +559,44 @@ export const SaleManagerScreen: React.FC = () => {
     return Number.isInteger(numeric) ? numeric.toString() : numeric.toFixed(3);
   };
   const visibleItems = (sale?.itens || []).filter((line) => line.situacao !== 'cancelada');
+  const visibleItemGroups = useMemo(() => {
+    const consumed = new Set<number>();
+
+    return visibleItems.reduce<VisibleItemGroup[]>((acc, line) => {
+      const lineNumber = toItemNumber(line.numeroItem);
+      if (lineNumber > 0 && consumed.has(lineNumber)) {
+        return acc;
+      }
+
+      const lines = getFractionGroupLines(line, visibleItems);
+      const isFractionGroup = lines.length > 1;
+
+      lines.forEach((item) => {
+        const itemNumber = toItemNumber(item.numeroItem);
+        if (itemNumber > 0) {
+          consumed.add(itemNumber);
+        }
+      });
+
+      const rootItemNumber = getFractionRootItemNumber(line, visibleItems);
+      const primaryLine = getFractionPrimaryLine(line, lines);
+      const fallbackGroupKey = getFractionFallbackGroupKey(primaryLine);
+
+      acc.push({
+        key: isFractionGroup
+          ? fallbackGroupKey
+            ? `fraction-auto-${fallbackGroupKey}`
+            : `fraction-${rootItemNumber || lineNumber}`
+          : `item-${lineNumber}`,
+        lines,
+        primaryLine,
+        isFractionGroup,
+        total: lines.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
+      });
+
+      return acc;
+    }, []);
+  }, [visibleItems]);
 
   const total = sale?.valorTotal || sale?.valor || 0;
   const status = formatSaleStatus(
@@ -360,153 +677,205 @@ export const SaleManagerScreen: React.FC = () => {
     return null;
   };
 
+  const canManageSale = Boolean(activeTable && idVenda);
+
+  const renderVisibleItemGroup = ({ item: group }: { item: VisibleItemGroup }) => {
+    const lineImageSource = resolveLineImageSource(group.primaryLine);
+    const lineSizeLabel = getLineSizeLabel(group.primaryLine);
+    const lineWaiterName = getLineWaiterName(group.primaryLine);
+    const lineLaunchDateTime = getGroupLaunchDateTime(group.lines);
+
+    return (
+      <View style={styles.lineCard}>
+        {lineImageSource ? (
+          <View style={styles.lineThumbWrap}>
+            <Image source={lineImageSource} style={styles.lineThumb} resizeMode="cover" />
+          </View>
+        ) : null}
+        <View style={styles.lineContent}>
+          <Text style={styles.lineTitle}>
+            {group.isFractionGroup ? 'Item fracionado' : group.primaryLine.produtoDescricao}
+          </Text>
+          {group.isFractionGroup ? (
+            <>
+              <View style={styles.lineMetaRow}>
+                <Text style={styles.lineText}>Frações: {group.lines.length}</Text>
+                {lineSizeLabel ? <Text style={styles.lineText}>Tamanho: {lineSizeLabel}</Text> : null}
+              </View>
+              {lineWaiterName ? <Text style={styles.lineText}>Garçom: {lineWaiterName}</Text> : null}
+              {lineLaunchDateTime ? <Text style={styles.lineText}>Lançado em: {lineLaunchDateTime}</Text> : null}
+              <View style={styles.fractionList}>
+                {group.lines.map((fractionLine, index) => (
+                  <View
+                    key={`${fractionLine.numeroItem}-${fractionLine.idProduto}`}
+                    style={index > 0 ? styles.fractionItemDivider : undefined}
+                  >
+                    <Text style={styles.lineText}>{fractionLine.produtoDescricao}</Text>
+                    <View style={styles.lineMetaRow}>
+                      <Text style={styles.lineText}>Qtde: {formatQuantity(fractionLine.quantidade)}</Text>
+                    </View>
+                    {getVisibleLineObservation(fractionLine) ? (
+                      <Text style={styles.lineText}>Obs: {getVisibleLineObservation(fractionLine)}</Text>
+                    ) : null}
+                    <Text style={styles.lineText}>{formatMoney(fractionLine.valorTotal)}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.linePrice}>{formatMoney(group.total)}</Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.lineMetaRow}>
+                <Text style={styles.lineText}>Qtde: {formatQuantity(group.primaryLine.quantidade)}</Text>
+                {lineSizeLabel ? <Text style={styles.lineText}>Tamanho: {lineSizeLabel}</Text> : null}
+              </View>
+              {lineWaiterName ? <Text style={styles.lineText}>Garçom: {lineWaiterName}</Text> : null}
+              {lineLaunchDateTime ? <Text style={styles.lineText}>Lançado em: {lineLaunchDateTime}</Text> : null}
+              {getVisibleLineObservation(group.primaryLine) ? (
+                <Text style={styles.lineText}>Obs: {getVisibleLineObservation(group.primaryLine)}</Text>
+              ) : null}
+              <Text style={styles.linePrice}>{formatMoney(group.primaryLine.valorTotal)}</Text>
+            </>
+          )}
+        </View>
+        {user?.permiteCancelarItemMobile ? (
+          <Pressable
+            style={({ pressed }) => [styles.lineAction, pressed ? styles.lineActionPressed : null]}
+            onPress={() => onCancelLine(group.primaryLine)}
+          >
+            <View style={styles.lineActionIconWrap}>
+              <SafeMaterialCommunityIcons name="trash-can-outline" size={20} color="#E11D48" />
+            </View>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
   return (
-    <ScrollView
+    <>
+      <FlatList
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      data={canManageSale ? visibleItemGroups : []}
+      keyExtractor={(item) => item.key}
+      renderItem={renderVisibleItemGroup}
+      showsVerticalScrollIndicator={false}
+      removeClippedSubviews
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={7}
+      updateCellsBatchingPeriod={16}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={loadSale} />}
-      contentContainerStyle={{ paddingBottom: 140 }}
-    >
-      <ScreenRouteLabel />
-
-      <Pressable style={styles.secondaryBtn} onPress={goToMenu}>
-        <Text style={styles.secondaryText}>Voltar</Text>
-      </Pressable>
-
-      {!activeTable ? (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Fluxo inválido</Text>
-          <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas para gerenciar itens e fechamento.</Text>
-        </View>
-      ) : !idVenda ? (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Fluxo inválido</Text>
-          <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas para gerenciar itens e fechamento.</Text>
-        </View>
-      ) : (
+      ListHeaderComponent={
         <>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryInlineLabel}>{mesaLabel}</Text>
-              <Text style={styles.summaryInlineValue}>{mesaDisplay}</Text>
-              <Text style={styles.summaryInlineLabel}>Status</Text>
-              <Text style={styles.summaryInlineValue}>{status}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryInlineLabel}>Total</Text>
-              <Text style={styles.totalInline}>{formatMoney(total)}</Text>
-            </View>
-          </View>
+          <ScreenRouteLabel />
 
-          <View style={styles.rowInputs}>
-            <View style={styles.singleRowBlock}>
-              <View style={styles.counterInlineRow}>
-                <Text style={styles.fieldLabelInline}>Pessoas</Text>
-                <View style={styles.counterWrap}>
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(personCount, setPersonCount, -1)}>
-                    <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
-                  </Pressable>
-                  <TextInput
-                    style={styles.counterInput}
-                    keyboardType="numeric"
-                    value={personCount}
-                    onChangeText={setPersonCount}
-                    placeholder="0"
-                  />
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(personCount, setPersonCount, 1)}>
-                    <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-            <View style={styles.rowInputsSecondary}>
-              <View style={styles.halfInputBlock}>
-                <Text style={styles.fieldLabel}>Couvert M</Text>
-                <View style={styles.counterWrap}>
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, -1)}>
-                    <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
-                  </Pressable>
-                  <TextInput
-                    style={styles.counterInput}
-                    keyboardType="numeric"
-                    value={couvertMasc}
-                    onChangeText={setCouvertMasc}
-                    placeholder="0"
-                  />
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, 1)}>
-                    <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-              <View style={styles.halfInputBlock}>
-                <Text style={styles.fieldLabel}>Couvert F</Text>
-                <View style={styles.counterWrap}>
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, -1)}>
-                    <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
-                  </Pressable>
-                  <TextInput
-                    style={styles.counterInput}
-                    keyboardType="numeric"
-                    value={couvertFem}
-                    onChangeText={setCouvertFem}
-                    placeholder="0"
-                  />
-                  <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, 1)}>
-                    <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <Pressable style={styles.primaryBtn} onPress={onSaveCouvert} disabled={savingCouvert}>
-            <Text style={styles.primaryText}>{savingCouvert ? 'Salvando...' : 'Salvar couvert e pessoas'}</Text>
+          <Pressable style={styles.secondaryBtn} onPress={goToMenu}>
+            <Text style={styles.secondaryText}>Voltar</Text>
           </Pressable>
 
-          {!!visibleItems.length && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Itens da venda</Text>
-              {visibleItems.map((line) => {
-                const lineImageSource = resolveLineImageSource(line);
-                const lineSizeLabel = getLineSizeLabel(line);
-                const lineWaiterName = getLineWaiterName(line);
-                return (
-                  <View key={`${line.numeroItem}-${line.idProduto}`} style={styles.lineCard}>
-                    {lineImageSource ? (
-                      <View style={styles.lineThumbWrap}>
-                        <Image source={lineImageSource} style={styles.lineThumb} resizeMode="cover" />
-                      </View>
-                    ) : null}
-                    <View style={styles.lineContent}>
-                      <Text style={styles.lineTitle}>{line.produtoDescricao}</Text>
-                      <View style={styles.lineMetaRow}>
-                        <Text style={styles.lineText}>Qtde: {formatQuantity(line.quantidade)}</Text>
-                        {lineSizeLabel ? (
-                          <Text style={styles.lineText}>Tamanho: {lineSizeLabel}</Text>
-                        ) : null}
-                      </View>
-                      {lineWaiterName ? <Text style={styles.lineText}>Garçom: {lineWaiterName}</Text> : null}
-                      {line.observacao ? <Text style={styles.lineText}>Obs: {line.observacao}</Text> : null}
-                      <Text style={styles.linePrice}>{formatMoney(line.valorTotal)}</Text>
-                    </View>
-                    {user?.permiteCancelarItemMobile ? (
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.lineAction,
-                          pressed ? styles.lineActionPressed : null
-                        ]}
-                        onPress={() => onCancelLine(line)}
-                      >
-                        <View style={styles.lineActionIconWrap}>
-                          <SafeMaterialCommunityIcons name="trash-can-outline" size={20} color="#E11D48" />
-                        </View>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                );
-              })}
+          {!activeTable ? (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>Fluxo inválido</Text>
+              <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas para gerenciar itens e fechamento.</Text>
             </View>
-          )}
+          ) : !idVenda ? (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>Fluxo inválido</Text>
+              <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas para gerenciar itens e fechamento.</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryInlineLabel}>{mesaLabel}</Text>
+                  <Text style={styles.summaryInlineValue}>{mesaDisplay}</Text>
+                  <Text style={styles.summaryInlineLabel}>Status</Text>
+                  <Text style={styles.summaryInlineValue}>{status}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryInlineLabel}>Total</Text>
+                  <Text style={styles.totalInline}>{formatMoney(total)}</Text>
+                </View>
+              </View>
 
+              <View style={styles.rowInputs}>
+                <View style={styles.singleRowBlock}>
+                  <View style={styles.counterInlineRow}>
+                    <Text style={styles.fieldLabelInline}>Pessoas</Text>
+                    <View style={styles.counterWrap}>
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(personCount, setPersonCount, -1)}>
+                        <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
+                      </Pressable>
+                      <TextInput
+                        style={styles.counterInput}
+                        keyboardType="numeric"
+                        value={personCount}
+                        onChangeText={setPersonCount}
+                        placeholder="0"
+                      />
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(personCount, setPersonCount, 1)}>
+                        <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.rowInputsSecondary}>
+                  <View style={styles.halfInputBlock}>
+                    <Text style={styles.fieldLabel}>Couvert M</Text>
+                    <View style={styles.counterWrap}>
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, -1)}>
+                        <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
+                      </Pressable>
+                      <TextInput
+                        style={styles.counterInput}
+                        keyboardType="numeric"
+                        value={couvertMasc}
+                        onChangeText={setCouvertMasc}
+                        placeholder="0"
+                      />
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, 1)}>
+                        <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
+                      </Pressable>
+                    </View>
+                  </View>
+                  <View style={styles.halfInputBlock}>
+                    <Text style={styles.fieldLabel}>Couvert F</Text>
+                    <View style={styles.counterWrap}>
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, -1)}>
+                        <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
+                      </Pressable>
+                      <TextInput
+                        style={styles.counterInput}
+                        keyboardType="numeric"
+                        value={couvertFem}
+                        onChangeText={setCouvertFem}
+                        placeholder="0"
+                      />
+                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, 1)}>
+                        <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <Pressable style={styles.primaryBtn} onPress={onSaveCouvert} disabled={savingCouvert}>
+                <Text style={styles.primaryText}>{savingCouvert ? 'Salvando...' : 'Salvar couvert e pessoas'}</Text>
+              </Pressable>
+
+              {!!visibleItemGroups.length ? (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Itens da venda</Text>
+                </View>
+              ) : null}
+            </>
+          )}
+        </>
+      }
+      ListFooterComponent={
+        canManageSale ? (
           <View style={styles.actionGrid}>
             <Pressable
               style={styles.actionCard}
@@ -581,8 +950,9 @@ export const SaleManagerScreen: React.FC = () => {
               <Text style={styles.actionHint}>Atualizar pessoas e couvert</Text>
             </Pressable>
           </View>
-        </>
-      )}
+        ) : null
+      }
+    />
       <SweetAlert
         visible={sweetAlert.visible}
         title={sweetAlert.title}
@@ -595,14 +965,30 @@ export const SaleManagerScreen: React.FC = () => {
           }))
         }
       />
-    </ScrollView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.background
+  },
+  contentContainer: {
+    padding: Space.md,
+    paddingBottom: 140
+  },
+  fractionList: {
+    marginTop: 8
+  },
+  fractionItemDivider: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border
+  },
+  sectionHeader: {
+    marginTop: 8,
     padding: Space.md
   },
   infoCard: {

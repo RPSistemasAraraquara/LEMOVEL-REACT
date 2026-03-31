@@ -361,7 +361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .sort((a, b) => a.id - b.id)
       .map(
         (item) =>
-          `${item.id}|${item.valorVenda}|${item.descricao}|${item.vendaPorTamanho ? 1 : 0}|${item.permiteFracao ? 1 : 0}|${item.possuiImagem ? 1 : 0}|${(item.opcionais || [])
+          `${item.id}|${item.valorVenda}|${item.descricao}|${item.vendaPorTamanho ? 1 : 0}|${item.permiteFracao ? 1 : 0}|${item.possuiImagem ? 1 : 0}|${item.imagem ? item.imagem.length : 0}|${item.imagem_db ? item.imagem_db.length : 0}|${item.imagemLocalPath ? item.imagemLocalPath.length : 0}|${(item.opcionais || [])
             .map(
               (optional) =>
                 `${optional.idOpcional}:${optional.descricao}:${optional.valor}:${optional.opcionalP || ''}:${optional.opcionalM || ''}:${optional.opcionalG || ''}:${optional.opcionalGG || ''}:${optional.opcionalExtra || ''}`
