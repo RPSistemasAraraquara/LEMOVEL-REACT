@@ -112,57 +112,61 @@ export const LoginScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenRouteLabel />
-      <View style={styles.card}>
-        <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.title}>RP MOVEL</Text>
+      <View style={styles.content}>
+        <View style={styles.card}>
+          <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.title}>RP MOVEL</Text>
 
-        <Text style={styles.label}>Usuário</Text>
-        <TextInput
-          placeholder="Login"
-          value={user}
-          onChangeText={setUser}
-          autoCapitalize="none"
-          style={styles.input}
-          placeholderTextColor={Colors.textMuted}
-        />
-        <Text style={styles.label}>Senha</Text>
-        <TextInput
-          placeholder="Senha"
-          value={senha}
-          secureTextEntry
-          onChangeText={setSenha}
-          style={styles.input}
-          placeholderTextColor={Colors.textMuted}
-        />
+          <Text style={styles.label}>Usuário</Text>
+          <TextInput
+            placeholder="Login"
+            value={user}
+            onChangeText={setUser}
+            autoCapitalize="none"
+            style={styles.input}
+            placeholderTextColor={Colors.textMuted}
+          />
+          <Text style={styles.label}>Senha</Text>
+          <TextInput
+            placeholder="Senha"
+            value={senha}
+            secureTextEntry
+            onChangeText={setSenha}
+            style={styles.input}
+            placeholderTextColor={Colors.textMuted}
+          />
 
-        {!!error && <Text style={styles.error}>{error}</Text>}
-        {companyInfo?.utilizaRPMovel === false ? (
-          <Text style={styles.error}>Módulo RPMOVEL não ativo.</Text>
-        ) : null}
-        <Text style={styles.connection}>
-          {apiConnection.checking
-            ? 'Verificando conexão com API...'
-            : apiConnection.ok
-            ? `API: conectado (${apiConnection.status || '-'})`
-            : `API: sem conexão (${apiConnection.status || '-'}): ${apiConnection.message}`}
-        </Text>
+          {!!error && <Text style={styles.error}>{error}</Text>}
+          {companyInfo?.utilizaRPMovel === false ? (
+            <Text style={styles.error}>Módulo RPMOVEL não ativo.</Text>
+          ) : null}
+          <Text style={styles.connection}>
+            {apiConnection.checking
+              ? 'Verificando conexão com API...'
+              : apiConnection.ok
+              ? `API: conectado (${apiConnection.status || '-'})`
+              : `API: sem conexão (${apiConnection.status || '-'}): ${apiConnection.message}`}
+          </Text>
 
-        <Pressable onPress={onSubmit} style={styles.button} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>Entrar</Text>}
-        </Pressable>
+          <Pressable onPress={onSubmit} style={styles.button} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>Entrar</Text>}
+          </Pressable>
 
-        <Pressable onPress={goConfig} style={styles.configButton} disabled={loading}>
-          <Text style={styles.configButtonLabel}>Configuração</Text>
-        </Pressable>
+          <Pressable onPress={goConfig} style={styles.configButton} disabled={loading}>
+            <Text style={styles.configButtonLabel}>Configuração</Text>
+          </Pressable>
 
-        <Text style={styles.versionLabel}>Versão 8.0.0.2</Text>
+          <Text style={styles.versionLabel}>Versão 8.0.0.2</Text>
+        </View>
       </View>
+      <Text style={styles.footer}>www.sistemalechef.com.br</Text>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, justifyContent: 'center', padding: Space.xl },
+  container: { flex: 1, backgroundColor: Colors.background, padding: Space.xl },
+  content: { flex: 1, justifyContent: 'center' },
   card: {
     backgroundColor: Colors.card,
     borderRadius: Radius.xl,
@@ -180,7 +184,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 14
   },
-  title: { fontSize: 28, color: Colors.text, fontWeight: '800', marginBottom: 8, alignSelf: 'center' },
+  title: { fontSize: 28, color: Colors.primary, fontWeight: '800', marginBottom: 8, alignSelf: 'center' },
   label: {
     color: Colors.text,
     fontSize: 12,
@@ -220,6 +224,12 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 12,
     textAlign: 'center'
+  },
+  footer: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: Space.md
   },
   error: { color: Colors.danger, marginBottom: 6, marginTop: -2 },
   connection: {

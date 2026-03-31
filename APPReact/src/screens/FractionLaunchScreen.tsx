@@ -538,7 +538,7 @@ export const FractionLaunchScreen: React.FC = () => {
           tamanho: selectedSize,
           desconto: 0,
           acrescimo: 0,
-          observacao: observacao.trim() || `Fracionado ${fractionQuantityLabel} de ${product.descricao}`,
+          observacao: observacao.trim() || undefined,
           idMesaVinculada: 0,
           fractionGroupId,
           valorUnitario: unitPrice,

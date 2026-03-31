@@ -960,7 +960,7 @@ export const ItemLaunchScreen: React.FC = () => {
             tamanho: sizePayloadCode,
             desconto: 0,
             acrescimo: 0,
-            observacao: fractionObservation || `Fracionado ${fractionQtyLabel} de ${product.descricao}`,
+            observacao: fractionObservation || undefined,
             idMesaVinculada: 0,
             fractionGroupId,
             valorUnitario: unitPrice,
@@ -983,7 +983,7 @@ export const ItemLaunchScreen: React.FC = () => {
         tamanho: sizePayloadCode,
         desconto: 0,
         acrescimo: 0,
-        observacao,
+        observacao: currentObservationLabel || undefined,
         idMesaVinculada: 0,
         valorUnitario: selectedPrice,
         opcionais: opc

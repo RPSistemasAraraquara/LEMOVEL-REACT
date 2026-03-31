@@ -949,14 +949,10 @@ export const SaleClosureScreen: React.FC = () => {
         valor
       }));
 
-      const closePrintInternal = closeInternalPrint;
       const valorTaxaServico = Number(sale?.valorTaxaServico || 0);
       const cobrarTaxaGarcom = valorTaxaServico > 0;
 
-      const shouldUseLocalCloseTerminalPrint =
-        (usePagBankPrinter || useStoneOrCieloPrinter) && printOnlyAtClose;
-      const shouldRequestClosePrintContent = shouldUseLocalCloseTerminalPrint;
-      const closeResponse = await api.closeSale({
+      await api.closeSale({
         idVenda,
         idUsuario,
         numeroCouvertMasculino: parseInteger(masc),
@@ -967,36 +963,32 @@ export const SaleClosureScreen: React.FC = () => {
         valorTaxaServico,
         CobrarTaxaGarcom: cobrarTaxaGarcom,
         pagamentos: linhas,
-        impressoraInterna: closePrintInternal,
-        imprimirPreFechamentoMobile: printOnlyAtClose
+        impressoraInterna: false,
+        imprimirPreFechamentoMobile: false
       }, {
-        accept: shouldRequestClosePrintContent ? 'text/plain' : 'application/json',
+        accept: 'application/json',
         numeroColunas: appSettings.impressaoColunas,
+        impressaoInterna: false,
         tipoMaquina: resolveMachineType(appSettings, true)
       });
 
       let closePrintMessage = '';
-      if (shouldUseLocalCloseTerminalPrint) {
-        let printContent = typeof closeResponse === 'string' ? closeResponse : '';
-        if (!printContent || !printContent.trim()) {
-          try {
-            printContent = await loadSalePrintContent({
-              idVenda,
-              appSettings,
-              usarRotaMaquininha: true
-            });
-          } catch {
-            printContent = '';
-          }
-        }
+      if (printOnlyAtClose) {
         try {
-          showPrintProcessing('Processando impressão do fechamento...');
-          await printSaleContent({
-            content: printContent,
+          showPrintProcessing(
+            usePagBankPrinter || useStoneOrCieloPrinter
+              ? 'Processando impressão do fechamento...'
+              : 'Enviando impressão do fechamento...'
+          );
+          await executeSalePrint({
+            idVenda,
             appSettings,
             usarRotaMaquininha: true
           });
-          closePrintMessage = ' Impressão enviada para a maquininha.';
+          closePrintMessage =
+            usePagBankPrinter || useStoneOrCieloPrinter
+              ? ' Impressão enviada para a maquininha.'
+              : ' Impressão enviada com sucesso.';
         } catch (printError: any) {
           closePrintMessage = ` Venda fechada, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`;
         } finally {

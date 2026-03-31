@@ -73,7 +73,7 @@ export type LaunchItemPayload = {
   tamanho: string;
   vendaPorTamanho: boolean;
   descricaoTamanho: string;
-  observacao: string;
+  observacao?: string;
   idMesaVinculada: number;
   idGarcom?: number;
   opcionais: LaunchOptionalPayload[];

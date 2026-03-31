@@ -29,7 +29,7 @@ export type CartItem = Omit<MenuItem, 'opcionais'> & {
   tamanho: string;
   desconto: number;
   acrescimo: number;
-  observacao: string;
+  observacao?: string;
   idMesaVinculada: number;
   fractionGroupId?: string;
   valorUnitario: number;
