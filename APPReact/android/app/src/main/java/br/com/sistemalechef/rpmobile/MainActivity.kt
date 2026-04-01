@@ -1,4 +1,4 @@
-package br.com.sistemalechef.lemovel
+package br.com.sistemalechef.rpmobile
 
 import android.os.Build
 import android.os.Bundle

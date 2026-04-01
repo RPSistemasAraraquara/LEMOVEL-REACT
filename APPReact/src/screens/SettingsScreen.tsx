@@ -215,8 +215,13 @@ export const SettingsScreen: React.FC = () => {
     setSettings((prev) => ({
       ...prev,
       utilizaMaquininhaStone: value,
-      tipoIntegracao: value && prev.tipoIntegracao === 'nenhum' ? 'vero' : value ? prev.tipoIntegracao : 'nenhum',
-      modeloMaquininha: value ? prev.modeloMaquininha : 'false'
+      sincronizarAposLogin: value ? true : prev.sincronizarAposLogin,
+      tipoIntegracao: value ? (prev.tipoIntegracao === 'nenhum' ? 'stone' : prev.tipoIntegracao) : 'nenhum',
+      modeloMaquininha: value
+        ? !prev.modeloMaquininha || prev.modeloMaquininha === 'false'
+          ? 'Stone'
+          : prev.modeloMaquininha
+        : 'false'
     }));
   };
 

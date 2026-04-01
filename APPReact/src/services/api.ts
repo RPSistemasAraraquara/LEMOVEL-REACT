@@ -421,9 +421,9 @@ export const defaultMobileSettings: MobileAppSettings = {
   impressaoLinhasPulo: 1,
   sincronizarAposLogin: true,
   modoExibicao: 'mesa',
-  utilizaMaquininhaStone: true,
-  tipoIntegracao: 'pagbank',
-  modeloMaquininha: 'PagBank',
+  utilizaMaquininhaStone: false,
+  tipoIntegracao: 'nenhum',
+  modeloMaquininha: 'false',
   usuario: '1',
   senha: '1'
 };
