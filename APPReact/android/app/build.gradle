@@ -79,6 +79,13 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
+def resolveTargetArchitectures = {
+    def configured = (findProperty('targetArchitectures') ?: findProperty('reactNativeArchitectures') ?: "arm64-v8a").toString()
+    return configured
+        .split(",")
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -104,7 +111,7 @@ android {
         versionCode 105804
         versionName "52.0.0"
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters(*resolveTargetArchitectures())
         }
     }
     signingConfigs {

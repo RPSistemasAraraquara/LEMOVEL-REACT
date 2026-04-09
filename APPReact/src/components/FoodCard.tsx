@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { Colors, Radius, Space, Typography } from '../theme';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { getProductImageSource, MenuItem, resolveImageUri } from '../services/api';
 
 export const FoodCard: React.FC<{
@@ -22,6 +22,7 @@ export const FoodCard: React.FC<{
 
   return (
     <Pressable style={[styles.card, showImageSlot ? styles.cardWithImage : styles.cardCompact]} onPress={onOpen}>
+      <View style={styles.cardAccent} />
       {showImageSlot ? (
         <View style={styles.imageWrap}>
           {imageSource ? (
@@ -35,19 +36,43 @@ export const FoodCard: React.FC<{
           ) : (
             <View style={styles.imagePlaceholder} />
           )}
+          <View style={styles.imageBadge}>
+            <Text style={styles.imageBadgeText}>R$ {price.toFixed(2)}</Text>
+          </View>
         </View>
       ) : null}
-      <View style={styles.headStacked}>
-        <Text style={styles.titleFull}>
-          {item.descricao}
-        </Text>
-        <View style={styles.badgeInline}>
-          <Text style={styles.badgeText}>R$ {price.toFixed(2)}</Text>
+      <View style={styles.cardBody}>
+        {!showImageSlot ? (
+          <View style={styles.cardMetaRow}>
+            <View style={styles.badgeInline}>
+              <Text style={styles.badgeText}>R$ {price.toFixed(2)}</Text>
+            </View>
+            <View style={styles.launchChip}>
+              <Text style={styles.launchChipText}>LANÇAR</Text>
+            </View>
+          </View>
+        ) : null}
+        <View style={styles.headStacked}>
+          <Text style={styles.titleFull}>
+            {item.descricao}
+          </Text>
+          <Text style={[styles.desc, !label ? styles.descHidden : null]} numberOfLines={2}>
+            {label || ' '}
+          </Text>
+        </View>
+        <View style={styles.footerRow}>
+          {showImageSlot ? (
+            <View style={styles.badgeInline}>
+              <Text style={styles.badgeText}>R$ {price.toFixed(2)}</Text>
+            </View>
+          ) : (
+            <Text style={styles.footerHint}>Toque para lançar</Text>
+          )}
+          <View style={styles.footerAction}>
+            <Text style={styles.footerActionText}>Abrir</Text>
+          </View>
         </View>
       </View>
-      <Text style={[styles.desc, !label ? styles.descHidden : null]} numberOfLines={2}>
-        {label || ' '}
-      </Text>
     </Pressable>
   );
 };
@@ -70,24 +95,29 @@ export const MemoFoodCard = React.memo(
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    padding: 12,
+    borderRadius: Radius.lg,
+    padding: 14,
     marginBottom: Space.sm,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    shadowColor: Colors.shadow,
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: Colors.border,
+    ...Shadows.card,
     flex: 1,
     justifyContent: 'space-between',
     overflow: 'hidden'
   },
   cardCompact: {
-    minHeight: 124
+    minHeight: 158
   },
   cardWithImage: {
     minHeight: 0
+  },
+  cardAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: Colors.accent
   },
   imageWrap: {
     marginBottom: Space.sm,
@@ -95,16 +125,44 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.primarySoft
+    backgroundColor: Colors.primarySoft,
+    position: 'relative'
   },
   image: {
     width: '100%',
-    height: 108
+    height: 122
   },
   imagePlaceholder: {
     width: '100%',
-    height: 108,
+    height: 122,
     backgroundColor: Colors.primarySoft
+  },
+  imageBadge: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    backgroundColor: 'rgba(255, 253, 249, 0.92)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(27, 79, 114, 0.08)'
+  },
+  imageBadgeText: {
+    color: Colors.primary,
+    fontWeight: '900',
+    fontSize: 12
+  },
+  cardBody: {
+    flex: 1,
+    justifyContent: 'space-between'
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    marginBottom: 10
   },
   headStacked: {
     gap: 8,
@@ -112,21 +170,36 @@ const styles = StyleSheet.create({
   },
   titleFull: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.text,
     lineHeight: 21,
     flexShrink: 1
   },
   badgeInline: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: Colors.accentSoft,
     borderRadius: Radius.sm,
-    paddingHorizontal: 9,
-    paddingVertical: 3
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 153, 74, 0.18)'
   },
-  badgeText: { color: Colors.primary, fontWeight: '800', fontSize: 12 },
+  badgeText: { color: Colors.accent, fontWeight: '800', fontSize: 12 },
+  launchChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: Colors.primarySoft,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  launchChipText: {
+    color: Colors.primary,
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 0.4
+  },
   desc: {
-    marginTop: 6,
+    marginTop: 8,
     color: Colors.textMuted,
     fontSize: Typography.caption,
     lineHeight: 18,
@@ -137,5 +210,29 @@ const styles = StyleSheet.create({
     minHeight: 0,
     marginTop: 0,
     opacity: 0
+  },
+  footerRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm
+  },
+  footerHint: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  footerAction: {
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    ...Shadows.button
+  },
+  footerActionText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12
   }
 });

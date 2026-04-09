@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { InteractionManager, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type OpenTableNameModalProps = {
   visible: boolean;
@@ -9,6 +9,8 @@ type OpenTableNameModalProps = {
   title?: string;
   description?: string;
   placeholder?: string;
+  confirmLabel?: string;
+  confirmLoadingLabel?: string;
   onChangeText: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
@@ -21,6 +23,8 @@ export const OpenTableNameModal: React.FC<OpenTableNameModalProps> = ({
   title = 'Nome da mesa/comanda',
   description = 'Informe o nome para abrir a nova mesa/comanda.',
   placeholder = 'Digite o nome',
+  confirmLabel = 'Confirmar',
+  confirmLoadingLabel = 'Abrindo...',
   onChangeText,
   onCancel,
   onConfirm
@@ -116,7 +120,7 @@ export const OpenTableNameModal: React.FC<OpenTableNameModalProps> = ({
             activeOpacity={0.85}
             disabled={loading}
           >
-            <Text style={styles.primaryButtonText}>{loading ? 'Abrindo...' : 'Confirmar'}</Text>
+            <Text style={styles.primaryButtonText}>{loading ? confirmLoadingLabel : confirmLabel}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -131,7 +135,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Space.lg,
-    backgroundColor: 'rgba(15, 23, 42, 0.28)'
+    backgroundColor: 'rgba(15, 23, 42, 0.34)'
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject
@@ -144,7 +148,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Space.lg,
-    gap: Space.md
+    gap: Space.md,
+    ...Shadows.card
   },
   title: {
     color: Colors.text,
@@ -157,8 +162,8 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 16,
     backgroundColor: Colors.cardSoft,
     color: Colors.text,
     paddingHorizontal: 14,
@@ -172,9 +177,9 @@ const styles = StyleSheet.create({
   secondaryButton: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 13,
     backgroundColor: Colors.cardSoft
   },
   secondaryButtonText: {
@@ -182,10 +187,11 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   primaryButton: {
-    borderRadius: Radius.md,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 11,
-    backgroundColor: Colors.primary
+    paddingVertical: 13,
+    backgroundColor: Colors.primary,
+    ...Shadows.button
   },
   primaryButtonDisabled: {
     opacity: 0.7

@@ -299,6 +299,13 @@ export type MobileAppSettings = {
   senha?: string;
 };
 
+export const OPENING_SETTINGS_CONFLICT_MESSAGE =
+  'Não é permitido vincular comanda com mesa e exigir nome na abertura da mesa/comanda simultaneamente.';
+
+export const hasConflictingOpeningSettings = (
+  settings: Pick<MobileAppSettings, 'vincularComandaComMesa' | 'exigeNomeAbertura'>
+) => Boolean(settings.vincularComandaComMesa && settings.exigeNomeAbertura);
+
 const fallbackProfile: UserProfile = {
   idUsuario: 1,
   nome: 'Demo Garçom',
@@ -424,8 +431,8 @@ export const defaultMobileSettings: MobileAppSettings = {
   utilizaMaquininhaStone: false,
   tipoIntegracao: 'nenhum',
   modeloMaquininha: 'false',
-  usuario: '1',
-  senha: '1'
+  usuario: '',
+  senha: ''
 };
 
 const STORAGE_KEY = '@rpcheff:mobile-settings';
@@ -744,6 +751,49 @@ export function isTableStatusReserved(value: unknown): boolean {
   );
 }
 
+export function formatTableStatusLabel(value: unknown): string {
+  const status = normalizeSaleStatus(value).toLowerCase();
+  if (!status) {
+    return '';
+  }
+
+  if (status.includes('prefechamento') || status.includes('pre-fechamento')) {
+    return 'Pré-fechamento';
+  }
+  if (status.includes('pendente')) {
+    return 'Pendente';
+  }
+  if (status.includes('digitacao')) {
+    return 'Digitação';
+  }
+  if (status.includes('finalizada')) {
+    return 'Finalizada';
+  }
+  if (status.includes('cancelada')) {
+    return 'Cancelada';
+  }
+  if (status.includes('reservada') || status.includes('reserva') || status.includes('smreservada')) {
+    return 'Reservada';
+  }
+  if (status.includes('aguard')) {
+    return 'Aguardando';
+  }
+  if (status.includes('smdisponivel') || status.includes('dispon') || status.includes('liber')) {
+    return 'Disponível';
+  }
+  if (status.includes('ocup') || status.includes('aberta')) {
+    return 'Ocupada';
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const cleaned = raw.replace(/^sm/i, '');
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 function normalizeNomeMesa(id: number, prefix: string, fallbackId: number, providedName?: string) {
   const base = sanitizeText(providedName, '').trim();
   if (base) return base;
@@ -816,6 +866,7 @@ function sanitizeText(value: any, fallback = ''): string {
 function normalizeMobileSettings(payload: unknown): MobileAppSettings {
   const value = (payload as Record<string, unknown>) || {};
   const tipoIntegracao = parsePaymentIntegration(value);
+  const salvarLoginSenha = parseBoolean(value.salvarLoginSenha, defaultMobileSettings.salvarLoginSenha);
   const categoriaLegacyDisabled = resolveField(value, [
     'naoUtilizarCategoria',
     'naoUtilizaCategoria',
@@ -828,7 +879,7 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
       defaultMobileSettings.empresaId
     ),
     terminalImpressao: sanitizeText(value.terminalImpressao, defaultMobileSettings.terminalImpressao),
-    salvarLoginSenha: parseBoolean(value.salvarLoginSenha, defaultMobileSettings.salvarLoginSenha),
+    salvarLoginSenha,
     utilizaCatraca: parseBoolean(value.utilizaCatraca, defaultMobileSettings.utilizaCatraca),
     cobrarMaiorValorFracionado: parseBoolean(
       value.cobrarMaiorValorFracionado,
@@ -900,8 +951,12 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
     utilizaMaquininhaStone: parseBoolean(value.utilizaMaquininhaStone, false) || tipoIntegracao !== 'nenhum',
     tipoIntegracao,
     modeloMaquininha: sanitizeText(value.modeloMaquininha, defaultMobileSettings.modeloMaquininha),
-    usuario: sanitizeText((value as Record<string, unknown>).usuario, defaultMobileSettings.usuario || ''),
-    senha: sanitizeText((value as Record<string, unknown>).senha, defaultMobileSettings.senha || '')
+    usuario: salvarLoginSenha
+      ? sanitizeText((value as Record<string, unknown>).usuario, defaultMobileSettings.usuario || '')
+      : '',
+    senha: salvarLoginSenha
+      ? sanitizeText((value as Record<string, unknown>).senha, defaultMobileSettings.senha || '')
+      : ''
   };
 }
 
@@ -2420,29 +2475,29 @@ export class ApiClient {
   async login(login: string, senha: string): Promise<UserProfile> {
     const normalizedLogin = String(login || '').trim();
     const normalizedPassword = String(senha || '').trim();
-
-    try {
-      const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/usuario/login`, {
-        method: 'POST',
-        body: JSON.stringify({ login: normalizedLogin, senha: normalizedPassword })
-      });
-      if (typeof payload !== 'object' || !payload) {
-        throw new Error('Falha de autenticação');
-      }
-      return parseUserProfile(payload as Record<string, any>);
-    } catch {
-      const resolvedUser = await this.resolveUserProfileByLogin(normalizedLogin);
-      if (resolvedUser) {
-        return resolvedUser;
-      }
-
-      return {
-        ...fallbackProfile,
-        idUsuario: 0,
-        nome: normalizedLogin || fallbackProfile.nome,
-        login: normalizedLogin || fallbackProfile.login
-      };
+    if (!normalizedLogin || !normalizedPassword) {
+      throw new Error('Informe usuário e senha.');
     }
+
+    const { response, payload } = await this.request(`rpCheff/v1/empresa/${this.idEmpresa}/usuario/login`, {
+      method: 'POST',
+      body: JSON.stringify({ login: normalizedLogin, senha: normalizedPassword })
+    });
+
+    if (!response.ok) {
+      throw new Error(extractApiErrorMessage(payload, 'Usuário ou senha inválidos.'));
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Resposta inválida ao autenticar usuário.');
+    }
+
+    const resolvedUser = parseUserProfile(payload as Record<string, unknown>);
+    if (Number(resolvedUser.idUsuario || 0) <= 0) {
+      throw new Error('Usuário ou senha inválidos.');
+    }
+
+    return resolvedUser;
   }
 
   async listUsers(): Promise<UserProfile[]> {

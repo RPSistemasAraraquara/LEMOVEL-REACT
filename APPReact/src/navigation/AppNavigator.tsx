@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, Pressable, StyleSheet } from 'react-native';
@@ -25,7 +25,7 @@ import { SaleClosureScreen } from '../screens/SaleClosureScreen';
 import { SalePaymentScreen } from '../screens/SalePaymentScreen';
 import { PaymentProgressScreen } from '../screens/PaymentProgressScreen';
 import { TransferMergeScreen } from '../screens/TransferMergeScreen';
-import { Colors, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { MenuItem, normalizeSaleStatus, api } from '../services/api';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { GlobalSweetAlertHost } from '../components/GlobalSweetAlertHost';
@@ -87,6 +87,18 @@ export type TabParams = {
 
 const Stack = createNativeStackNavigator<RootStackParams>();
 const Tabs = createBottomTabNavigator<TabParams>();
+const navTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: Colors.background,
+    card: Colors.card,
+    text: Colors.text,
+    primary: Colors.primary,
+    border: Colors.border,
+    notification: Colors.accent
+  }
+};
 
 function BottomButtonBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { activeTable, user, refreshDashboard } = useApp();
@@ -277,15 +289,15 @@ export function AppNavigator() {
   const { user } = useApp();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <>
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
-            headerStyle: { backgroundColor: Colors.card },
+            headerStyle: { backgroundColor: Colors.background },
             headerShadowVisible: false,
-            headerTintColor: Colors.text,
-            headerTitleStyle: { fontWeight: '800' }
+            headerTintColor: Colors.primary,
+            headerTitleStyle: { fontWeight: '900', color: Colors.text }
           }}
         >
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -383,56 +395,51 @@ export function AppNavigator() {
 const styles = StyleSheet.create({
   tabBarSafeArea: {
     paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingTop: 8,
     backgroundColor: 'transparent'
   },
   tabBarContainer: {
-    borderRadius: 16,
-    backgroundColor: Colors.card,
+    borderRadius: Radius.xl,
+    backgroundColor: 'rgba(255, 253, 249, 0.98)',
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 6,
+    padding: 7,
     flexDirection: 'row',
     gap: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
+    ...Shadows.card,
     zIndex: 9999,
     elevation: 16
   },
   tabBarButton: {
     flex: 1,
-    borderRadius: 12,
-    minHeight: 42,
+    borderRadius: 18,
+    minHeight: 48,
     paddingHorizontal: 8,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center'
   },
   tabBarButtonActive: {
-    backgroundColor: Colors.primary
+    backgroundColor: Colors.primary,
+    ...Shadows.button
   },
   tabBarButtonInactive: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.cardSoft,
     borderWidth: 1,
-    borderColor: Colors.primary
+    borderColor: Colors.border
   },
   tabBarButtonPressed: {
     opacity: 0.75
   },
   tabBarTextActive: {
     color: '#ffffff',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 12,
     textAlign: 'center'
   },
   tabBarTextInactive: {
     color: Colors.text,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 12,
     textAlign: 'center'
   }

@@ -18,12 +18,14 @@ import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigat
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
 import { RootStackParams } from '../navigation/AppNavigator';
-import { Colors, Radius, Space, Typography } from '../theme';
-import { isTableStatusQuickLaunch, isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
+import { formatTableStatusLabel, isTableStatusQuickLaunch, isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
 import { TableCard } from '../components/TableCard';
+import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
 import { OpenTableNameModal } from '../components/OpenTableNameModal';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SafeIonicons } from '../components/SafeExpoIcons';
+import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
 
 type StackNav = NativeStackNavigationProp<RootStackParams>;
 type InitialRoute = RouteProp<RootStackParams, 'Inicial'>;
@@ -137,13 +139,17 @@ export const InitialScreen: React.FC = () => {
   const {
     tables,
     appSettings,
+    settingsReady,
     refreshDashboard,
     flushPendingItems,
     cart,
     user,
     logout,
     openTableByCard,
-    setActiveTable
+    initialScreenMode,
+    setActiveTable,
+    setInitialScreenMode,
+    setLinkedMesaSelection
   } = useApp();
 
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -158,6 +164,11 @@ export const InitialScreen: React.FC = () => {
     table: TableOrder;
     route: 'Gestao' | 'Cardapio';
   } | null>(null);
+  const [pendingLinkedMesaOpen, setPendingLinkedMesaOpen] = React.useState<{
+    table: TableOrder;
+    route: 'Gestao' | 'Cardapio';
+    customName?: string;
+  } | null>(null);
   const [readerCameraOpen, setReaderCameraOpen] = React.useState(false);
   const [CameraViewComponent, setCameraViewComponent] = React.useState<React.ComponentType<any> | null>(null);
   const [gridWidth, setGridWidth] = React.useState(0);
@@ -167,6 +178,7 @@ export const InitialScreen: React.FC = () => {
   const autoSendTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartCountRef = React.useRef(0);
   const tableOpenLockRef = React.useRef(false);
+  const linkedMesaOpenAutoPromptRef = React.useRef(false);
   const lastWarningRef = React.useRef<{ message: string; at: number }>({ message: '', at: 0 });
   const filterInputRef = React.useRef<TextInput>(null);
   const canUseCamera = Platform.OS !== 'web' && Boolean(CameraViewComponent);
@@ -174,22 +186,49 @@ export const InitialScreen: React.FC = () => {
   const dashboardRefreshInFlightRef = React.useRef(false);
   const configuredDisplayMode = appSettings.modoExibicao || 'mesa';
   const [visibleMode, setVisibleMode] = React.useState<'mesa' | 'comanda'>(
-    configuredDisplayMode === 'comanda' ? 'comanda' : 'mesa'
+    configuredDisplayMode === 'comanda' ? 'comanda' : configuredDisplayMode === 'mesa' ? 'mesa' : initialScreenMode
   );
   const isComandaMode = visibleMode === 'comanda';
   const canToggleDisplayMode = configuredDisplayMode === 'mesaComanda';
+  const shouldBindMesaOnOpen = Boolean(
+    pendingLinkedMesaOpen && appSettings.vincularComandaComMesa && pendingLinkedMesaOpen.table.tipo === 'comanda'
+  );
+  const {
+    bindingResolved: linkedMesaOpenBindingResolved,
+    pickerVisible: linkedMesaOpenVisible,
+    pickerLoading: linkedMesaOpenLoading,
+    pickerTables: linkedMesaOpenTables,
+    openPicker: openLinkedMesaOpenPicker,
+    closePicker: closeLinkedMesaOpenPicker,
+    refreshPickerTables: refreshLinkedMesaOpenPickerTables
+  } = useLinkedMesaBinding({
+    enabled: shouldBindMesaOnOpen,
+    saleTable: pendingLinkedMesaOpen?.table || null
+  });
 
   React.useEffect(() => {
     if (configuredDisplayMode === 'comanda') {
-      setVisibleMode('comanda');
+      if (visibleMode !== 'comanda') {
+        setVisibleMode('comanda');
+      }
+      if (initialScreenMode !== 'comanda') {
+        setInitialScreenMode('comanda');
+      }
       return;
     }
     if (configuredDisplayMode === 'mesa') {
-      setVisibleMode('mesa');
+      if (visibleMode !== 'mesa') {
+        setVisibleMode('mesa');
+      }
+      if (initialScreenMode !== 'mesa') {
+        setInitialScreenMode('mesa');
+      }
       return;
     }
-    setVisibleMode((current) => (current === 'comanda' ? 'comanda' : 'mesa'));
-  }, [configuredDisplayMode]);
+    if (visibleMode !== initialScreenMode) {
+      setVisibleMode(initialScreenMode);
+    }
+  }, [configuredDisplayMode, initialScreenMode, setInitialScreenMode, visibleMode]);
 
   const menuItems: FilterItem[] = React.useMemo(() => {
     const base: FilterItem[] = [
@@ -293,21 +332,6 @@ export const InitialScreen: React.FC = () => {
     []
   );
 
-  const renderTableItem = React.useCallback(
-    ({ item, index }: { item: TableOrder; index: number }) => (
-      <View style={[styles.tableCell, { width: cardWidth }, index % tableColumns !== tableColumns - 1 ? styles.tableCellSpacing : null]}>
-        <TableCard
-          table={item}
-          displayMode={visibleMode}
-          paletteMode={selectedFilter}
-          onPress={() => openByTable(item, false)}
-          onLongPress={() => openByTable(item, true)}
-        />
-      </View>
-    ),
-    [cardWidth, openByTable, selectedFilter, tableColumns, visibleMode]
-  );
-
   const parseQrText = (value: string) => {
     const normalized = value.trim();
     const withoutPrefix = normalized
@@ -348,19 +372,34 @@ export const InitialScreen: React.FC = () => {
   }, []);
 
   const openNewTable = React.useCallback(
-    async (item: TableOrder, route: 'Gestao' | 'Cardapio', customName?: string) => {
+    async (
+      item: TableOrder,
+      route: 'Gestao' | 'Cardapio',
+      customName?: string,
+      linkedMesa?: TableOrder | null
+    ) => {
       if (tableOpenLockRef.current) {
         return;
       }
       tableOpenLockRef.current = true;
+      const normalizedLinkedMesa =
+        linkedMesa && Number(linkedMesa.idMesa || 0) > 0
+          ? {
+              ...linkedMesa,
+              tipo: 'mesa' as const,
+              nomeMesaComanda: String(linkedMesa.nomeMesaComanda || '').trim() || `Mesa ${Number(linkedMesa.idMesa || 0)}`
+            }
+          : null;
 
       try {
         const effectiveName = customName?.trim() || undefined;
         const opened = await openTableByCard(item.idMesa, effectiveName, item.tipo);
         setActiveTable(opened || item);
+        setLinkedMesaSelection(normalizedLinkedMesa);
         navigation.navigate('Tabs', { screen: route } as never);
       } catch {
         setActiveTable(item);
+        setLinkedMesaSelection(normalizedLinkedMesa);
         navigation.navigate('Tabs', { screen: route } as never);
         showDedupWarning('Atenção', 'Não foi possível abrir a venda agora. Você ainda pode selecionar itens no cardápio.');
       } finally {
@@ -369,7 +408,63 @@ export const InitialScreen: React.FC = () => {
         }, 350);
       }
     },
-    [navigation, openTableByCard, setActiveTable, showDedupWarning]
+    [navigation, openTableByCard, setActiveTable, setLinkedMesaSelection, showDedupWarning]
+  );
+
+  const closeLinkedMesaOpenFlow = React.useCallback(() => {
+    linkedMesaOpenAutoPromptRef.current = false;
+    closeLinkedMesaOpenPicker();
+    setPendingLinkedMesaOpen(null);
+  }, [closeLinkedMesaOpenPicker]);
+
+  const requestLinkedMesaOpen = React.useCallback(
+    (item: TableOrder, route: 'Gestao' | 'Cardapio', customName?: string) => {
+      linkedMesaOpenAutoPromptRef.current = true;
+      setReaderOpen(false);
+      setReaderCameraOpen(false);
+      setReaderText('');
+      setPendingLinkedMesaOpen({
+        table: item,
+        route,
+        customName: customName?.trim() || undefined
+      });
+      setTimeout(() => {
+        void openLinkedMesaOpenPicker();
+      }, 0);
+    },
+    [openLinkedMesaOpenPicker]
+  );
+
+  React.useEffect(() => {
+    if (!shouldBindMesaOnOpen) {
+      linkedMesaOpenAutoPromptRef.current = false;
+      return;
+    }
+
+    if (!linkedMesaOpenBindingResolved || linkedMesaOpenVisible || linkedMesaOpenAutoPromptRef.current) {
+      return;
+    }
+
+    linkedMesaOpenAutoPromptRef.current = true;
+    void openLinkedMesaOpenPicker();
+  }, [
+    linkedMesaOpenBindingResolved,
+    linkedMesaOpenVisible,
+    openLinkedMesaOpenPicker,
+    shouldBindMesaOnOpen
+  ]);
+
+  const beginOpenFlow = React.useCallback(
+    async (item: TableOrder, route: 'Gestao' | 'Cardapio', customName?: string) => {
+      const shouldBindMesa = appSettings.vincularComandaComMesa && item.tipo === 'comanda';
+      if (shouldBindMesa) {
+        requestLinkedMesaOpen(item, route, customName);
+        return;
+      }
+
+      await openNewTable(item, route, customName);
+    },
+    [appSettings.vincularComandaComMesa, openNewTable, requestLinkedMesaOpen]
   );
 
   const confirmOpenWithName = React.useCallback(async () => {
@@ -384,12 +479,30 @@ export const InitialScreen: React.FC = () => {
     }
 
     closeOpenNameModal();
-    await openNewTable(pending.table, pending.route, nome);
-  }, [closeOpenNameModal, openNameText, openNewTable, pendingOpenTable]);
+    await beginOpenFlow(pending.table, pending.route, nome);
+  }, [beginOpenFlow, closeOpenNameModal, openNameText, pendingOpenTable]);
+
+  const confirmLinkedMesaOpen = React.useCallback(
+    async (mesa: TableOrder) => {
+      const pending = pendingLinkedMesaOpen;
+      if (!pending) {
+        return;
+      }
+
+      closeLinkedMesaOpenFlow();
+      await openNewTable(pending.table, pending.route, pending.customName, mesa);
+    },
+    [closeLinkedMesaOpenFlow, openNewTable, pendingLinkedMesaOpen]
+  );
 
   const openByTable = React.useCallback(async (item: TableOrder, forceManagement = false) => {
     const route = forceManagement ? 'Gestao' : 'Cardapio';
     const tableHasOpenSale = Boolean(item.idVenda && Number(item.idVenda) > 0);
+
+    if (!settingsReady) {
+      Alert.alert('Atenção', 'Aguarde o carregamento das configurações antes de abrir a mesa/comanda.');
+      return;
+    }
 
     if (tableHasOpenSale) {
       setActiveTable(item);
@@ -402,10 +515,30 @@ export const InitialScreen: React.FC = () => {
       return;
     }
 
-    await openNewTable(item, route);
-  }, [appSettings.exigeNomeAbertura, navigation, openNewTable, requestOpenName, setActiveTable]);
+    await beginOpenFlow(item, route);
+  }, [appSettings.exigeNomeAbertura, beginOpenFlow, navigation, requestOpenName, setActiveTable, settingsReady]);
+
+  const renderTableItem = React.useCallback(
+    ({ item, index }: { item: TableOrder; index: number }) => (
+      <View style={[styles.tableCell, { width: cardWidth }, index % tableColumns !== tableColumns - 1 ? styles.tableCellSpacing : null]}>
+        <TableCard
+          table={item}
+          displayMode={visibleMode}
+          paletteMode={selectedFilter}
+          onPress={() => openByTable(item, false)}
+          onLongPress={() => openByTable(item, true)}
+        />
+      </View>
+    ),
+    [cardWidth, openByTable, selectedFilter, tableColumns, visibleMode]
+  );
 
   const openTableByCode = async (raw: string) => {
+    if (!settingsReady) {
+      Alert.alert('Atenção', 'Aguarde o carregamento das configurações antes de abrir a mesa/comanda.');
+      return;
+    }
+
     const id = parseQrText(raw);
     if (!id) {
       Alert.alert('Atenção', 'QR/código inválido. Informe um número válido.');
@@ -418,25 +551,33 @@ export const InitialScreen: React.FC = () => {
       if (!target) {
         throw new Error('Mesa não encontrada.');
       }
-      const tableMode = target?.tipo === 'comanda' ? 'comanda' : visibleMode;
+      const route = isQuickLaunchTable(target) ? 'Cardapio' : 'Gestao';
       if (!target.idVenda && appSettings.exigeNomeAbertura) {
         setReaderOpen(false);
         setReaderCameraOpen(false);
         setReaderText('');
-        requestOpenName(target, isQuickLaunchTable(target) ? 'Cardapio' : 'Gestao');
+        requestOpenName(target, route);
         return;
       }
+      if (!target.idVenda) {
+        setReaderOpen(false);
+        setReaderCameraOpen(false);
+        setReaderText('');
+        await beginOpenFlow(target, route);
+        return;
+      }
+      const tableMode = target?.tipo === 'comanda' ? 'comanda' : visibleMode;
       const opened = await openTableByCard(
         id,
         target?.idVenda ? target?.nomeMesaComanda : undefined,
         tableMode
       );
       setActiveTable(opened);
-      const route = isQuickLaunchTable(opened) ? 'Cardapio' : 'Gestao';
+      const nextRoute = isQuickLaunchTable(opened) ? 'Cardapio' : 'Gestao';
       setReaderOpen(false);
       setReaderCameraOpen(false);
       setReaderText('');
-      navigation.navigate('Tabs', { screen: route } as never);
+      navigation.navigate('Tabs', { screen: nextRoute } as never);
     } catch {
       const fallback = tables.find((item) => item.idMesa === id);
       const fallbackTable: TableOrder = fallback
@@ -630,6 +771,7 @@ export const InitialScreen: React.FC = () => {
     }
     const nextMode = isComandaMode ? 'mesa' : 'comanda';
     setVisibleMode(nextMode);
+    setInitialScreenMode(nextMode);
     setActiveTable(null);
     setSelectedFilter('todas');
     setFilterText('');
@@ -649,10 +791,13 @@ export const InitialScreen: React.FC = () => {
       routes: [{ name: 'Login' }]
     });
   };
+  const activeFilterTitle = menuItems.find((item) => item.key === selectedFilter)?.title || 'Todas';
 
   return (
     <View style={styles.container}>
       <ScreenRouteLabel />
+      <View pointerEvents="none" style={styles.heroGlowPrimary} />
+      <View pointerEvents="none" style={styles.heroGlowSecondary} />
       <View style={styles.menuHeaderRow}>
         <TouchableOpacity style={styles.menuToggle} onPress={() => setMenuOpen(true)} activeOpacity={0.9}>
           <Text style={styles.menuToggleText}>☰</Text>
@@ -679,26 +824,32 @@ export const InitialScreen: React.FC = () => {
 
       {filterVisible ? (
         <View style={styles.filterWrap}>
-          <TextInput
-            ref={filterInputRef}
-            style={styles.filterInput}
-            placeholder="Filtrar mesa..."
-            placeholderTextColor={Colors.textMuted}
-            value={filterText}
-            onChangeText={setFilterText}
-            returnKeyType="search"
-            autoCapitalize="none"
-          />
-          <TouchableOpacity
-            style={styles.filterClear}
-            onPress={() => {
-              setFilterText('');
-              setFilterVisible(false);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.filterClearText}>✕</Text>
-          </TouchableOpacity>
+          <View style={styles.filterPanelHeader}>
+            <Text style={styles.filterPanelEyebrow}>BUSCA RÁPIDA</Text>
+            <Text style={styles.filterPanelTitle}>Localize por número, nome ou status</Text>
+          </View>
+          <View style={styles.filterRow}>
+            <TextInput
+              ref={filterInputRef}
+              style={styles.filterInput}
+              placeholder={`Filtrar ${isComandaMode ? 'comanda' : 'mesa'}...`}
+              placeholderTextColor={Colors.textMuted}
+              value={filterText}
+              onChangeText={setFilterText}
+              returnKeyType="search"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.filterClear}
+              onPress={() => {
+                setFilterText('');
+                setFilterVisible(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.filterClearText}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
 
@@ -815,8 +966,29 @@ export const InitialScreen: React.FC = () => {
         onCancel={closeOpenNameModal}
         onConfirm={confirmOpenWithName}
       />
+      <LinkedMesaPickerModal
+        visible={linkedMesaOpenVisible}
+        tables={linkedMesaOpenTables}
+        loading={linkedMesaOpenLoading}
+        title="Vincular comanda na mesa"
+        description="Selecione a mesa obrigatória para abrir esta comanda. Nos próximos lançamentos a mesma mesa virá sugerida, com opção de troca."
+        onClose={closeLinkedMesaOpenFlow}
+        onRefresh={() => {
+          void refreshLinkedMesaOpenPickerTables();
+        }}
+        onSelect={(table) => {
+          void confirmLinkedMesaOpen(table);
+        }}
+      />
 
       <View style={styles.filtersPanel}>
+        <View style={styles.filtersPanelHeader}>
+          <View>
+            <Text style={styles.filtersPanelEyebrow}>FILTROS</Text>
+            <Text style={styles.filtersPanelTitle}>{activeFilterTitle}</Text>
+          </View>
+          <Text style={styles.filtersPanelMeta}>{groupTotals[selectedFilter]} em foco</Text>
+        </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -889,6 +1061,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     padding: Space.md
   },
+  heroGlowPrimary: {
+    position: 'absolute',
+    top: -70,
+    right: -18,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(27, 79, 114, 0.13)'
+  },
+  heroGlowSecondary: {
+    position: 'absolute',
+    top: 58,
+    left: -38,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(242, 153, 74, 0.12)'
+  },
   menuHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -898,11 +1088,12 @@ const styles = StyleSheet.create({
   },
   menuToggle: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    width: 40,
-    height: 40,
+    borderRadius: 20,
+    width: 50,
+    height: 50,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    ...Shadows.button
   },
   menuToggleText: {
     color: '#ffffff',
@@ -914,32 +1105,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 'auto',
-    gap: 8
+    gap: 10
   },
   topActionBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 50,
+    height: 50,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0CFA4',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF8EF',
-    shadowColor: '#C88738',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1
+    backgroundColor: '#FFFFFF',
+    ...Shadows.soft
   },
   modeActionBtn: {
-    width: 92,
-    backgroundColor: '#FFF8EF',
-    borderColor: '#F0CFA4',
-    paddingHorizontal: 6
+    width: 104,
+    backgroundColor: '#FFFFFF',
+    borderColor: Colors.border,
+    paddingHorizontal: 8
   },
   modeActionText: {
-    color: '#C88738',
-    fontSize: 11,
+    color: Colors.primary,
+    fontSize: 12,
     fontWeight: '800'
   },
   topActionIcon: {
@@ -960,31 +1147,55 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   filterWrap: {
-    position: 'relative',
     marginBottom: Space.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    padding: Space.md,
+    gap: Space.sm,
+    ...Shadows.card
+  },
+  filterPanelHeader: {
+    gap: 4
+  },
+  filterPanelEyebrow: {
+    color: Colors.accent,
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 0.6
+  },
+  filterPanelTitle: {
+    color: Colors.text,
+    fontWeight: '800',
+    fontSize: 16
+  },
+  filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
   },
   filterInput: {
     flex: 1,
-    borderRadius: Radius.md,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
     color: Colors.text,
-    backgroundColor: Colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    ...Shadows.soft
   },
   filterClear: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.card,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.cardSoft,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    ...Shadows.soft
   },
   filterClearText: {
     color: Colors.text,
@@ -1007,11 +1218,12 @@ const styles = StyleSheet.create({
     width: '72%',
     maxWidth: 300,
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Space.md,
-    gap: Space.sm
+    gap: Space.sm,
+    ...Shadows.card
   },
   menuPanelHeader: {
     flexDirection: 'row',
@@ -1031,7 +1243,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background
+    backgroundColor: Colors.cardSoft
   },
   closeButtonText: {
     color: Colors.text,
@@ -1045,13 +1257,14 @@ const styles = StyleSheet.create({
   menuItem: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
-    gap: 8
+    backgroundColor: Colors.cardSoft,
+    gap: 8,
+    ...Shadows.soft
   },
   menuItemIcon: {
     marginRight: 4
@@ -1082,7 +1295,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Space.md,
-    gap: Space.md
+    gap: Space.md,
+    ...Shadows.card
   },
   readerTitle: {
     color: Colors.text,
@@ -1094,13 +1308,13 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
   readerInput: {
-    borderRadius: Radius.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.cardSoft,
     color: Colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingHorizontal: 14,
+    paddingVertical: 12
   },
   readerActions: {
     flexDirection: 'row',
@@ -1109,11 +1323,11 @@ const styles = StyleSheet.create({
   },
   readerButton: {
     flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center'
   },
   readerButtonText: {
@@ -1122,7 +1336,8 @@ const styles = StyleSheet.create({
   },
   readerButtonPrimary: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary
+    borderColor: Colors.primary,
+    ...Shadows.button
   },
   readerButtonTextPrimary: {
     color: '#ffffff',
@@ -1155,22 +1370,44 @@ const styles = StyleSheet.create({
   },
   filtersPanel: {
     marginBottom: Space.md,
-    backgroundColor: '#FFFCF8',
-    borderRadius: 18,
+    backgroundColor: Colors.card,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#EEE3D5',
-    paddingVertical: 12,
-    paddingHorizontal: 9,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1
+    borderColor: Colors.border,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    ...Shadows.card
+  },
+  filtersPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    marginBottom: 10,
+    paddingHorizontal: 4
+  },
+  filtersPanelEyebrow: {
+    color: Colors.accent,
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 0.6,
+    marginBottom: 4
+  },
+  filtersPanelTitle: {
+    color: Colors.text,
+    fontWeight: '900',
+    fontSize: 18
+  },
+  filtersPanelMeta: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingTop: 18
   },
   filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: 'transparent',
     gap: 8,
     paddingHorizontal: 2,
     paddingVertical: 2
@@ -1179,12 +1416,13 @@ const styles = StyleSheet.create({
     minWidth: 98,
     minHeight: 74,
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: 20,
     backgroundColor: Colors.card,
     paddingVertical: 12,
     paddingHorizontal: 10,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    ...Shadows.soft
   },
   filterBadgeSlider: {
     width: 122
@@ -1251,11 +1489,12 @@ const styles = StyleSheet.create({
     height: Space.lg
   },
   emptyCard: {
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: Space.md
+    padding: Space.md,
+    ...Shadows.card
   },
   emptyTitle: {
     fontSize: Typography.subtitle,

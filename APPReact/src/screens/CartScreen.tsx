@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { RootStackParams } from '../navigation/AppNavigator';
-import { Colors, Radius, Space, Typography } from '../theme';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 
 type AppNav = NativeStackNavigationProp<RootStackParams>;
 
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#fff',
+    backgroundColor: Colors.card,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -152,7 +152,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 6,
+    ...Shadows.soft
   },
   backButtonText: {
     color: Colors.primary,
@@ -167,20 +168,22 @@ const styles = StyleSheet.create({
   },
   empty: {
     padding: Space.md,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: Colors.border
+    borderColor: Colors.border,
+    ...Shadows.card
   },
   emptyTitle: { fontSize: Typography.subtitle, fontWeight: '700', marginBottom: 4 },
   emptyText: { color: Colors.textMuted },
   alertCard: {
     borderWidth: 1,
     borderColor: Colors.warning,
-    backgroundColor: '#fff4e6',
-    borderRadius: Radius.md,
+    backgroundColor: Colors.accentSoft,
+    borderRadius: 22,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.soft
   },
   alertTitle: {
     color: Colors.warning,
@@ -194,10 +197,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderWidth: 1,
     borderColor: Colors.warning,
-    backgroundColor: '#fff4e6',
-    borderRadius: Radius.md,
+    backgroundColor: Colors.accentSoft,
+    borderRadius: 22,
     padding: 12,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.soft
   },
   flowTitle: {
     color: Colors.warning,
@@ -212,12 +216,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     padding: Space.md,
     marginBottom: Space.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.card
   },
   name: { fontWeight: '700', color: Colors.text },
   desc: { color: Colors.textMuted, marginTop: 4 },
@@ -233,21 +238,23 @@ const styles = StyleSheet.create({
   totalCard: {
     marginTop: Space.md,
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     borderColor: Colors.border,
     borderWidth: 1,
     padding: Space.md,
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    ...Shadows.card
   },
   totalLabel: { color: Colors.textMuted },
   totalValue: { color: Colors.text, fontWeight: '800', fontSize: 20 },
   primaryBtn: {
     marginTop: 12,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 14,
     alignItems: 'center',
-    backgroundColor: Colors.primary
+    backgroundColor: Colors.primary,
+    ...Shadows.button
   },
   btnText: { color: '#fff', fontWeight: '700' },
   primaryBtnText: {
@@ -256,10 +263,13 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     marginTop: 8,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 14,
     alignItems: 'center',
-    backgroundColor: Colors.primarySoft
+    backgroundColor: Colors.cardSoft,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.soft
   },
   btnTextSecondary: { color: Colors.primary, fontWeight: '700' }
 });

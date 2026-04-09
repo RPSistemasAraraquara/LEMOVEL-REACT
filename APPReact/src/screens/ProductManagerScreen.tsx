@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { MenuItem } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type ProductForm = {
   descricao: string;
@@ -242,8 +242,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Space.md
+    borderRadius: 24,
+    padding: Space.md,
+    ...Shadows.card
   },
   label: {
     color: Colors.textMuted,
@@ -252,9 +253,9 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
+    padding: 12,
     backgroundColor: Colors.cardSoft,
     color: Colors.text,
     marginBottom: 10
@@ -276,9 +277,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: Colors.card
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: Colors.cardSoft
   },
   sizeChipActive: {
     borderColor: Colors.primary,
@@ -295,21 +296,23 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     paddingVertical: 12,
     paddingHorizontal: 14,
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    ...Shadows.button
   },
   btnSecondary: {
-    backgroundColor: Colors.primarySoft,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
     paddingVertical: 12,
     paddingHorizontal: 14,
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    ...Shadows.soft
   },
   btnText: {
     color: '#fff',
@@ -332,12 +335,13 @@ const styles = StyleSheet.create({
   item: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     padding: 12,
     marginBottom: 8,
     backgroundColor: Colors.cardSoft,
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    ...Shadows.soft
   },
   itemTitle: {
     color: Colors.text,
@@ -359,12 +363,13 @@ const styles = StyleSheet.create({
     gap: 8
   },
   smallBtn: {
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: Colors.card
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: Colors.card,
+    ...Shadows.soft
   },
   smallText: {
     color: Colors.text,

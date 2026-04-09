@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { api, normalizeSaleStatus } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 
 type Route = RouteProp<RootStackParams, 'Transferencia' | 'JuntarMesa'>;
@@ -392,10 +392,11 @@ const styles = StyleSheet.create({
   sourceCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     backgroundColor: Colors.card,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   sourceLabel: {
     color: Colors.textMuted,
@@ -415,10 +416,11 @@ const styles = StyleSheet.create({
   filterCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   filterLabel: {
     color: Colors.textMuted,
@@ -428,9 +430,9 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
+    padding: 12,
     color: Colors.text,
     backgroundColor: Colors.cardSoft
   },
@@ -449,12 +451,13 @@ const styles = StyleSheet.create({
   optionCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderRadius: 22,
+    padding: 12,
     backgroundColor: Colors.card,
     minWidth: '47%',
     flexGrow: 1,
-    flexBasis: '47%'
+    flexBasis: '47%',
+    ...Shadows.card
   },
   optionCardSelected: {
     borderColor: '#FC8019',
@@ -473,9 +476,10 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
-    padding: Space.md
+    padding: Space.md,
+    ...Shadows.card
   },
   emptyTitle: {
     color: Colors.text,
@@ -488,9 +492,10 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: 14,
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 14,
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.button
   },
   primaryBtnDisabled: {
     opacity: 0.5

@@ -6,7 +6,7 @@ import { RootStackParams } from '../navigation/AppNavigator';
 import { useApp } from '../context/AppContext';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type Navigation = NativeStackNavigationProp<RootStackParams>;
 
@@ -110,12 +110,13 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   backBtn: {
-    borderRadius: Radius.sm,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
     paddingHorizontal: 14,
-    paddingVertical: 9
+    paddingVertical: 9,
+    ...Shadows.soft
   },
   backBtnText: {
     color: Colors.text,
@@ -124,10 +125,11 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: 10,
-    marginBottom: Space.sm
+    marginBottom: Space.sm,
+    ...Shadows.card
   },
   summaryText: {
     color: Colors.text,
@@ -139,9 +141,10 @@ const styles = StyleSheet.create({
   emptyCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
-    padding: Space.md
+    padding: Space.md,
+    ...Shadows.card
   },
   emptyTitle: {
     color: Colors.text,
@@ -153,11 +156,12 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   emptyBtn: {
-    borderRadius: Radius.sm,
+    borderRadius: 18,
     backgroundColor: Colors.primary,
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 8,
+    ...Shadows.button
   },
   emptyBtnText: {
     color: '#fff',
@@ -166,12 +170,13 @@ const styles = StyleSheet.create({
   itemCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: 12,
     marginBottom: 8,
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.card
   },
   itemInfo: {
     flex: 1
@@ -202,12 +207,13 @@ const styles = StyleSheet.create({
   },
   removeBtn: {
     marginLeft: 12,
-    borderRadius: Radius.sm,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.warning,
-    backgroundColor: Colors.warning + '15',
+    backgroundColor: Colors.accentSoft,
     paddingHorizontal: 10,
-    paddingVertical: 10
+    paddingVertical: 10,
+    ...Shadows.soft
   },
   removeBtnText: {
     color: Colors.warning,

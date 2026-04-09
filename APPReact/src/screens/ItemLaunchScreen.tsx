@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
 import { useApp } from '../context/AppContext';
-import { api, MenuItem, ProductOptional, TableOrder } from '../services/api';
-import { Colors, Radius, Space, Typography } from '../theme';
+import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
+import { api, formatTableStatusLabel, MenuItem, ProductOptional, TableOrder } from '../services/api';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 
 type LaunchRoute = RouteProp<RootStackParams, 'Lancamento'>;
@@ -206,9 +208,11 @@ export const ItemLaunchScreen: React.FC = () => {
     activeTable,
     cart,
     getLinkedTableId,
+    linkedMesaSelection,
     openTableByCard,
     products,
     setActiveTable,
+    setLinkedMesaSelection,
     flushPendingItems,
     pauseAutoRefresh,
     resumeAutoRefresh
@@ -260,6 +264,36 @@ export const ItemLaunchScreen: React.FC = () => {
   const returnTo = route.params?.returnTo || 'Cardapio';
   const returnCategoryId =
     typeof route.params?.returnCategoryId === 'number' ? route.params.returnCategoryId : undefined;
+  const tableBindingSource = activeVenda || activeTable || routeTable;
+  const requiresLinkedMesa = appSettings.vincularComandaComMesa && tableBindingSource?.tipo === 'comanda';
+  const preferredLinkedMesaId = useMemo(() => {
+    const storedMesaId = Number(linkedMesaSelection?.idMesa || 0);
+    if (storedMesaId > 0) {
+      return storedMesaId;
+    }
+    for (let index = cart.length - 1; index >= 0; index -= 1) {
+      const mesaId = Number(cart[index]?.idMesaVinculada || 0);
+      if (mesaId > 0) {
+        return mesaId;
+      }
+    }
+    return 0;
+  }, [cart, linkedMesaSelection?.idMesa]);
+  const {
+    linkedMesa,
+    pickerVisible: linkedMesaPickerVisible,
+    pickerLoading: linkedMesaPickerLoading,
+    pickerTables: linkedMesaPickerTables,
+    openPicker: openLinkedMesaPicker,
+    closePicker: closeLinkedMesaPicker,
+    selectMesa: selectLinkedMesa,
+    refreshPickerTables: refreshLinkedMesaPickerTables,
+    ensureLinkedMesaSelected
+  } = useLinkedMesaBinding({
+    enabled: requiresLinkedMesa,
+    saleTable: tableBindingSource,
+    preferredLinkedMesaId
+  });
   const product = useMemo<MenuItem | null>(() => {
     if (!routeProduct) return null;
     if (!loadedProduct) return routeProduct;
@@ -393,6 +427,23 @@ export const ItemLaunchScreen: React.FC = () => {
       resumeAutoRefresh();
     };
   }, [pauseAutoRefresh, resumeAutoRefresh]);
+
+  useEffect(() => {
+    if (!requiresLinkedMesa || !linkedMesa?.idMesa) {
+      return;
+    }
+
+    if (Number(linkedMesaSelection?.idMesa || 0) === Number(linkedMesa.idMesa || 0)) {
+      return;
+    }
+
+    setLinkedMesaSelection(linkedMesa);
+  }, [linkedMesa, linkedMesaSelection?.idMesa, requiresLinkedMesa, setLinkedMesaSelection]);
+
+  const handleLinkedMesaSelect = useCallback((table: TableOrder) => {
+    selectLinkedMesa(table);
+    setLinkedMesaSelection(table);
+  }, [selectLinkedMesa, setLinkedMesaSelection]);
 
   useEffect(() => {
     const handleBack = () => {
@@ -904,6 +955,7 @@ export const ItemLaunchScreen: React.FC = () => {
       const opened = await ensureActiveSale();
       const tableSource = opened || activeVenda || activeTable || routeTable;
       const tableId = getLinkedTableId(tableSource);
+      const shouldBindMesa = appSettings.vincularComandaComMesa && tableSource?.tipo === 'comanda';
 
       if (!tableSource || !tableSource.idMesa) {
         Alert.alert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens.');
@@ -915,6 +967,15 @@ export const ItemLaunchScreen: React.FC = () => {
         return;
       }
 
+      if (shouldBindMesa) {
+        const hasLinkedMesa = await ensureLinkedMesaSelected();
+        if (!hasLinkedMesa) {
+          Alert.alert('Mesa vinculada', 'Selecione a mesa vinculada antes de lançar itens nesta comanda.');
+          return;
+        }
+      }
+
+      const linkedMesaId = shouldBindMesa ? Number(linkedMesa?.idMesa || 0) : 0;
       const opc = buildOptionalsPayload(selectedOptionals, (optionalId) => selectedOptionalQty[optionalId] || 0);
 
       const shouldLaunchFraction = shouldShowFlavorCount &&
@@ -961,7 +1022,7 @@ export const ItemLaunchScreen: React.FC = () => {
             desconto: 0,
             acrescimo: 0,
             observacao: fractionObservation || undefined,
-            idMesaVinculada: 0,
+            idMesaVinculada: linkedMesaId,
             fractionGroupId,
             valorUnitario: unitPrice,
             opcionais: fractionOpc
@@ -984,7 +1045,7 @@ export const ItemLaunchScreen: React.FC = () => {
         desconto: 0,
         acrescimo: 0,
         observacao: currentObservationLabel || undefined,
-        idMesaVinculada: 0,
+        idMesaVinculada: linkedMesaId,
         valorUnitario: selectedPrice,
         opcionais: opc
       });
@@ -1034,13 +1095,13 @@ export const ItemLaunchScreen: React.FC = () => {
         </View>
       </View>
 
-      {activeTable && (
+      {tableBindingSource && (
         <View style={styles.tableCard}>
-          <Text style={styles.tableTitle}>Mesa vinculada</Text>
-        <Text style={styles.tableValue}>
-          {activeTable.nomeMesaComanda || `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`}
-          {activeTable.idVenda ? ` | Venda ${activeTable.idVenda}` : ''}
-        </Text>
+          <Text style={styles.tableTitle}>Venda ativa</Text>
+          <Text style={styles.tableValue}>
+            {tableBindingSource.nomeMesaComanda || `${tableBindingSource.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${tableBindingSource.idMesa}`}
+            {tableBindingSource.idVenda ? ` | Venda ${tableBindingSource.idVenda}` : ''}
+          </Text>
         </View>
       )}
 
@@ -1048,6 +1109,25 @@ export const ItemLaunchScreen: React.FC = () => {
         <View style={styles.tableCard}>
           <Text style={styles.tableTitle}>Abrindo venda</Text>
           <Text style={styles.tableValue}>Aguarde, iniciando venda da mesa...</Text>
+        </View>
+      ) : null}
+
+      {requiresLinkedMesa ? (
+        <View style={styles.tableCard}>
+          <Text style={styles.tableTitle}>Mesa vinculada aos itens</Text>
+          <Text style={styles.tableValue}>
+            {linkedMesa
+              ? `${linkedMesa.nomeMesaComanda || `Mesa ${linkedMesa.idMesa}`}${formatTableStatusLabel(linkedMesa.situacao) ? ` | ${formatTableStatusLabel(linkedMesa.situacao)}` : ''}`
+              : 'Nenhuma mesa selecionada para esta comanda.'}
+          </Text>
+          <Text style={styles.tableHint}>
+            Os itens lancados nesta comanda serao enviados com o vinculo da mesa escolhida.
+          </Text>
+          <View style={styles.tableActionRow}>
+            <Pressable style={styles.tableActionButton} onPress={() => void openLinkedMesaPicker()}>
+              <Text style={styles.tableActionButtonText}>{linkedMesa ? 'Trocar mesa' : 'Escolher mesa'}</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -1306,6 +1386,18 @@ export const ItemLaunchScreen: React.FC = () => {
       <Pressable onPress={onAdd} style={styles.primaryBtn}>
         <Text style={styles.primaryText}>Adicionar ao carrinho</Text>
       </Pressable>
+
+      <LinkedMesaPickerModal
+        visible={linkedMesaPickerVisible}
+        tables={linkedMesaPickerTables}
+        loading={linkedMesaPickerLoading}
+        selectedTableId={Number(linkedMesa?.idMesa || preferredLinkedMesaId || 0)}
+        onClose={closeLinkedMesaPicker}
+        onRefresh={() => {
+          void refreshLinkedMesaPickerTables(true);
+        }}
+        onSelect={handleLinkedMesaSelect}
+      />
     </ScrollView>
   );
 };
@@ -1318,11 +1410,12 @@ const styles = StyleSheet.create({
   },
   topCard: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   backButton: {
     marginLeft: 4,
@@ -1354,8 +1447,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.cardSoft,
-    borderRadius: Radius.sm,
-    padding: 10
+    borderRadius: 18,
+    padding: 12
   },
   productPreviewRow: {
     flexDirection: 'row',
@@ -1369,8 +1462,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.cardSoft,
-    borderRadius: Radius.sm,
-    padding: 10
+    borderRadius: 18,
+    padding: 12
   },
   productPreviewLabel: {
     color: Colors.textMuted,
@@ -1384,12 +1477,13 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   tableCard: {
-    borderRadius: Radius.md,
+    borderRadius: 22,
     padding: Space.md,
     borderWidth: 1,
-    borderColor: Colors.primarySoft,
-    backgroundColor: Colors.primarySoft,
-    marginBottom: Space.md
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   tableTitle: {
     color: Colors.text,
@@ -1403,6 +1497,27 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '700'
   },
+  tableHint: {
+    color: Colors.textMuted,
+    marginTop: 8,
+    lineHeight: 20
+  },
+  tableActionRow: {
+    flexDirection: 'row',
+    marginTop: Space.sm
+  },
+  tableActionButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  tableActionButtonText: {
+    color: Colors.text,
+    fontWeight: '800'
+  },
   section: {
     marginTop: 12,
     marginBottom: 8,
@@ -1410,14 +1525,15 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   option: {
-    borderRadius: Radius.md,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
     padding: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8
+    marginBottom: 8,
+    ...Shadows.soft
   },
   optionActive: {
     borderColor: Colors.primary,
@@ -1438,12 +1554,13 @@ const styles = StyleSheet.create({
   qtyBtn: {
     width: 42,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.card
+    backgroundColor: Colors.cardSoft,
+    ...Shadows.soft
   },
   qtyBtnText: {
     color: Colors.text,
@@ -1460,19 +1577,19 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    backgroundColor: Colors.cardSoft,
     color: Colors.text,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     marginHorizontal: 8,
     fontWeight: '700',
     paddingVertical: 10
   },
   textarea: {
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.cardSoft,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
     padding: 12,
     minHeight: 80,
     color: Colors.text
@@ -1484,22 +1601,23 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    backgroundColor: Colors.cardSoft,
+    borderRadius: 18,
+    padding: 12,
     color: Colors.text
   },
   optionalRow: {
     borderWidth: 1,
-    borderColor: '#F0CFA4',
+    borderColor: Colors.border,
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 20,
     padding: 10,
     marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    ...Shadows.soft
   },
   optionalLabel: {
     color: Colors.text,
@@ -1524,12 +1642,13 @@ const styles = StyleSheet.create({
   flavorOption: {
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.cardSoft,
     borderRadius: 20,
     width: 40,
     height: 40,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    ...Shadows.soft
   },
   flavorOptionActive: {
     backgroundColor: Colors.primary,
@@ -1550,11 +1669,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderColor: Colors.border,
+    borderRadius: 18,
     backgroundColor: Colors.card,
     paddingHorizontal: 12,
-    marginBottom: 12
+    marginBottom: 12,
+    ...Shadows.soft
   },
   fractionSearchIcon: {
     fontSize: 18,
@@ -1569,9 +1689,10 @@ const styles = StyleSheet.create({
   fractionCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 20,
     backgroundColor: Colors.card,
-    padding: 12
+    padding: 12,
+    ...Shadows.soft
   },
   fractionHeader: {
     flexDirection: 'row',
@@ -1639,11 +1760,12 @@ const styles = StyleSheet.create({
   summary: {
     marginTop: 20,
     borderWidth: 1,
-    borderColor: '#F0CFA4',
-    borderRadius: Radius.md,
+    borderColor: Colors.border,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: 12,
-    gap: 4
+    gap: 4,
+    ...Shadows.card
   },
   summaryText: {
     color: Colors.text,
@@ -1658,9 +1780,10 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 0,
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 14,
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.button
   },
   primaryText: {
     color: '#fff',
@@ -1686,10 +1809,10 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0CFA4',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.card
+    backgroundColor: Colors.cardSoft
   },
   qtyBtnSmallText: {
     color: Colors.text,

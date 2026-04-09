@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, ScrollView, Style
 import { CommonActions, useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
-import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { api, normalizeSaleStatus, PaymentMethod, Sale, SalePayment } from '../services/api';
@@ -178,6 +177,29 @@ const parsePrintCommandsToText = (raw: string): string => {
 
   return base;
 };
+
+const ClosureSection = ({
+  eyebrow,
+  title,
+  subtitle,
+  children,
+  tone = 'default'
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  tone?: 'default' | 'warm';
+}) => (
+  <View style={[styles.sectionShell, tone === 'warm' ? styles.sectionShellWarm : null]}>
+    <View style={styles.sectionHeaderBlock}>
+      <Text style={[styles.sectionEyebrow, tone === 'warm' ? styles.sectionEyebrowWarm : null]}>{eyebrow}</Text>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+    </View>
+    {children}
+  </View>
+);
 
 export const SaleClosureScreen: React.FC = () => {
   const { height: screenHeight } = useWindowDimensions();
@@ -1021,6 +1043,21 @@ export const SaleClosureScreen: React.FC = () => {
   const buttonText = mode === 'pre'
     ? (!allowSave ? 'Pré Fechamento indisponível' : (saving ? 'Salvando...' : 'Salvar Pré Fechamento'))
     : (saving ? 'Fechando...' : 'Fechar venda');
+  const locationLabel = tableType === 'comanda' ? 'Comanda' : 'Mesa';
+  const saveUnavailableMessage = !allowSave
+    ? (
+      mode === 'pre'
+        ? !hasSaleItems
+          ? 'Venda sem produtos lançados.'
+          : isAlreadyPreClosed
+            ? 'Venda já está em pré-fechamento.'
+            : 'Pré-fechamento indisponível para esta situação.'
+        : 'Fechamento indisponível para esta situação.'
+    )
+    : '';
+  const heroSubtitle = mode === 'pre'
+    ? 'Ajuste pessoas, couvert e impressão em um fechamento mais claro, mantendo a mesma lógica operacional do sistema.'
+    : 'Revise totais, pagamentos e descontos em uma tela reorganizada para facilitar a conferência antes de concluir.';
 
   const openPaymentPicker = async (index: number) => {
     Keyboard.dismiss();
@@ -1192,9 +1229,10 @@ export const SaleClosureScreen: React.FC = () => {
 
   if (!idVenda) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.warningContainer}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <ScreenRouteLabel />
         <View style={styles.warningCard}>
+          <Text style={styles.warningEyebrow}>Fechamento indisponível</Text>
           <Text style={styles.warningTitle}>Venda não disponível</Text>
           <Text style={styles.warningText}>Selecione uma mesa e abra a venda em Mesas antes de fechar.</Text>
           <Pressable
@@ -1211,304 +1249,333 @@ export const SaleClosureScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {mode !== 'pre' ? <ScreenRouteLabel /> : null}
-      {mode !== 'pre' ? (
-        <SectionHeader
-          title={`${title} da venda #${idVenda}`}
-          subtitle={sale ? `Mesa: ${sale.nomeMesaComanda || 'Sem identificador'}` : undefined}
-        />
-      ) : null}
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Total da venda</Text>
-        <Text style={styles.summaryValue}>{formatMoney(total)}</Text>
-        {mode === 'final' && partialPaid > 0 ? (
-          <>
-            <Text style={styles.summaryLabel}>Pagamentos parciais</Text>
-            <Text style={styles.summaryValue}>{formatMoney(partialPaid)}</Text>
-          </>
-        ) : null}
-        <Text style={styles.summaryLabel}>Situação atual</Text>
-        <Text style={styles.summaryValue}>{toDisplayStatus(sale?.situacao)}</Text>
-        {!allowSave ? (
-          <Text style={styles.alertText}>
-            {mode === 'pre'
-              ? !hasSaleItems
-                ? 'Venda sem produtos lançados.'
-                : isAlreadyPreClosed
-                  ? 'Venda já está em pré-fechamento.'
-                  : 'Pré-fechamento indisponível para esta situação.'
-              : 'Fechamento indisponível para esta situação.'}
-          </Text>
-        ) : null}
-      </View>
+      <View style={styles.heroShell}>
+        <Text style={styles.heroEyebrow}>{mode === 'pre' ? 'Pré fechamento' : 'Fechamento da venda'}</Text>
+        <Text style={styles.heroTitle}>{title} da venda #{idVenda}</Text>
+        <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Pessoas</Text>
-        <View style={styles.counterRow}>
-          <Pressable
-            style={styles.counterBtn}
-            onPress={() => changeInteger(setNumPessoas, numPessoas, -1)}
-          >
-            <Text style={styles.counterText}>-</Text>
-          </Pressable>
-          <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={numPessoas} onChangeText={setNumPessoas} />
-          <Pressable
-            style={styles.counterBtn}
-            onPress={() => changeInteger(setNumPessoas, numPessoas, +1)}
-          >
-            <Text style={styles.counterText}>+</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Couvert M/F</Text>
-        <View style={styles.couvertLine}>
-          <Text style={styles.payLabel}>Masculino</Text>
-          <View style={styles.counterRow}>
-            <Pressable
-              style={styles.counterBtn}
-              onPress={() => changeInteger(setMasc, masc, -1)}
-            >
-              <Text style={styles.counterText}>-</Text>
-            </Pressable>
-            <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={masc} onChangeText={setMasc} />
-            <Pressable
-              style={styles.counterBtn}
-              onPress={() => changeInteger(setMasc, masc, +1)}
-            >
-              <Text style={styles.counterText}>+</Text>
-            </Pressable>
+        <View style={styles.metricGrid}>
+          <View style={[styles.metricCard, styles.metricCardAccent]}>
+            <Text style={styles.metricLabel}>Total</Text>
+            <Text style={[styles.metricValue, styles.metricValueAccent]}>{formatMoney(total)}</Text>
           </View>
-        </View>
-        <View style={styles.couvertLine}>
-          <Text style={styles.payLabel}>Feminino</Text>
-          <View style={styles.counterRow}>
-            <Pressable
-              style={styles.counterBtn}
-              onPress={() => changeInteger(setFem, fem, -1)}
-            >
-              <Text style={styles.counterText}>-</Text>
-            </Pressable>
-            <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={fem} onChangeText={setFem} />
-            <Pressable
-              style={styles.counterBtn}
-              onPress={() => changeInteger(setFem, fem, +1)}
-            >
-              <Text style={styles.counterText}>+</Text>
-            </Pressable>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>{locationLabel}</Text>
+            <Text style={styles.metricValue}>{sale?.nomeMesaComanda || 'Sem identificador'}</Text>
           </View>
-        </View>
-      </View>
-
-      {mode === 'pre' ? (
-        <View style={styles.summaryCard}>
-          <View style={styles.switchRow}>
-            <Text style={styles.infoTitle}>Pré-visualizar impressão</Text>
-            <Switch
-              value={canPreviewPreClosure && previewBeforePrint}
-              onValueChange={(value) => {
-                if (!canPreviewPreClosure) return;
-                setPreviewBeforePrint(value);
-              }}
-              disabled={!canPreviewPreClosure}
-            />
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Situação</Text>
+            <Text style={styles.metricValue}>{toDisplayStatus(sale?.situacao)}</Text>
           </View>
-          {!canPreviewPreClosure ? (
-            <Text style={styles.permissionHint}>
-              Seu usuário não possui permissão para usar a pré-visualização.
-            </Text>
-          ) : null}
-          <TouchableOpacity
-            style={[
-              styles.previewBtn,
-              { marginTop: 10 },
-              saving || !allowSave || !canPreviewPreClosure ? styles.primaryBtnDisabled : null
-            ]}
-            onPress={onPreviewOnly}
-            activeOpacity={0.85}
-            disabled={saving || !allowSave || !canPreviewPreClosure}
-          >
-            <Text style={styles.previewBtnText}>{saving ? 'Carregando...' : 'Pré-visualizar'}</Text>
-          </TouchableOpacity>
-          {showPreview && previewText ? (
-            <View style={[styles.previewBox, { minHeight: Math.max(560, screenHeight * 0.86) }]}>
-              <Text style={styles.previewTitle}>TextImpressao</Text>
-              <ScrollView style={[styles.previewScroll, { maxHeight: Math.max(520, screenHeight * 0.78) }]}> 
-                <Text style={styles.previewText}>{previewText}</Text>
-              </ScrollView>
-              <View style={styles.previewActions}>
-                <Pressable
-                  style={styles.previewBtn}
-                  onPress={async () => {
-                    try {
-                      setActionStatus({ kind: 'info', message: 'Enviando impressão...' });
-                      if (usePagBankPrinter || useStoneOrCieloPrinter) {
-                        showPrintProcessing('Processando impressão...');
-                        await printSaleContent({
-                          content: previewRawPrintContent || previewText,
-                          appSettings,
-                          usarRotaMaquininha: true
-                        });
-                      } else {
-                        await executeSalePrint({
-                          idVenda: idVenda || 0,
-                          appSettings,
-                          usarRotaMaquininha: true
-                        });
-                      }
-                      setActionStatus({ kind: 'success', message: 'Impressão enviada com sucesso.' });
-                      showSweetAlert('Concluído', 'Impressão enviada.', 'success');
-                      setShowPreview(false);
-                    } catch (error: any) {
-                      setActionStatus({ kind: 'error', message: error?.message || 'Falha ao imprimir.' });
-                      showSweetAlert('Erro', error?.message || 'Falha ao imprimir.', 'error');
-                    } finally {
-                      hidePrintProcessing();
-                    }
-                  }}
-                >
-                  <Text style={styles.previewBtnText}>Imprimir</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.previewBtn, styles.previewBtnSecondary]}
-                  onPress={() => {
-                    setShowPreview(false);
-                    goToReturn();
-                  }}
-                >
-                  <Text style={styles.previewBtnText}>Voltar</Text>
-                </Pressable>
-              </View>
+          {mode === 'final' && partialPaid > 0 ? (
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Pagamentos parciais</Text>
+              <Text style={styles.metricValue}>{formatMoney(partialPaid)}</Text>
             </View>
           ) : null}
         </View>
+
+        {saveUnavailableMessage ? (
+          <View style={styles.alertBanner}>
+            <Text style={styles.alertBannerText}>{saveUnavailableMessage}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <ClosureSection
+        eyebrow="Atendimento"
+        title="Pessoas e couvert"
+        subtitle="Ajuste os contadores mantendo exatamente o mesmo comportamento atual da tela."
+      >
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Pessoas</Text>
+          <View style={styles.counterRow}>
+            <Pressable
+              style={styles.counterBtn}
+              onPress={() => changeInteger(setNumPessoas, numPessoas, -1)}
+            >
+              <Text style={styles.counterText}>-</Text>
+            </Pressable>
+            <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={numPessoas} onChangeText={setNumPessoas} />
+            <Pressable
+              style={styles.counterBtn}
+              onPress={() => changeInteger(setNumPessoas, numPessoas, +1)}
+            >
+              <Text style={styles.counterText}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Couvert M/F</Text>
+          <View style={styles.couvertLine}>
+            <Text style={styles.payLabel}>Masculino</Text>
+            <View style={styles.counterRow}>
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setMasc, masc, -1)}
+              >
+                <Text style={styles.counterText}>-</Text>
+              </Pressable>
+              <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={masc} onChangeText={setMasc} />
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setMasc, masc, +1)}
+              >
+                <Text style={styles.counterText}>+</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.couvertLine}>
+            <Text style={styles.payLabel}>Feminino</Text>
+            <View style={styles.counterRow}>
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setFem, fem, -1)}
+              >
+                <Text style={styles.counterText}>-</Text>
+              </Pressable>
+              <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={fem} onChangeText={setFem} />
+              <Pressable
+                style={styles.counterBtn}
+                onPress={() => changeInteger(setFem, fem, +1)}
+              >
+                <Text style={styles.counterText}>+</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </ClosureSection>
+
+      {mode === 'pre' ? (
+        <ClosureSection
+          eyebrow="Impressão"
+          title="Pré-visualização"
+          subtitle="Consulte o conteúdo da impressão antes de enviar, quando a permissão estiver disponível."
+        >
+          <View style={styles.summaryCard}>
+            <View style={styles.switchRow}>
+              <Text style={styles.infoTitle}>Pré-visualizar impressão</Text>
+              <Switch
+                value={canPreviewPreClosure && previewBeforePrint}
+                onValueChange={(value) => {
+                  if (!canPreviewPreClosure) return;
+                  setPreviewBeforePrint(value);
+                }}
+                disabled={!canPreviewPreClosure}
+              />
+            </View>
+            {!canPreviewPreClosure ? (
+              <Text style={styles.permissionHint}>
+                Seu usuário não possui permissão para usar a pré-visualização.
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.previewBtn,
+                { marginTop: 10 },
+                saving || !allowSave || !canPreviewPreClosure ? styles.primaryBtnDisabled : null
+              ]}
+              onPress={onPreviewOnly}
+              activeOpacity={0.85}
+              disabled={saving || !allowSave || !canPreviewPreClosure}
+            >
+              <Text style={styles.previewBtnText}>{saving ? 'Carregando...' : 'Pré-visualizar'}</Text>
+            </TouchableOpacity>
+            {showPreview && previewText ? (
+              <View style={[styles.previewBox, { minHeight: Math.max(560, screenHeight * 0.86) }]}>
+                <Text style={styles.previewTitle}>TextImpressao</Text>
+                <ScrollView style={[styles.previewScroll, { maxHeight: Math.max(520, screenHeight * 0.78) }]}>
+                  <Text style={styles.previewText}>{previewText}</Text>
+                </ScrollView>
+                <View style={styles.previewActions}>
+                  <Pressable
+                    style={styles.previewBtn}
+                    onPress={async () => {
+                      try {
+                        setActionStatus({ kind: 'info', message: 'Enviando impressão...' });
+                        if (usePagBankPrinter || useStoneOrCieloPrinter) {
+                          showPrintProcessing('Processando impressão...');
+                          await printSaleContent({
+                            content: previewRawPrintContent || previewText,
+                            appSettings,
+                            usarRotaMaquininha: true
+                          });
+                        } else {
+                          await executeSalePrint({
+                            idVenda: idVenda || 0,
+                            appSettings,
+                            usarRotaMaquininha: true
+                          });
+                        }
+                        setActionStatus({ kind: 'success', message: 'Impressão enviada com sucesso.' });
+                        showSweetAlert('Concluído', 'Impressão enviada.', 'success');
+                        setShowPreview(false);
+                      } catch (error: any) {
+                        setActionStatus({ kind: 'error', message: error?.message || 'Falha ao imprimir.' });
+                        showSweetAlert('Erro', error?.message || 'Falha ao imprimir.', 'error');
+                      } finally {
+                        hidePrintProcessing();
+                      }
+                    }}
+                  >
+                    <Text style={styles.previewBtnText}>Imprimir</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.previewBtn, styles.previewBtnSecondary]}
+                    onPress={() => {
+                      setShowPreview(false);
+                      goToReturn();
+                    }}
+                  >
+                    <Text style={styles.previewBtnText}>Voltar</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </ClosureSection>
       ) : null}
 
       {mode === 'final' ? (
         <>
           {showDiscountControls ? (
-            <View style={[styles.summaryCard, !canApplyDiscount ? styles.summaryCardDisabled : null]}>
-              <Text style={styles.summaryLabel}>Desconto (R$)</Text>
-              <TextInput
-                style={[styles.input, !canApplyDiscount ? styles.inputDisabled : null]}
-                keyboardType="numeric"
-                value={descontoValor}
-                onChangeText={handleDiscountValueChange}
-                editable={canApplyDiscount}
-              />
-              <Text style={styles.summaryLabel}>Desconto (%)</Text>
-              <TextInput
-                style={[styles.input, !canApplyDiscount ? styles.inputDisabled : null]}
-                keyboardType="numeric"
-                value={descontoPercentual}
-                onChangeText={handleDiscountPercentChange}
-                editable={canApplyDiscount}
-              />
-              {!canApplyDiscount ? (
-                <Text style={styles.permissionHint}>Desconto indisponível para este usuário.</Text>
-              ) : null}
-              <Text style={styles.summaryLabel}>Saldo estimado</Text>
-              <Text style={[styles.summaryValue, saldo < 0 ? styles.warning : null]}>R$ {saldo.toFixed(2)}</Text>
-            </View>
+            <ClosureSection
+              eyebrow="Financeiro"
+              title="Desconto e saldo"
+              subtitle="Revise o desconto antes de fechar a conta."
+            >
+              <View style={[styles.summaryCard, !canApplyDiscount ? styles.summaryCardDisabled : null]}>
+                <Text style={styles.summaryLabel}>Desconto (R$)</Text>
+                <TextInput
+                  style={[styles.input, !canApplyDiscount ? styles.inputDisabled : null]}
+                  keyboardType="numeric"
+                  value={descontoValor}
+                  onChangeText={handleDiscountValueChange}
+                  editable={canApplyDiscount}
+                />
+                <Text style={styles.summaryLabel}>Desconto (%)</Text>
+                <TextInput
+                  style={[styles.input, !canApplyDiscount ? styles.inputDisabled : null]}
+                  keyboardType="numeric"
+                  value={descontoPercentual}
+                  onChangeText={handleDiscountPercentChange}
+                  editable={canApplyDiscount}
+                />
+                {!canApplyDiscount ? (
+                  <Text style={styles.permissionHint}>Desconto indisponível para este usuário.</Text>
+                ) : null}
+                <Text style={styles.summaryLabel}>Saldo estimado</Text>
+                <Text style={[styles.summaryValue, saldo < 0 ? styles.warning : null]}>R$ {saldo.toFixed(2)}</Text>
+              </View>
+            </ClosureSection>
           ) : null}
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Pagamentos</Text>
-            {pagamentos.map((linha, index) => {
-              const selectedMethod = methods.find((m) => m.codigo === linha.codigo);
-              const isLocked = Boolean(linha.processed);
-              return (
-                <View key={`pay-${index}`} style={[styles.paymentLine, isLocked ? styles.paymentLineLocked : null]}>
-                  <Text style={styles.payLabel}>Método</Text>
-                  <Pressable
-                    style={[styles.selectMethodBtn, isLocked ? styles.selectMethodBtnLocked : null]}
-                    disabled={isLocked}
-                    onPress={() => openPaymentPicker(index)}
-                  >
-                    <Text style={styles.selectMethodText}>{selectedMethod?.descricao || 'Selecionar forma de pagamento'}</Text>
-                  </Pressable>
-                  <Text style={styles.payLabel}>Valor</Text>
-                  <TextInput
-                    style={[styles.input, isLocked ? styles.inputLocked : null]}
-                    keyboardType="numeric"
-                    value={linha.valor}
-                    editable={!isLocked}
-                    onChangeText={(value) => setLineValue(index, value)}
-                  />
-                  {isLocked ? (
-                    <View style={styles.paymentApprovedBox}>
-                      <Text style={styles.paymentApprovedTitle}>Pagamento aprovado</Text>
-                      <Text style={styles.paymentApprovedText}>
-                        {linha.provider ? `Integração: ${String(linha.provider).toUpperCase()}` : 'Integração eletrônica confirmada'}
-                      </Text>
-                      {linha.nsu ? <Text style={styles.paymentApprovedText}>NSU: {linha.nsu}</Text> : null}
-                    </View>
-                  ) : null}
-                  {!isLocked ? (
-                    <Pressable style={styles.removeBtn} onPress={() => removeLine(index)}>
-                      <Text style={styles.removeText}>Remover</Text>
+          <ClosureSection
+            eyebrow="Pagamento"
+            title="Fechamento financeiro"
+            subtitle="Selecione as formas de pagamento e confira cada aprovação sem alterar a lógica já existente."
+          >
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Pagamentos</Text>
+              {pagamentos.map((linha, index) => {
+                const selectedMethod = methods.find((m) => m.codigo === linha.codigo);
+                const isLocked = Boolean(linha.processed);
+                return (
+                  <View key={`pay-${index}`} style={[styles.paymentLine, isLocked ? styles.paymentLineLocked : null]}>
+                    <Text style={styles.payLabel}>Método</Text>
+                    <Pressable
+                      style={[styles.selectMethodBtn, isLocked ? styles.selectMethodBtnLocked : null]}
+                      disabled={isLocked}
+                      onPress={() => openPaymentPicker(index)}
+                    >
+                      <Text style={styles.selectMethodText}>{selectedMethod?.descricao || 'Selecionar forma de pagamento'}</Text>
                     </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
-            {shouldShowAddPaymentButton ? (
-              <Pressable
-                style={[styles.addBtn, saving || isMachinePaymentRunning ? styles.primaryBtnDisabled : null]}
-                onPress={addLine}
-                disabled={saving || isMachinePaymentRunning}
-              >
-                <Text style={styles.addText}>
-                  {pagamentos.length === 0 ? 'Inserir pagamento' : 'Adicionar outra forma'}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+                    <Text style={styles.payLabel}>Valor</Text>
+                    <TextInput
+                      style={[styles.input, isLocked ? styles.inputLocked : null]}
+                      keyboardType="numeric"
+                      value={linha.valor}
+                      editable={!isLocked}
+                      onChangeText={(value) => setLineValue(index, value)}
+                    />
+                    {isLocked ? (
+                      <View style={styles.paymentApprovedBox}>
+                        <Text style={styles.paymentApprovedTitle}>Pagamento aprovado</Text>
+                        <Text style={styles.paymentApprovedText}>
+                          {linha.provider ? `Integração: ${String(linha.provider).toUpperCase()}` : 'Integração eletrônica confirmada'}
+                        </Text>
+                        {linha.nsu ? <Text style={styles.paymentApprovedText}>NSU: {linha.nsu}</Text> : null}
+                      </View>
+                    ) : null}
+                    {!isLocked ? (
+                      <Pressable style={styles.removeBtn} onPress={() => removeLine(index)}>
+                        <Text style={styles.removeText}>Remover</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })}
+              {shouldShowAddPaymentButton ? (
+                <Pressable
+                  style={[styles.addBtn, saving || isMachinePaymentRunning ? styles.primaryBtnDisabled : null]}
+                  onPress={addLine}
+                  disabled={saving || isMachinePaymentRunning}
+                >
+                  <Text style={styles.addText}>
+                    {pagamentos.length === 0 ? 'Inserir pagamento' : 'Adicionar outra forma'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </ClosureSection>
         </>
       ) : null}
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.infoTitle}>{title}</Text>
-        <Text style={styles.infoText}>{description}</Text>
-      </View>
-
-      {actionStatus.message ? (
-        <View
-          style={[
-            styles.statusBox,
-            actionStatus.kind === 'error'
-              ? styles.statusError
-              : actionStatus.kind === 'success'
-                ? styles.statusSuccess
-                : styles.statusInfo
-          ]}
-        >
-          <Text
+      <ClosureSection
+        eyebrow={mode === 'pre' ? 'Conferência final' : 'Concluir venda'}
+        title={title}
+        subtitle={description}
+        tone="warm"
+      >
+        {actionStatus.message ? (
+          <View
             style={[
-              styles.statusText,
+              styles.statusBox,
               actionStatus.kind === 'error'
-                ? styles.statusTextError
+                ? styles.statusError
                 : actionStatus.kind === 'success'
-                  ? styles.statusTextSuccess
-                  : styles.statusTextInfo
+                  ? styles.statusSuccess
+                  : styles.statusInfo
             ]}
           >
-            {actionStatus.message}
-          </Text>
-        </View>
-      ) : null}
+            <Text
+              style={[
+                styles.statusText,
+                actionStatus.kind === 'error'
+                  ? styles.statusTextError
+                  : actionStatus.kind === 'success'
+                    ? styles.statusTextSuccess
+                    : styles.statusTextInfo
+              ]}
+            >
+              {actionStatus.message}
+            </Text>
+          </View>
+        ) : null}
 
-      <TouchableOpacity
-        style={[styles.primaryBtn, saving || !allowSave || isMachinePaymentRunning ? styles.primaryBtnDisabled : null]}
-        disabled={saving || !allowSave || isMachinePaymentRunning}
-        onPress={onSave}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.primaryText}>{buttonText}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.primaryBtn, saving || !allowSave || isMachinePaymentRunning ? styles.primaryBtnDisabled : null]}
+          disabled={saving || !allowSave || isMachinePaymentRunning}
+          onPress={onSave}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.primaryText}>{buttonText}</Text>
+        </TouchableOpacity>
+      </ClosureSection>
 
       <Modal
         transparent
@@ -1603,12 +1670,156 @@ export const SaleClosureScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: Space.md },
+  container: {
+    flex: 1,
+    backgroundColor: '#f6f8fc'
+  },
+  scrollContent: {
+    paddingHorizontal: Space.md,
+    paddingTop: Space.md,
+    paddingBottom: 120
+  },
+  heroShell: {
+    marginBottom: Space.md,
+    padding: Space.xl,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 153, 74, 0.14)',
+    backgroundColor: '#fffaf4',
+    shadowColor: '#684327',
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 7
+  },
+  heroEyebrow: {
+    alignSelf: 'flex-start',
+    color: '#d46c15',
+    backgroundColor: 'rgba(242, 153, 74, 0.14)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginBottom: 14
+  },
+  heroTitle: {
+    color: '#23314d',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 34,
+    marginBottom: 8
+  },
+  heroSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: Space.lg
+  },
+  sectionShell: {
+    marginBottom: Space.md,
+    padding: Space.lg,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 228, 239, 0.96)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5
+  },
+  sectionShellWarm: {
+    borderColor: 'rgba(242, 153, 74, 0.16)',
+    backgroundColor: '#fffaf4'
+  },
+  sectionHeaderBlock: {
+    marginBottom: Space.md
+  },
+  sectionEyebrow: {
+    alignSelf: 'flex-start',
+    color: '#1b4f72',
+    backgroundColor: 'rgba(27, 79, 114, 0.08)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginBottom: 10
+  },
+  sectionEyebrowWarm: {
+    color: '#d46c15',
+    backgroundColor: 'rgba(242, 153, 74, 0.14)'
+  },
+  sectionTitle: {
+    color: '#23314d',
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 6
+  },
+  sectionSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12
+  },
+  metricCard: {
+    flexGrow: 1,
+    minWidth: 150,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 228, 239, 0.96)',
+    backgroundColor: '#ffffff'
+  },
+  metricCardAccent: {
+    borderColor: 'transparent',
+    backgroundColor: '#1b4f72'
+  },
+  metricLabel: {
+    color: '#f2994a',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8
+  },
+  metricValue: {
+    color: '#23314d',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24
+  },
+  metricValueAccent: {
+    color: '#ffffff'
+  },
+  alertBanner: {
+    marginTop: Space.md,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.18)',
+    borderRadius: 18,
+    backgroundColor: '#fff5ea',
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  alertBannerText: {
+    color: Colors.warning,
+    fontWeight: '800'
+  },
   summaryCard: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.card,
+    borderColor: 'rgba(217, 228, 239, 0.96)',
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
     padding: Space.md,
     marginBottom: Space.md
   },
@@ -1616,14 +1827,16 @@ const styles = StyleSheet.create({
     opacity: 0.75
   },
   summaryLabel: {
-    color: Colors.textMuted,
-    fontWeight: '700',
-    fontSize: 12,
-    marginBottom: 4
+    color: '#1b4f72',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8
   },
   summaryValue: {
-    color: Colors.primary,
-    fontSize: 22,
+    color: '#23314d',
+    fontSize: 24,
     fontWeight: '900',
     marginBottom: 12
   },
@@ -1640,27 +1853,33 @@ const styles = StyleSheet.create({
     gap: 10
   },
   counterBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.cardSoft,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    backgroundColor: '#f7fbff',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    shadowColor: '#1b4f72',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
   },
   counterText: {
-    color: Colors.text,
+    color: '#23314d',
     fontWeight: '900',
     fontSize: 18
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.cardSoft,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    backgroundColor: '#f8fbff',
     color: Colors.text,
-    borderRadius: Radius.sm,
-    padding: 10,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     marginBottom: 10
   },
   inputDisabled: {
@@ -1685,11 +1904,11 @@ const styles = StyleSheet.create({
   },
   previewBox: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
+    borderColor: 'rgba(27, 79, 114, 0.1)',
+    borderRadius: 20,
     marginTop: 10,
     padding: 14,
-    backgroundColor: Colors.cardSoft
+    backgroundColor: '#f8fbff'
   },
   previewScroll: {
     maxHeight: 520
@@ -1710,13 +1929,13 @@ const styles = StyleSheet.create({
   },
   previewBtn: {
     flex: 1,
-    borderRadius: Radius.sm,
-    paddingVertical: 10,
+    borderRadius: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: Colors.primary
+    backgroundColor: '#1b4f72'
   },
   previewBtnSecondary: {
-    backgroundColor: Colors.textMuted
+    backgroundColor: '#64748b'
   },
   previewBtnText: {
     color: '#fff',
@@ -1724,16 +1943,20 @@ const styles = StyleSheet.create({
   },
   paymentLine: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.cardSoft,
-    borderRadius: Radius.md,
-    padding: 10,
-    marginBottom: 8
+    borderColor: 'rgba(27, 79, 114, 0.1)',
+    backgroundColor: '#fbfdff',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10
   },
   payLabel: {
-    color: Colors.textMuted,
+    color: '#1b4f72',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
     marginTop: 4,
-    marginBottom: 4
+    marginBottom: 6
   },
   selectedMethod: {
     color: Colors.text,
@@ -1741,16 +1964,16 @@ const styles = StyleSheet.create({
   },
   selectMethodBtn: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.card,
-    paddingVertical: 10,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
     paddingHorizontal: 12,
     marginBottom: 8
   },
   selectMethodText: {
-    color: Colors.text,
-    fontWeight: '700'
+    color: '#23314d',
+    fontWeight: '800'
   },
   methodList: {
     flexDirection: 'row',
@@ -1780,15 +2003,16 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: 'rgba(27, 79, 114, 0.14)',
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    backgroundColor: Colors.primarySoft
+    backgroundColor: '#f6f9fc'
   },
   addText: {
-    color: Colors.primary,
-    fontWeight: '700'
+    color: '#1b4f72',
+    fontWeight: '800'
   },
   removeBtn: {
     marginTop: 8,
@@ -1797,7 +2021,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.warning,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 8,
+    backgroundColor: '#fff5ea'
   },
   removeText: {
     color: Colors.warning,
@@ -1832,17 +2057,23 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   primaryBtn: {
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primary,
-    padding: 14,
-    alignItems: 'center'
+    borderRadius: 18,
+    backgroundColor: '#1b4f72',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    shadowColor: '#1b4f72',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4
   },
   primaryBtnDisabled: {
     opacity: 0.7
   },
   primaryText: {
     color: '#fff',
-    fontWeight: '700'
+    fontWeight: '800'
   },
   warningContainer: {
     paddingBottom: 120,
@@ -1850,28 +2081,39 @@ const styles = StyleSheet.create({
     paddingTop: Space.md
   },
   warningCard: {
-    borderRadius: Radius.md,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: Colors.warning,
-    backgroundColor: Colors.card,
-    padding: Space.md
+    borderColor: 'rgba(249, 115, 22, 0.18)',
+    backgroundColor: '#fffaf4',
+    padding: Space.xl
+  },
+  warningEyebrow: {
+    alignSelf: 'flex-start',
+    color: '#d46c15',
+    backgroundColor: 'rgba(242, 153, 74, 0.14)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginBottom: 12
   },
   warningTitle: {
-    color: Colors.warning,
-    fontWeight: '700',
-    marginBottom: 6
+    color: '#23314d',
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 8
   },
   warningText: {
-    color: Colors.textMuted
-  },
-  alertText: {
-    color: Colors.warning,
-    marginBottom: 4,
-    fontWeight: '700'
+    color: Colors.textMuted,
+    lineHeight: 22,
+    marginBottom: Space.lg
   },
   infoTitle: {
-    color: Colors.text,
-    fontWeight: '700',
+    color: '#23314d',
+    fontWeight: '800',
     marginBottom: 4
   },
   infoText: {
@@ -1883,7 +2125,7 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   statusBox: {
-    borderRadius: Radius.sm,
+    borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1916,16 +2158,16 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
     justifyContent: 'center',
     padding: Space.md
   },
   modalCard: {
-    borderRadius: Radius.md,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(217, 228, 239, 0.96)',
     backgroundColor: Colors.card,
-    padding: Space.md
+    padding: Space.lg
   },
   modalTitle: {
     color: Colors.text,
@@ -1934,12 +2176,12 @@ const styles = StyleSheet.create({
   },
   modalOption: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingVertical: 10,
+    borderColor: 'rgba(27, 79, 114, 0.1)',
+    borderRadius: 16,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     marginBottom: 8,
-    backgroundColor: Colors.cardSoft
+    backgroundColor: '#f8fbff'
   },
   modalOptionText: {
     color: Colors.text,
@@ -1956,7 +2198,7 @@ const styles = StyleSheet.create({
   processingCard: {
     width: '84%',
     maxWidth: 360,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     backgroundColor: Colors.card,
     padding: Space.lg,
     alignSelf: 'center',

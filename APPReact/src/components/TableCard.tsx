@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
 import { SafeMaterialCommunityIcons } from './SafeExpoIcons';
 
@@ -243,24 +243,20 @@ export const TableCard = React.memo(TableCardComponent, areEqual);
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: '#E6DDD3',
     overflow: 'hidden',
     height: 168,
     marginBottom: Space.sm,
-    shadowColor: '#1F2937',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1
+    ...Shadows.card
   },
   topAccent: {
     height: 4,
     width: '100%'
   },
   contentWrap: {
-    padding: 12,
+    padding: 14,
     gap: 10,
     flex: 1,
     justifyContent: 'space-between'
@@ -325,7 +321,7 @@ const styles = StyleSheet.create({
     minHeight: 24
   },
   valueCard: {
-    borderRadius: 9,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#FFF0E5',
     backgroundColor: '#FFF0E5',
@@ -345,7 +341,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3
   },
   valueAmount: {
-    color: '#F85F6A',
+    color: Colors.primary,
     fontWeight: '800',
     fontSize: 15,
     lineHeight: 18,

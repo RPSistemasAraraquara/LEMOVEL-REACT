@@ -7,7 +7,7 @@ import { useApp } from '../context/AppContext';
 import { api, SalePayment } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type Route = RouteProp<RootStackParams, 'PagamentoProgresso'>;
 
@@ -100,9 +100,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   warning: { color: Colors.warning, fontWeight: '700', marginBottom: 4 },
   text: { color: Colors.textMuted },
@@ -131,10 +132,11 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: 10,
     alignSelf: 'flex-start',
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: Colors.primary,
     paddingHorizontal: 14,
-    paddingVertical: 10
+    paddingVertical: 10,
+    ...Shadows.button
   },
   primaryText: {
     color: '#fff',

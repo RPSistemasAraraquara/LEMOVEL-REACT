@@ -7,7 +7,7 @@ import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type Route = RouteProp<RootStackParams, 'Couvert'>;
 
@@ -183,10 +183,11 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     backgroundColor: Colors.card,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   title: {
     color: Colors.text,
@@ -198,11 +199,12 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 12,
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: Colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    alignSelf: 'flex-start'
+    alignSelf: 'flex-start',
+    ...Shadows.button
   },
   primaryBtnText: {
     color: '#fff',
@@ -221,10 +223,10 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
     backgroundColor: Colors.cardSoft,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderRadius: 18,
+    padding: 12,
     color: Colors.text,
     marginBottom: 12
   },
@@ -237,12 +239,13 @@ const styles = StyleSheet.create({
   counterBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.card
+    backgroundColor: Colors.cardSoft,
+    ...Shadows.soft
   },
   counterText: {
     color: Colors.primary,
@@ -255,10 +258,11 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   btn: {
-    borderRadius: Radius.md,
+    borderRadius: 18,
     backgroundColor: Colors.primary,
     padding: 12,
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.button
   },
   btnText: {
     color: '#fff',

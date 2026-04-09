@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,14 +22,14 @@ import { api, applyCompanyPolicyToSettings, CompanyInfo } from '../services/api'
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams, 'Login'>>();
   const { appSettings, login, loading, apiConnection, checkApiConnection, saveAppSettings, user: loggedUser } = useApp();
-  const [user, setUser] = useState(appSettings.usuario || '1');
-  const [senha, setSenha] = useState(appSettings.senha || '1');
+  const [user, setUser] = useState(appSettings.usuario || '');
+  const [senha, setSenha] = useState(appSettings.senha || '');
   const [error, setError] = useState('');
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
 
   useEffect(() => {
-    setUser(appSettings.usuario || '1');
-    setSenha(appSettings.senha || '1');
+    setUser(appSettings.usuario || '');
+    setSenha(appSettings.senha || '');
   }, [appSettings.usuario, appSettings.senha]);
 
   useEffect(() => {
@@ -79,6 +80,14 @@ export const LoginScreen: React.FC = () => {
 
   const onSubmit = async () => {
     setError('');
+    const normalizedUser = user.trim();
+    const normalizedPassword = senha.trim();
+
+    if (!normalizedUser || !normalizedPassword) {
+      setError('Informe usuário e senha.');
+      return;
+    }
+
     try {
       const connection = await checkApiConnection();
       if (!connection.ok && connection.status === 401) {
@@ -95,7 +104,7 @@ export const LoginScreen: React.FC = () => {
         setError('Módulo RPMOVEL não ativo.');
         return;
       }
-      await login(user.trim(), senha.trim());
+      await login(normalizedUser, normalizedPassword);
     } catch (e: any) {
       if (e?.message) {
         setError(String(e.message));
@@ -112,115 +121,266 @@ export const LoginScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenRouteLabel />
-      <View style={styles.content}>
-        <View style={styles.card}>
+      <View pointerEvents="none" style={styles.backgroundGlowTop} />
+      <View pointerEvents="none" style={styles.backgroundGlowMiddle} />
+      <View pointerEvents="none" style={styles.backgroundGlowBottom} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.heroCard}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>Acesso RP MOVEL</Text>
+          </View>
           <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>RP MOVEL</Text>
+        </View>
 
-          <Text style={styles.label}>Usuário</Text>
-          <TextInput
-            placeholder="Login"
-            value={user}
-            onChangeText={setUser}
-            autoCapitalize="none"
-            style={styles.input}
-            placeholderTextColor={Colors.textMuted}
-          />
-          <Text style={styles.label}>Senha</Text>
-          <TextInput
-            placeholder="Senha"
-            value={senha}
-            secureTextEntry
-            onChangeText={setSenha}
-            style={styles.input}
-            placeholderTextColor={Colors.textMuted}
-          />
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardEyebrow}>Login do operador</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Usuário</Text>
+            <View style={styles.inputShell}>
+              <TextInput
+                placeholder="Digite seu login"
+                value={user}
+                onChangeText={setUser}
+                autoCapitalize="none"
+                style={styles.input}
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Senha</Text>
+            <View style={styles.inputShell}>
+              <TextInput
+                placeholder="Digite sua senha"
+                value={senha}
+                secureTextEntry
+                onChangeText={setSenha}
+                style={styles.input}
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          </View>
 
           {!!error && <Text style={styles.error}>{error}</Text>}
           {companyInfo?.utilizaRPMovel === false ? (
             <Text style={styles.error}>Módulo RPMOVEL não ativo.</Text>
           ) : null}
-          <Text style={styles.connection}>
-            {apiConnection.checking
-              ? 'Verificando conexão com API...'
-              : apiConnection.ok
-              ? `API: conectado (${apiConnection.status || '-'})`
-              : `API: sem conexão (${apiConnection.status || '-'}): ${apiConnection.message}`}
-          </Text>
+
+          <View style={[styles.connectionCard, apiConnection.ok ? styles.connectionCardOk : styles.connectionCardOffline]}>
+            <Text style={styles.connectionEyebrow}>Status da API</Text>
+            <Text style={styles.connection}>
+              {apiConnection.checking
+                ? 'Verificando conexão com API...'
+                : apiConnection.ok
+                ? `Conectado (${apiConnection.status || '-'})`
+                : `Sem conexão (${apiConnection.status || '-'}): ${apiConnection.message}`}
+            </Text>
+          </View>
 
           <Pressable onPress={onSubmit} style={styles.button} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>Entrar</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>Entrar no sistema</Text>}
           </Pressable>
 
           <Pressable onPress={goConfig} style={styles.configButton} disabled={loading}>
-            <Text style={styles.configButtonLabel}>Configuração</Text>
+            <Text style={styles.configButtonLabel}>Abrir configuração</Text>
           </Pressable>
 
-          <Text style={styles.versionLabel}>Versão 9.0.0</Text>
+          <Text style={styles.versionLabel}>Versão 10.0.0</Text>
         </View>
-      </View>
+      </ScrollView>
       <Text style={styles.footer}>www.sistemalechef.com.br</Text>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: Space.xl },
-  content: { flex: 1, justifyContent: 'center' },
-  card: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.xl,
-    padding: Space.xl,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    shadowColor: Colors.shadow,
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 5
+  container: {
+    flex: 1,
+    backgroundColor: '#f6f8fc',
+    paddingHorizontal: Space.xl,
+    paddingTop: Space.xl,
+    paddingBottom: Space.lg
   },
-  logo: {
-    width: 82,
-    height: 82,
-    alignSelf: 'center',
+  backgroundGlowTop: {
+    position: 'absolute',
+    top: -90,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(242, 153, 74, 0.18)'
+  },
+  backgroundGlowMiddle: {
+    position: 'absolute',
+    top: 180,
+    left: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(46, 134, 193, 0.12)'
+  },
+  backgroundGlowBottom: {
+    position: 'absolute',
+    bottom: 40,
+    right: -30,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(27, 79, 114, 0.08)'
+  },
+  scroll: {
+    flex: 1
+  },
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    gap: Space.md,
+    paddingVertical: Space.md
+  },
+  heroCard: {
+    borderRadius: 28,
+    paddingHorizontal: Space.xl,
+    paddingVertical: Space.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 153, 74, 0.18)',
+    backgroundColor: '#fffaf4',
+    shadowColor: '#684327',
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8
+  },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(242, 153, 74, 0.14)',
     marginBottom: 14
   },
-  title: { fontSize: 28, color: Colors.primary, fontWeight: '800', marginBottom: 8, alignSelf: 'center' },
+  heroBadgeText: {
+    color: '#d46c15',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase'
+  },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 28,
+    padding: Space.xl,
+    borderColor: 'rgba(217, 228, 239, 0.96)',
+    borderWidth: 1,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6
+  },
+  cardHeader: {
+    marginBottom: Space.lg
+  },
+  cardEyebrow: {
+    color: '#1b4f72',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 0
+  },
+  logo: {
+    width: 84,
+    height: 84,
+    alignSelf: 'center',
+    marginBottom: 16
+  },
+  title: {
+    fontSize: 30,
+    color: '#23314d',
+    fontWeight: '900',
+    alignSelf: 'center'
+  },
+  fieldGroup: {
+    marginBottom: Space.md
+  },
   label: {
-    color: Colors.text,
+    color: '#23314d',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 6,
     marginLeft: 2
   },
-  input: {
+  inputShell: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
+    backgroundColor: '#f8fbff',
+    paddingHorizontal: 4
+  },
+  input: {
     borderRadius: Radius.md,
-    padding: 12,
-    marginBottom: Space.sm,
-    backgroundColor: Colors.cardSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
     color: Colors.text
   },
+  connectionCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12
+  },
+  connectionCardOk: {
+    borderColor: 'rgba(22, 163, 74, 0.16)',
+    backgroundColor: '#f1fbf4'
+  },
+  connectionCardOffline: {
+    borderColor: 'rgba(249, 115, 22, 0.18)',
+    backgroundColor: '#fff7ef'
+  },
+  connectionEyebrow: {
+    color: '#1b4f72',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    marginBottom: 4
+  },
   button: {
-    marginTop: 6,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    alignItems: 'center'
+    marginTop: 4,
+    borderRadius: 18,
+    backgroundColor: '#1b4f72',
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#1b4f72',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4
   },
   configButton: {
     marginTop: 10,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primarySoft,
-    paddingVertical: 12,
+    borderColor: 'rgba(27, 79, 114, 0.14)',
+    backgroundColor: '#f6f9fc',
+    paddingVertical: 14,
     alignItems: 'center'
   },
-  buttonLabel: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  configButtonLabel: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
+  buttonLabel: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  configButtonLabel: { color: '#1b4f72', fontWeight: '800', fontSize: 14 },
   versionLabel: {
-    marginTop: 10,
+    marginTop: 14,
     color: Colors.textMuted,
     fontSize: 12,
     textAlign: 'center'
@@ -235,7 +395,6 @@ const styles = StyleSheet.create({
   connection: {
     color: Colors.textMuted,
     fontSize: 12,
-    marginBottom: 10,
-    marginTop: 2
+    lineHeight: 18
   }
 });

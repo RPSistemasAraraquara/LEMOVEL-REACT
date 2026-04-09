@@ -7,7 +7,7 @@ import { api, quickConnectionCheckTimeoutMs } from '../services/api';
 import type { SyncResult, SyncTaskResult } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 
 type SyncTask = {
@@ -320,11 +320,12 @@ const styles = StyleSheet.create({
     paddingBottom: 120
   },
   primary: {
-    borderRadius: Radius.md,
+    borderRadius: 20,
     backgroundColor: Colors.primary,
-    padding: 14,
+    padding: 15,
     alignItems: 'center',
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.button
   },
   disabled: {
     opacity: 0.7
@@ -374,8 +375,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    padding: 12
+    borderRadius: 22,
+    padding: 14,
+    ...Shadows.card
   },
   cardTitle: {
     color: Colors.text,
@@ -390,8 +392,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Space.md
+    borderRadius: 24,
+    padding: Space.md,
+    ...Shadows.card
   },
   logTitle: {
     color: Colors.text,

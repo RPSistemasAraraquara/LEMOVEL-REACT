@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState as RNAppState, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   api,
   Category,
   defaultMobileSettings,
+  hasConflictingOpeningSettings,
   LaunchItemPayload,
   loadMobileSettings,
   MobileAppSettings,
   MenuItem,
+  OPENING_SETTINGS_CONFLICT_MESSAGE,
   saveMobileSettings,
   TableOrder,
   UserProfile
@@ -47,6 +50,7 @@ type AppContextState = {
     lastChecked?: string;
   };
   appSettings: MobileAppSettings;
+  settingsReady: boolean;
   user: UserProfile | null;
   loading: boolean;
   tables: TableOrder[];
@@ -55,8 +59,10 @@ type AppContextState = {
   syncStatus: 'idle' | 'running' | 'success' | 'error';
   lastSyncAt?: string;
   selectedCategoryId: number | null;
+  initialScreenMode: 'mesa' | 'comanda';
   cart: CartItem[];
   activeTable: TableOrder | null;
+  linkedMesaSelection: TableOrder | null;
   hasActiveTable: boolean;
   hasOpenSale: boolean;
   ensureActiveTable: () => TableOrder;
@@ -76,12 +82,14 @@ type AppContextState = {
   setAppSettings: (settings: MobileAppSettings) => void;
   saveAppSettings: (settings: MobileAppSettings) => Promise<void>;
   setSelectedCategoryId: (id: number | null) => void;
+  setInitialScreenMode: (mode: 'mesa' | 'comanda') => void;
   openTableByCard: (
     tableId: number,
     nomeMesaComanda?: string,
     tableTypeHint?: 'mesa' | 'comanda'
   ) => Promise<TableOrder>;
   setActiveTable: (table: TableOrder | null) => void;
+  setLinkedMesaSelection: (table: TableOrder | null) => void;
   checkApiConnection: (timeoutMs?: number) => Promise<ApiConnectionStatus>;
   checkoutCart: () => Promise<void>;
   flushPendingItems: () => Promise<boolean>;
@@ -175,6 +183,7 @@ const AUTO_REFRESH_INTERVAL_MS = 7000;
 const AUTO_REFRESH_THROTTLE_MS = 1200;
 const AUTO_MENU_REFRESH_THROTTLE_MS = 5000;
 const PARTIAL_PAYMENT_TOTAL_TTL_MS = 4500;
+const INITIAL_SCREEN_MODE_STORAGE_KEY = '@rpcheff_mobile:last_initial_screen_mode';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [baseUrl, setBaseUrlState] = useState(defaultMobileSettings.baseUrl);
@@ -187,8 +196,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [initialScreenMode, setInitialScreenModeState] = useState<'mesa' | 'comanda'>(
+    defaultMobileSettings.modoExibicao === 'comanda' ? 'comanda' : 'mesa'
+  );
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeTable, setActiveTableState] = useState<TableOrder | null>(null);
+  const [linkedMesaSelection, setLinkedMesaSelectionState] = useState<TableOrder | null>(null);
   const [apiConnection, setApiConnection] = useState(defaultConnectionState);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | undefined>(undefined);
@@ -234,6 +247,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     })();
   }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const storedMode = await AsyncStorage.getItem(INITIAL_SCREEN_MODE_STORAGE_KEY);
+        if (storedMode === 'comanda' || storedMode === 'mesa') {
+          setInitialScreenModeState(storedMode);
+        }
+      } catch {
+        // Mantem o padrao local quando nao consegue restaurar o ultimo modo.
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    void AsyncStorage.setItem(INITIAL_SCREEN_MODE_STORAGE_KEY, initialScreenMode).catch(() => null);
+  }, [initialScreenMode]);
 
   const syncSettingsToApi = (settings: MobileAppSettings) => {
     const normalizedUrl = normalizeBaseUrl(settings.baseUrl);
@@ -560,6 +590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSyncStatus('idle');
     setUser(null);
     setActiveTableState(null);
+    setLinkedMesaSelectionState(null);
     setCart([]);
     setTables([]);
     setCategories([]);
@@ -857,6 +888,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncSettingsToApi(settings);
   };
 
+  const setInitialScreenMode = (mode: 'mesa' | 'comanda') => {
+    setInitialScreenModeState(mode === 'comanda' ? 'comanda' : 'mesa');
+  };
+
   const saveAppSettings = async (settings: MobileAppSettings) => {
     const normalized: MobileAppSettings = {
       ...appSettings,
@@ -864,12 +899,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       empresaId: settings.empresaId || appSettings.empresaId || 1,
       baseUrl: settings.baseUrl?.trim() || appSettings.baseUrl
     };
-    syncSettingsToApi({
+    const sanitizedCredentials =
+      normalized.salvarLoginSenha
+        ? {
+            usuario: String(normalized.usuario || '').trim(),
+            senha: String(normalized.senha || '').trim()
+          }
+        : {
+            usuario: '',
+            senha: ''
+          };
+    const sanitized: MobileAppSettings = {
       ...normalized,
+      ...sanitizedCredentials,
       baseUrl: normalized.baseUrl.trim()
-    });
-    await saveMobileSettings(normalized);
-    await api.saveSettings(normalized as Record<string, unknown>);
+    };
+
+    if (hasConflictingOpeningSettings(sanitized)) {
+      throw new Error(OPENING_SETTINGS_CONFLICT_MESSAGE);
+    }
+
+    syncSettingsToApi(sanitized);
+    await saveMobileSettings(sanitized);
+    await api.saveSettings(sanitized as Record<string, unknown>);
   };
 
   const setActiveTable = (table: TableOrder | null) => {
@@ -879,7 +931,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!table) {
       setCart([]);
     }
+    if (!table || table.tipo !== 'comanda') {
+      setLinkedMesaSelectionState(null);
+    } else if (!activeTable || !isSameTableIdentity(activeTable, table)) {
+      setLinkedMesaSelectionState(null);
+    }
     setActiveTableState(table);
+  };
+
+  const setLinkedMesaSelection = (table: TableOrder | null) => {
+    if (!table || Number(table.idMesa || 0) <= 0) {
+      setLinkedMesaSelectionState(null);
+      return;
+    }
+
+    setLinkedMesaSelectionState({
+      ...table,
+      tipo: 'mesa',
+      nomeMesaComanda: String(table.nomeMesaComanda || '').trim() || `Mesa ${Number(table.idMesa || 0)}`
+    });
   };
 
   const isAutoRefreshAllowed = () => autoRefreshPauseRef.current <= 0;
@@ -1155,14 +1225,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       baseUrl,
       apiConnection,
       appSettings,
+      settingsReady,
       user,
       loading,
       tables,
       categories,
       products,
       selectedCategoryId,
+      initialScreenMode,
       cart,
       activeTable,
+      linkedMesaSelection,
       hasActiveTable,
       hasOpenSale,
       ensureActiveTable,
@@ -1179,8 +1252,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAppSettings,
       saveAppSettings,
       setSelectedCategoryId,
+      setInitialScreenMode,
       openTableByCard,
       setActiveTable,
+      setLinkedMesaSelection,
       checkApiConnection,
       checkoutCart,
       flushPendingItems,
@@ -1202,13 +1277,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       categories,
       products,
       selectedCategoryId,
+      initialScreenMode,
       cart,
       activeTable,
+      linkedMesaSelection,
       hasActiveTable,
       hasOpenSale,
       apiConnection,
       syncStatus,
       lastSyncAt,
+      settingsReady,
+      initialScreenMode,
       pauseAutoRefresh,
       resumeAutoRefresh
     ]

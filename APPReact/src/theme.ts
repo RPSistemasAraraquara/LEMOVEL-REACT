@@ -1,27 +1,29 @@
 export const Colors = {
-  background: '#f4f6ff',
-  backgroundDark: '#131a2a',
-  surface: '#eef1ff',
-  card: '#ffffff',
-  cardSoft: '#f4f7ff',
-  overlay: 'rgba(15, 23, 42, 0.05)',
-  text: '#0f172a',
-  textMuted: '#64748b',
-  primary: '#fc8019',
-  primarySoft: '#fff1e4',
-  accent: '#9d1cb2',
-  success: '#16a34a',
-  warning: '#f97316',
-  danger: '#ef4444',
-  border: '#dbe2f0',
-  shadow: 'rgba(17, 24, 39, 0.12)'
+  background: '#f6f8fc',
+  backgroundDark: '#122033',
+  surface: '#edf3f8',
+  card: '#fffdf9',
+  cardSoft: '#f7fbff',
+  overlay: 'rgba(15, 23, 42, 0.06)',
+  text: '#23314d',
+  textMuted: '#6a7b92',
+  primary: '#1b4f72',
+  primarySoft: '#eaf3fb',
+  accent: '#f2994a',
+  accentSoft: '#fff2e3',
+  success: '#1f8a4d',
+  warning: '#d97706',
+  danger: '#d64550',
+  border: '#d9e4ef',
+  borderStrong: '#b9ccdc',
+  shadow: 'rgba(15, 23, 42, 0.14)'
 };
 
 export const Radius = {
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24
+  sm: 12,
+  md: 18,
+  lg: 24,
+  xl: 30
 };
 
 export const Space = {
@@ -34,8 +36,41 @@ export const Space = {
 };
 
 export const Typography = {
-  title: 28,
-  subtitle: 18,
+  title: 30,
+  subtitle: 22,
   body: 15,
-  caption: 13
+  caption: 12
+};
+
+export const Shadows = {
+  card: {
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: {
+      width: 0,
+      height: 10
+    },
+    elevation: 4
+  },
+  soft: {
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 6
+    },
+    elevation: 2
+  },
+  button: {
+    shadowColor: '#1b4f72',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: {
+      width: 0,
+      height: 8
+    },
+    elevation: 4
+  }
 };

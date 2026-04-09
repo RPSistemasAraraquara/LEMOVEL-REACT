@@ -16,7 +16,7 @@ import { MemoFoodCard } from '../components/FoodCard';
 import { useApp } from '../context/AppContext';
 import { MenuItem, normalizeSaleStatus } from '../services/api';
 import { RootStackParams, TabParams } from '../navigation/AppNavigator';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 
@@ -468,32 +468,72 @@ export const MenuScreen: React.FC = () => {
   const mesaLabel = activeTable
     ? `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`
     : 'Mesa --';
-
+  const searchActive = searchQuery.trim().length > 0;
+  const activeCategoryLabel = useMemo(() => {
+    if (searchActive) {
+      return `Busca: ${searchQuery.trim()}`;
+    }
+    if (!categoriesEnabled) {
+      return 'Cardápio completo';
+    }
+    if (effectiveCategoryId === null) {
+      return 'Categorias';
+    }
+    return realCategories.find((item) => item.id === effectiveCategoryId)?.descricao || 'Categorias';
+  }, [categoriesEnabled, effectiveCategoryId, realCategories, searchActive, searchQuery]);
+  const statusPalette = canLaunchByStatus
+    ? {
+        border: '#C7E6D0',
+        soft: '#F3FBF5',
+        text: '#2F7A4F'
+      }
+    : {
+        border: '#F2D7B1',
+        soft: '#FFF5E9',
+        text: '#C88738'
+      };
   return (
     <View style={styles.container}>
       <ScreenRouteLabel />
-      <View style={styles.topRow}>
-        <View style={styles.topActions}>
-          <TouchableOpacity style={styles.backBtn} onPress={goToInitial} activeOpacity={0.85}>
+      <View pointerEvents="none" style={styles.heroGlowPrimary} />
+      <View pointerEvents="none" style={styles.heroGlowSecondary} />
+
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={goToInitial} activeOpacity={0.9}>
             <Text style={styles.backBtnText}>Voltar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.viewBtn} onPress={openPendingItems} activeOpacity={0.85}>
-            <Text style={styles.viewBtnText}>(<Text style={styles.viewBtnCount}>{cart.length}</Text>)</Text>
-          </TouchableOpacity>
-          <View style={styles.searchWrap}>
-            <Text style={styles.searchIcon}>⌕</Text>
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Pesquisar item"
-              placeholderTextColor={Colors.textMuted}
-              style={styles.searchInput}
-            />
+          <View style={styles.heroTopActions}>
+            <TouchableOpacity style={styles.viewBtn} onPress={openPendingItems} activeOpacity={0.9}>
+              <Text style={styles.viewBtnText}>Itens</Text>
+              <Text style={styles.viewBtnCount}>{cart.length}</Text>
+            </TouchableOpacity>
+            <View style={[styles.heroStatusBadge, { borderColor: statusPalette.border, backgroundColor: statusPalette.soft }]}>
+              <Text style={[styles.heroStatusValue, { color: statusPalette.text }]}>{currentStatusLabel}</Text>
+            </View>
           </View>
         </View>
-        <View style={styles.tableBadge}>
-          <Text style={styles.tableBadgeText}>{mesaLabel}</Text>
+
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroTitle}>{mesaLabel}</Text>
         </View>
+
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Pesquisar item, sabor ou atalho"
+            placeholderTextColor={Colors.textMuted}
+            style={styles.searchInput}
+          />
+          {searchActive ? (
+            <TouchableOpacity style={styles.searchClearButton} onPress={() => setSearchQuery('')} activeOpacity={0.85}>
+              <Text style={styles.searchClearButtonText}>Limpar</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
       </View>
       <FlatList
         onLayout={(event) => {
@@ -511,7 +551,7 @@ export const MenuScreen: React.FC = () => {
         windowSize={5}
         removeClippedSubviews={true}
         ListHeaderComponent={
-          <>
+          <View style={styles.listIntro}>
             {!canLaunchByStatus ? (
               <View style={styles.warningCard}>
                 <Text style={styles.warningText}>
@@ -524,21 +564,33 @@ export const MenuScreen: React.FC = () => {
                 <Text style={styles.warningText}>{launchWarning}</Text>
               </View>
             ) : null}
-            {categoriesEnabled && realCategories.length > 0 ? (
-              <CategorySlider
-                categories={realCategories}
-                selectedCategoryId={effectiveCategoryId}
-                onSelect={handleSelectCategory}
-              />
-            ) : null}
-          </>
+            <View style={styles.categoryPanel}>
+              <View style={styles.categoryPanelHeader}>
+                <View>
+                  <Text style={styles.categoryPanelEyebrow}>NAVEGAÇÃO</Text>
+                  <Text style={styles.categoryPanelTitle}>{activeCategoryLabel}</Text>
+                </View>
+                <Text style={styles.categoryPanelMeta}>{filtered.length} itens</Text>
+              </View>
+              {categoriesEnabled && realCategories.length > 0 ? (
+                <CategorySlider
+                  categories={realCategories}
+                  selectedCategoryId={effectiveCategoryId}
+                  onSelect={handleSelectCategory}
+                />
+              ) : (
+                <Text style={styles.categoryPanelEmpty}>Categorias desativadas. Exibindo todo o cardápio.</Text>
+              )}
+            </View>
+          </View>
         }
         ListHeaderComponentStyle={styles.categoryListHeader}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={styles.listContent}
         renderItem={renderMenuItem}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Nenhum item para essa categoria.</Text>
+            <Text style={styles.emptyTitle}>Nada encontrado por aqui</Text>
+            <Text style={styles.emptyText}>Ajuste a busca ou troque a categoria para continuar.</Text>
           </View>
         }
       />
@@ -630,85 +682,137 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     padding: Space.md
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10
+  heroGlowPrimary: {
+    position: 'absolute',
+    top: -60,
+    right: -20,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(27, 79, 114, 0.14)'
   },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 8
+  heroGlowSecondary: {
+    position: 'absolute',
+    top: 70,
+    left: -36,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(242, 153, 74, 0.12)'
   },
-  backBtn: {
-    borderRadius: Radius.sm,
+  heroCard: {
+    borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
+    padding: 12,
+    marginBottom: Space.md,
+    gap: 10,
+    ...Shadows.card
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm
+  },
+  heroTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  backBtn: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    paddingVertical: 9
+    paddingVertical: 8,
+    ...Shadows.soft
   },
   backBtnText: {
-    color: Colors.text,
-    fontWeight: '800'
+    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: 12
   },
   viewBtn: {
-    borderRadius: Radius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primarySoft,
-    paddingHorizontal: 10,
-    paddingVertical: 9
+    borderColor: 'rgba(242, 153, 74, 0.18)',
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    ...Shadows.soft
   },
   viewBtnText: {
-    color: Colors.primary,
-    fontWeight: '800'
+    color: Colors.accent,
+    fontWeight: '800',
+    fontSize: 12
   },
   viewBtnCount: {
-    color: '#D32F2F',
+    minWidth: 20,
+    textAlign: 'center',
+    color: '#D64550',
+    fontWeight: '900',
+    fontSize: 13
+  },
+  heroCopy: {
+    flex: 1
+  },
+  heroTitle: {
+    color: Colors.text,
+    fontWeight: '900',
+    fontSize: 17,
+    lineHeight: 22
+  },
+  heroStatusBadge: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'flex-start'
+  },
+  heroStatusValue: {
+    fontSize: 12,
     fontWeight: '900'
   },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.sm,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.card,
-    paddingHorizontal: 10,
-    flex: 1,
-    minWidth: 150,
-    maxWidth: 280
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    ...Shadows.soft
   },
   searchIcon: {
     color: Colors.textMuted,
-    fontSize: 14,
-    marginRight: 6
+    fontSize: 15,
+    marginRight: 8
   },
   searchInput: {
     flex: 1,
     color: Colors.text,
-    paddingVertical: 9
+    paddingVertical: 8
   },
-  tableBadge: {
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
-    paddingHorizontal: 12,
+  searchClearButton: {
+    borderRadius: 14,
+    backgroundColor: Colors.primarySoft,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     marginLeft: 8
   },
-  tableBadgeText: {
-    color: Colors.text,
-    fontWeight: '700',
+  searchClearButtonText: {
+    color: Colors.primary,
+    fontWeight: '800',
     fontSize: 12
   },
   categoryRow: {
-    paddingBottom: 8,
+    paddingBottom: 6,
     paddingRight: Space.sm
   },
   categorySliderWrapper: {
@@ -721,29 +825,83 @@ const styles = StyleSheet.create({
   categoryListHeader: {
     marginBottom: 12
   },
+  listIntro: {
+    gap: 10
+  },
+  categoryPanel: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.md,
+    ...Shadows.card
+  },
+  categoryPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Space.sm,
+    marginBottom: Space.sm
+  },
+  categoryPanelEyebrow: {
+    color: Colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    marginBottom: 4
+  },
+  categoryPanelTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '900'
+  },
+  categoryPanelMeta: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingTop: 18
+  },
+  categoryPanelEmpty: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18
+  },
   warningCard: {
     borderWidth: 1,
     borderColor: Colors.warning,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.warning + '12',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 8
+    borderRadius: 20,
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    ...Shadows.soft
   },
   warningText: {
     color: Colors.warning,
     fontWeight: '700',
-    fontSize: 12
+    fontSize: 12,
+    lineHeight: 17
   },
   empty: {
     padding: 24,
-    borderRadius: 12,
+    borderRadius: 26,
     backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: Colors.border
+    borderColor: Colors.border,
+    ...Shadows.card
+  },
+  emptyTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 6
   },
   emptyText: {
-    color: Colors.textMuted
+    color: Colors.textMuted,
+    lineHeight: 19
+  },
+  listContent: {
+    paddingBottom: 120
   },
   menuColumnWrapper: {
     justifyContent: 'flex-start',

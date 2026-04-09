@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { OpenTableNameModal } from '../components/OpenTableNameModal';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { useApp } from '../context/AppContext';
 import { api, getProductImageSource, normalizeSaleStatus, resolveImageUri, Sale, SaleLine } from '../services/api';
-import { Colors, Radius, Space, Typography } from '../theme';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SafeMaterialCommunityIcons } from '../components/SafeExpoIcons';
@@ -271,12 +272,15 @@ const getFractionPrimaryLine = (targetLine: SaleLine, lines: SaleLine[]): SaleLi
 
 export const SaleManagerScreen: React.FC = () => {
   const navigation = useNavigation<StackNav>();
-  const { activeTable, user, refreshDashboard, getLinkedTableId, products, appSettings } = useApp();
+  const { activeTable, user, refreshDashboard, getLinkedTableId, products, appSettings, setActiveTable } = useApp();
   const [sale, setSale] = useState<Sale | null>(null);
   const [saleUsers, setSaleUsers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [savingCouvert, setSavingCouvert] = useState(false);
   const [sending, setSending] = useState(false);
+  const [renameName, setRenameName] = useState('');
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renamingSale, setRenamingSale] = useState(false);
   const [couvertMasc, setCouvertMasc] = useState('0');
   const [couvertFem, setCouvertFem] = useState('0');
   const [personCount, setPersonCount] = useState('0');
@@ -391,6 +395,63 @@ export const SaleManagerScreen: React.FC = () => {
 
   const showPermissionDenied = (message: string) => {
     showSweetAlert('Atenção', message, 'warning');
+  };
+
+  const openRenameModal = () => {
+    if (!idVenda) {
+      Alert.alert('Atenção', 'Abra uma venda antes de alterar o nome.');
+      return;
+    }
+
+    setRenameName(String(activeTable?.nomeMesaComanda || sale?.nomeMesaComanda || '').trim());
+    setRenameVisible(true);
+  };
+
+  const closeRenameModal = () => {
+    if (renamingSale) {
+      return;
+    }
+
+    setRenameVisible(false);
+    setRenameName('');
+  };
+
+  const submitRename = async () => {
+    const nextName = renameName.trim();
+    if (!idVenda) {
+      Alert.alert('Atenção', 'Venda não encontrada para renomear.');
+      return;
+    }
+
+    if (!nextName) {
+      Alert.alert('Atenção', 'Informe o novo nome da mesa/comanda.');
+      return;
+    }
+
+    setRenamingSale(true);
+    try {
+      await api.setSaleName(idVenda, nextName);
+      setSale((prev) => (prev ? { ...prev, nomeMesaComanda: nextName } : prev));
+
+      if (activeTable) {
+        setActiveTable({
+          ...activeTable,
+          nomeMesaComanda: nextName,
+          venda: {
+            ...activeTable.venda,
+            nomeMesaComanda: nextName
+          }
+        });
+      }
+
+      setRenameVisible(false);
+      await refreshDashboard(undefined, { force: true }).catch(() => null);
+      Alert.alert('Sucesso', 'Nome atualizado com sucesso.');
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível atualizar o nome.');
+    } finally {
+      setRenamingSale(false);
+    }
   };
 
   const loadSale = async () => {
@@ -795,8 +856,17 @@ export const SaleManagerScreen: React.FC = () => {
                   <Text style={styles.summaryInlineValue}>{status}</Text>
                 </View>
                 <View style={styles.summaryRow}>
+                  <Text style={styles.summaryInlineLabel}>Nome</Text>
+                  <Text style={[styles.summaryInlineValue, styles.summaryInlineValueWide]}>{nomeMesa}</Text>
+                </View>
+                <View style={styles.summaryRow}>
                   <Text style={styles.summaryInlineLabel}>Total</Text>
                   <Text style={styles.totalInline}>{formatMoney(total)}</Text>
+                </View>
+                <View style={styles.summaryActionRow}>
+                  <Pressable style={styles.summaryActionButton} onPress={openRenameModal}>
+                    <Text style={styles.summaryActionButtonText}>Alterar nome</Text>
+                  </Pressable>
                 </View>
               </View>
 
@@ -915,7 +985,7 @@ export const SaleManagerScreen: React.FC = () => {
             </Pressable>
             <Pressable
               style={styles.actionCard}
-              onPress={() => navigation.navigate('PagamentoProgresso', { idVenda })}
+              onPress={() => navigation.navigate('PagamentoProgresso', { idVenda: Number(idVenda || 0) })}
             >
               <Text style={styles.actionTitle}>Progresso de pagamento</Text>
               <Text style={styles.actionHint}>Acompanhe parcial pago e pendente</Text>
@@ -953,6 +1023,19 @@ export const SaleManagerScreen: React.FC = () => {
         ) : null
       }
     />
+      <OpenTableNameModal
+        visible={renameVisible}
+        value={renameName}
+        loading={renamingSale}
+        title="Alterar nome"
+        description="Atualize o nome exibido para esta mesa/comanda sem reabrir a venda."
+        placeholder="Digite o novo nome"
+        confirmLabel="Salvar nome"
+        confirmLoadingLabel="Salvando..."
+        onChangeText={setRenameName}
+        onCancel={closeRenameModal}
+        onConfirm={submitRename}
+      />
       <SweetAlert
         visible={sweetAlert.visible}
         title={sweetAlert.title}
@@ -992,11 +1075,12 @@ const styles = StyleSheet.create({
     padding: Space.md
   },
   infoCard: {
-    borderRadius: Radius.md,
+    borderRadius: 24,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: Space.md
+    padding: Space.md,
+    ...Shadows.card
   },
   infoTitle: {
     color: Colors.warning,
@@ -1007,12 +1091,13 @@ const styles = StyleSheet.create({
     color: Colors.textMuted
   },
   summaryCard: {
-    borderRadius: Radius.md,
-    borderColor: Colors.primary,
+    borderRadius: 24,
+    borderColor: Colors.border,
     borderWidth: 1,
     backgroundColor: Colors.card,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   summaryRow: {
     flexDirection: 'row',
@@ -1030,6 +1115,25 @@ const styles = StyleSheet.create({
   summaryInlineValue: {
     color: Colors.text,
     fontWeight: '700'
+  },
+  summaryInlineValueWide: {
+    flexShrink: 1
+  },
+  summaryActionRow: {
+    flexDirection: 'row',
+    marginTop: Space.xs
+  },
+  summaryActionButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  summaryActionButtonText: {
+    color: Colors.text,
+    fontWeight: '800'
   },
   label: {
     color: Colors.textMuted,
@@ -1104,19 +1208,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
     backgroundColor: Colors.card,
-    borderRadius: Radius.sm,
+    borderRadius: 18,
     overflow: 'hidden',
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    ...Shadows.soft
   },
   counterButton: {
     width: 34,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background
+    backgroundColor: Colors.cardSoft
   },
   counterInput: {
     flex: 1,
@@ -1126,23 +1231,25 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: Colors.primary
+    borderColor: Colors.border
   },
   primaryBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 14,
     alignItems: 'center',
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.button
   },
   secondaryBtn: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 12,
     alignItems: 'center',
     marginBottom: Space.md,
     borderWidth: 1,
-    borderColor: Colors.primary
+    borderColor: Colors.border,
+    ...Shadows.soft
   },
   primaryText: {
     color: '#fff',
@@ -1163,15 +1270,16 @@ const styles = StyleSheet.create({
   },
   lineCard: {
     backgroundColor: Colors.card,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: Space.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    ...Shadows.card
   },
   lineThumbWrap: {
     width: 62,
@@ -1257,12 +1365,13 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderColor: Colors.border,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: Space.md,
     width: '48%',
-    minHeight: 100
+    minHeight: 100,
+    ...Shadows.card
   },
   actionTitle: {
     color: Colors.text,

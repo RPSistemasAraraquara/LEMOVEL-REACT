@@ -3,7 +3,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import { useApp } from '../context/AppContext';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 type LocalCategory = {
   id: number;
@@ -172,9 +172,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   label: {
     color: Colors.textMuted,
@@ -184,9 +185,9 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
+    padding: 12,
     marginBottom: 8,
     backgroundColor: Colors.cardSoft,
     color: Colors.text
@@ -197,17 +198,19 @@ const styles = StyleSheet.create({
   },
   btn: {
     flex: 1,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     padding: 12,
     alignItems: 'center'
   },
   btnPrimary: {
-    backgroundColor: Colors.primary
+    backgroundColor: Colors.primary,
+    ...Shadows.button
   },
   btnSecondary: {
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.cardSoft
+    backgroundColor: Colors.cardSoft,
+    ...Shadows.soft
   },
   btnText: {
     color: '#fff',
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   item: {
-    borderRadius: Radius.md,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
@@ -234,7 +237,8 @@ const styles = StyleSheet.create({
     marginBottom: Space.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.card
   },
   itemContent: {
     flexDirection: 'row',
@@ -273,7 +277,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    ...Shadows.soft
   },
   removeBtn: {
     borderColor: `${Colors.danger}44`

@@ -16,8 +16,15 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
 import { SectionHeader } from '../components/SectionHeader';
-import { Colors, Radius, Space } from '../theme';
-import { api, applyCompanyPolicyToSettings, CompanyInfo, MobileAppSettings } from '../services/api';
+import { Colors, Radius, Shadows, Space } from '../theme';
+import {
+  api,
+  applyCompanyPolicyToSettings,
+  CompanyInfo,
+  hasConflictingOpeningSettings,
+  MobileAppSettings,
+  OPENING_SETTINGS_CONFLICT_MESSAGE
+} from '../services/api';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 
@@ -207,6 +214,34 @@ export const SettingsScreen: React.FC = () => {
     }));
   };
 
+  const setOpeningRuleValue = (
+    key: 'vincularComandaComMesa' | 'exigeNomeAbertura',
+    value: boolean
+  ) => {
+    if (!value) {
+      setValue(key, false);
+      return;
+    }
+
+    const nextState =
+      key === 'vincularComandaComMesa'
+        ? {
+            vincularComandaComMesa: true,
+            exigeNomeAbertura: settingMemo.exigeNomeAbertura
+          }
+        : {
+            vincularComandaComMesa: settingMemo.vincularComandaComMesa,
+            exigeNomeAbertura: true
+          };
+
+    if (hasConflictingOpeningSettings(nextState)) {
+      Alert.alert('Aviso', OPENING_SETTINGS_CONFLICT_MESSAGE);
+      return;
+    }
+
+    setValue(key, true);
+  };
+
   const setComboValue = (key: keyof SettingsState, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value } as SettingsState));
   };
@@ -230,10 +265,16 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const save = async () => {
+    const next = toMobileAppSettings(settingMemo, empresa, appSettings);
+    if (hasConflictingOpeningSettings(next)) {
+      setStatus(OPENING_SETTINGS_CONFLICT_MESSAGE);
+      Alert.alert('Aviso', OPENING_SETTINGS_CONFLICT_MESSAGE);
+      return;
+    }
+
     setSalvando(true);
     setStatus('Salvando configurações...');
     try {
-      const next = toMobileAppSettings(settingMemo, empresa, appSettings);
       setBaseUrl(next.baseUrl);
       setEmpresaId(next.empresaId);
       await saveAppSettings(next);
@@ -361,7 +402,7 @@ export const SettingsScreen: React.FC = () => {
           label="Vincular comanda com mesa"
           description="Ativa vínculo entre abertura de comanda e mesa."
           value={settingMemo.vincularComandaComMesa}
-          onValueChange={(value) => setValue('vincularComandaComMesa', value)}
+          onValueChange={(value) => setOpeningRuleValue('vincularComandaComMesa', value)}
         />
         <SettingSwitch
           label="Impressão de mesa no fechamento"
@@ -415,7 +456,7 @@ export const SettingsScreen: React.FC = () => {
           label="Exige nome na abertura da mesa/comanda"
           description="Solicita identificação antes de abrir."
           value={settingMemo.exigeNomeAbertura}
-          onValueChange={(value) => setValue('exigeNomeAbertura', value)}
+          onValueChange={(value) => setOpeningRuleValue('exigeNomeAbertura', value)}
         />
       </Section>
 
@@ -648,11 +689,12 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 120 },
   card: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   sectionTitle: {
     fontSize: 16,
@@ -671,11 +713,11 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
     backgroundColor: Colors.cardSoft,
     color: Colors.text,
-    borderRadius: Radius.md,
-    padding: 10
+    borderRadius: 18,
+    padding: 12
   },
   selectWrap: {
     flexDirection: 'row',
@@ -686,8 +728,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.cardSoft,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 999,
     marginBottom: 8
   },
@@ -726,8 +768,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.cardSoft,
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     marginBottom: 4
   },
   chipActive: {
@@ -742,28 +784,29 @@ const styles = StyleSheet.create({
     color: Colors.primary
   },
   secondaryBtn: {
-    borderRadius: Radius.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
     marginBottom: 8,
     alignItems: 'center',
-    backgroundColor: Colors.cardSoft
+    backgroundColor: Colors.cardSoft,
+    ...Shadows.soft
   },
   secondaryBtnText: {
     fontWeight: '700',
     color: Colors.primary
   },
   saveWrap: {
-    borderRadius: Radius.md,
+    borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 24
   },
   saveButton: {
     backgroundColor: Colors.primary,
     color: '#fff',
-    paddingVertical: 14,
+    paddingVertical: 16,
     textAlign: 'center',
     fontWeight: '700'
   },

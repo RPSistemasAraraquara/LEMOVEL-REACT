@@ -11,13 +11,15 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
 import { TableCard } from '../components/TableCard';
 import { OpenTableNameModal } from '../components/OpenTableNameModal';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { useApp } from '../context/AppContext';
+import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
 import { isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
-import { Colors, Radius, Space, Typography } from '../theme';
+import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 
 type TabsNav = BottomTabNavigationProp<{
   Mesas: undefined;
@@ -26,7 +28,17 @@ type TabsNav = BottomTabNavigationProp<{
 }>;
 
 export const HomeScreen: React.FC = () => {
-  const { tables, refreshDashboard, openTableByCard, setActiveTable, activeTable, hasOpenSale, appSettings } = useApp();
+  const {
+    tables,
+    refreshDashboard,
+    openTableByCard,
+    setActiveTable,
+    setLinkedMesaSelection,
+    activeTable,
+    hasOpenSale,
+    appSettings,
+    settingsReady
+  } = useApp();
   const [refreshing, setRefreshing] = React.useState(false);
   const [openNameModalVisible, setOpenNameModalVisible] = React.useState(false);
   const [openNameText, setOpenNameText] = React.useState('');
@@ -34,10 +46,31 @@ export const HomeScreen: React.FC = () => {
     table: TableOrder;
     route: 'Gestao' | 'Cardapio';
   } | null>(null);
+  const [pendingLinkedMesaOpen, setPendingLinkedMesaOpen] = React.useState<{
+    table: TableOrder;
+    route: 'Gestao' | 'Cardapio';
+    customName?: string;
+  } | null>(null);
   const navigation = useNavigation<TabsNav>();
   const { width } = useWindowDimensions();
+  const linkedMesaOpenAutoPromptRef = React.useRef(false);
   const abertas = tables.filter((t) => t.situacao === 'Aberta').length;
   const total = tables.reduce((acc, t) => acc + (t.valorTotal || 0), 0);
+  const shouldBindMesaOnOpen = Boolean(
+    pendingLinkedMesaOpen && appSettings.vincularComandaComMesa && pendingLinkedMesaOpen.table.tipo === 'comanda'
+  );
+  const {
+    bindingResolved: linkedMesaOpenBindingResolved,
+    pickerVisible: linkedMesaOpenVisible,
+    pickerLoading: linkedMesaOpenLoading,
+    pickerTables: linkedMesaOpenTables,
+    openPicker: openLinkedMesaOpenPicker,
+    closePicker: closeLinkedMesaOpenPicker,
+    refreshPickerTables: refreshLinkedMesaOpenPickerTables
+  } = useLinkedMesaBinding({
+    enabled: shouldBindMesaOnOpen,
+    saleTable: pendingLinkedMesaOpen?.table || null
+  });
   const tableColumns = React.useMemo(() => {
     const availableWidth = Math.max(0, width - Space.md * 2);
     const maxColumns = Math.max(1, Math.floor(availableWidth / 180));
@@ -82,6 +115,11 @@ export const HomeScreen: React.FC = () => {
     const route: 'Gestao' | 'Cardapio' = forceManager || !isQuickLaunch(table) ? 'Gestao' : 'Cardapio';
     const tableHasOpenSale = Boolean(table.idVenda && Number(table.idVenda) > 0);
 
+    if (!settingsReady) {
+      Alert.alert('Atenção', 'Aguarde o carregamento das configurações antes de abrir a mesa/comanda.');
+      return;
+    }
+
     if (tableHasOpenSale) {
       setActiveTable(table);
       navigation.navigate(route);
@@ -92,6 +130,16 @@ export const HomeScreen: React.FC = () => {
       setPendingOpenTable({ table, route });
       setOpenNameText('');
       setOpenNameModalVisible(true);
+      return;
+    }
+
+    const shouldBindMesa = appSettings.vincularComandaComMesa && table.tipo === 'comanda';
+    if (shouldBindMesa) {
+      linkedMesaOpenAutoPromptRef.current = true;
+      setPendingLinkedMesaOpen({ table, route });
+      setTimeout(() => {
+        void openLinkedMesaOpenPicker();
+      }, 0);
       return;
     }
 
@@ -108,6 +156,31 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  React.useEffect(() => {
+    if (!shouldBindMesaOnOpen) {
+      linkedMesaOpenAutoPromptRef.current = false;
+      return;
+    }
+
+    if (!linkedMesaOpenBindingResolved || linkedMesaOpenVisible || linkedMesaOpenAutoPromptRef.current) {
+      return;
+    }
+
+    linkedMesaOpenAutoPromptRef.current = true;
+    void openLinkedMesaOpenPicker();
+  }, [
+    linkedMesaOpenBindingResolved,
+    linkedMesaOpenVisible,
+    openLinkedMesaOpenPicker,
+    shouldBindMesaOnOpen
+  ]);
+
+  const closeLinkedMesaOpenFlow = React.useCallback(() => {
+    linkedMesaOpenAutoPromptRef.current = false;
+    closeLinkedMesaOpenPicker();
+    setPendingLinkedMesaOpen(null);
+  }, [closeLinkedMesaOpenPicker]);
+
   const confirmOpenWithName = async () => {
     const pending = pendingOpenTable;
     const nome = openNameText.trim();
@@ -123,6 +196,20 @@ export const HomeScreen: React.FC = () => {
     setPendingOpenTable(null);
     setOpenNameText('');
 
+    const shouldBindMesa = appSettings.vincularComandaComMesa && pending.table.tipo === 'comanda';
+    if (shouldBindMesa) {
+      linkedMesaOpenAutoPromptRef.current = true;
+      setPendingLinkedMesaOpen({
+        table: pending.table,
+        route: pending.route,
+        customName: nome
+      });
+      setTimeout(() => {
+        void openLinkedMesaOpenPicker();
+      }, 0);
+      return;
+    }
+
     try {
       const opened = await openTableByCard(pending.table.idMesa, nome, pending.table.tipo);
       setActiveTable(opened);
@@ -131,6 +218,27 @@ export const HomeScreen: React.FC = () => {
       Alert.alert('Erro', 'Não foi possível abrir a mesa. Tente novamente.');
     }
   };
+
+  const confirmLinkedMesaOpen = React.useCallback(
+    async (mesa: TableOrder) => {
+      const pending = pendingLinkedMesaOpen;
+      if (!pending) {
+        return;
+      }
+
+      closeLinkedMesaOpenFlow();
+
+      try {
+        const opened = await openTableByCard(pending.table.idMesa, pending.customName, pending.table.tipo);
+        setActiveTable(opened);
+        setLinkedMesaSelection(mesa);
+        navigation.navigate(pending.route);
+      } catch {
+        Alert.alert('Erro', 'Não foi possível abrir a mesa. Tente novamente.');
+      }
+    },
+    [closeLinkedMesaOpenFlow, navigation, openTableByCard, pendingLinkedMesaOpen, setActiveTable, setLinkedMesaSelection]
+  );
 
   return (
     <View style={styles.container}>
@@ -222,6 +330,20 @@ export const HomeScreen: React.FC = () => {
         }}
         onConfirm={confirmOpenWithName}
       />
+      <LinkedMesaPickerModal
+        visible={linkedMesaOpenVisible}
+        tables={linkedMesaOpenTables}
+        loading={linkedMesaOpenLoading}
+        title="Vincular comanda na mesa"
+        description="Selecione a mesa obrigatória para abrir esta comanda. Depois, os lançamentos trarão essa mesa já marcada para conferência e troca."
+        onClose={closeLinkedMesaOpenFlow}
+        onRefresh={() => {
+          void refreshLinkedMesaOpenPickerTables();
+        }}
+        onSelect={(table) => {
+          void confirmLinkedMesaOpen(table);
+        }}
+      />
     </View>
   );
 };
@@ -250,13 +372,14 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     paddingVertical: Space.md,
     paddingHorizontal: Space.md,
     borderWidth: 1,
     borderColor: Colors.border,
     minWidth: '30%',
-    flex: 1
+    flex: 1,
+    ...Shadows.card
   },
   heroLabel: {
     color: Colors.textMuted,
@@ -270,15 +393,16 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     marginTop: 20,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: Space.lg
+    padding: Space.lg,
+    ...Shadows.card
   },
   emptyTitle: {
     fontSize: Typography.subtitle,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 6
   },
   emptyText: {
@@ -286,19 +410,21 @@ const styles = StyleSheet.create({
   },
   active: {
     marginBottom: 12,
-    backgroundColor: Colors.primarySoft,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.card,
+    borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 10
+    borderRadius: 22,
+    padding: 14,
+    ...Shadows.card
   },
   instructionCard: {
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   instructionTitle: {
     color: Colors.text,
@@ -311,14 +437,15 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: Colors.primary,
-    fontWeight: '700'
+    fontWeight: '800'
   },
   actionBtn: {
     marginTop: 8,
     backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    borderRadius: Radius.sm,
-    alignItems: 'center'
+    paddingVertical: 12,
+    borderRadius: 18,
+    alignItems: 'center',
+    ...Shadows.button
   },
   actionBtnText: {
     color: '#fff',
@@ -326,11 +453,12 @@ const styles = StyleSheet.create({
   },
   actionWarning: {
     marginTop: 8,
-    borderRadius: Radius.md,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.warning,
-    backgroundColor: '#fff4e6',
-    padding: 10
+    backgroundColor: Colors.accentSoft,
+    padding: 12,
+    ...Shadows.soft
   },
   actionWarningText: {
     color: Colors.warning,

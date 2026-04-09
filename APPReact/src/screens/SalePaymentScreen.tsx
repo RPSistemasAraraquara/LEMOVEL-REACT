@@ -4,7 +4,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { api, normalizeSaleStatus, PaymentMethod, SalePayment } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { useApp } from '../context/AppContext';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -347,9 +347,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 24,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   label: {
     color: Colors.textMuted,
@@ -377,7 +378,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingVertical: 8,
+    backgroundColor: Colors.cardSoft
   },
   methodSelected: {
     borderColor: Colors.primary,
@@ -393,8 +395,8 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderColor: 'rgba(27, 79, 114, 0.12)',
+    borderRadius: 18,
     padding: 12,
     backgroundColor: Colors.cardSoft,
     color: Colors.text,
@@ -402,12 +404,13 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: Radius.md,
-    padding: 10,
+    borderColor: Colors.border,
+    borderRadius: 18,
+    padding: 12,
     alignItems: 'center',
-    backgroundColor: Colors.primarySoft,
-    marginBottom: 12
+    backgroundColor: Colors.cardSoft,
+    marginBottom: 12,
+    ...Shadows.soft
   },
   addText: {
     color: Colors.primary,
@@ -415,11 +418,12 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 10,
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: Colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.button
   },
   primaryText: {
     color: '#fff',
@@ -433,18 +437,20 @@ const styles = StyleSheet.create({
   listWrap: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     backgroundColor: Colors.card,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.card
   },
   infoCard: {
     borderWidth: 1,
     borderColor: Colors.warning,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.card,
+    borderRadius: 22,
+    backgroundColor: Colors.accentSoft,
     padding: Space.md,
-    marginBottom: Space.md
+    marginBottom: Space.md,
+    ...Shadows.soft
   },
   infoTitle: {
     color: Colors.warning,
@@ -476,9 +482,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.cardSoft,
-    borderRadius: Radius.md,
+    borderRadius: 20,
     padding: 10,
-    marginBottom: 10
+    marginBottom: 10,
+    ...Shadows.soft
   },
   payLabel: {
     color: Colors.textMuted,

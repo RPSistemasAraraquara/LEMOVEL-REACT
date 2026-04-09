@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, Radius, Space } from '../theme';
+import { Colors, Radius, Shadows, Space } from '../theme';
 
 export type SweetAlertType = 'info' | 'warning' | 'error' | 'success';
 
@@ -61,7 +61,7 @@ export const SweetAlert: React.FC<Props> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: Space.md
@@ -76,15 +76,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 14,
-    alignItems: 'center'
+    alignItems: 'center',
+    ...Shadows.card
   },
   iconWrap: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: Colors.accentSoft,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: 'rgba(242, 153, 74, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.success
   },
   iconText: {
-    color: Colors.text,
+    color: Colors.primary,
     fontWeight: '900',
     fontSize: 24
   },
@@ -128,12 +129,13 @@ const styles = StyleSheet.create({
   btn: {
     minWidth: 104,
     borderRadius: Radius.sm,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     alignItems: 'center'
   },
   btnPrimary: {
-    backgroundColor: Colors.primary
+    backgroundColor: Colors.primary,
+    ...Shadows.button
   },
   btnPrimaryText: {
     color: '#fff',
@@ -149,4 +151,3 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   }
 });
-
