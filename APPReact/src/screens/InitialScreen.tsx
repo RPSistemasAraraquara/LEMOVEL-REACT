@@ -636,7 +636,15 @@ export const InitialScreen: React.FC = () => {
 
     try {
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Permitir abrir a camera para ler o QRCode da mesa',
+            message: 'Permitir abrir a camera para ler o QRCode da mesa',
+            buttonPositive: 'Permitir',
+            buttonNegative: 'Cancelar'
+          }
+        );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           Alert.alert(
             'Permissão de câmera',

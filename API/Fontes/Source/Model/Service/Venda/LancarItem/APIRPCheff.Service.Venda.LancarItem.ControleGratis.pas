@@ -35,6 +35,9 @@ type
 
 implementation
 
+const
+  OBSERVACAO_ITEM_GRATIS = 'GR' + #193 + 'TIS';
+
 { TAPIRPCheffServiceVendaLancarItemControleGratis }
 
 procedure TAPIRPCheffServiceVendaLancarItemControleGratis.AtribuirNumeroItem;
@@ -198,7 +201,9 @@ end;
 procedure TAPIRPCheffServiceVendaLancarItemControleGratis.GravarItensGratis;
 var
   I: Integer;
+  LObservacaoOriginal: string;
 begin
+  LObservacaoOriginal := FItem.observacao;
   for I := 1 to FQuantidadeGratis do
   begin
     FItem.quantidade := 1;
@@ -207,11 +212,15 @@ begin
     FItem.valorUnitario := 0;
     FItem.acrescimo := 0;
     FItem.desconto := 0;
+    FItem.gratis := True;
+    FItem.observacao := OBSERVACAO_ITEM_GRATIS;
     FItem.AtualizaValorTotal;
 
     GravarVendaItem;
     GravarVendaItemOpcional;
   end;
+  FItem.gratis := False;
+  FItem.observacao := LObservacaoOriginal;
 end;
 
 procedure TAPIRPCheffServiceVendaLancarItemControleGratis.GravarVendaItem;
@@ -221,6 +230,8 @@ begin
   LVendaItemDAO := FDAO.VendaItemDAO;
   LVendaItemDAO.ManagerTransaction(False);
   try
+    if FItem.valorTotal > 0 then
+      FItem.gratis := False;
     FItem.acrescimo := FItem.TotalOpcionais;
     if FItem.dataLancamento = 0 then
       FItem.dataLancamento := Now;

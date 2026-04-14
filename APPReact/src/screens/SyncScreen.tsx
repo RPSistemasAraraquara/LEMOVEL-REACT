@@ -13,14 +13,16 @@ import { RootStackParams } from '../navigation/AppNavigator';
 type SyncTask = {
   label: string;
   key: string;
+  subtitle?: string;
 };
 
 const tasks: SyncTask[] = [
-  { label: 'Catálogo', key: 'catalogo' },
-  { label: 'Mesas', key: 'mesas' },
-  { label: 'Formas de pagamento', key: 'formas' },
-  { label: 'Configurações', key: 'configuracoes' },
-  { label: 'Usuários', key: 'usuarios' }
+  { label: 'Catálogo', key: 'catalogo', subtitle: 'Atualiza categorias e produtos' },
+  { label: 'Produtos', key: 'produtos', subtitle: 'Atualiza produtos e opcionais' },
+  { label: 'Mesas', key: 'mesas', subtitle: 'Atualização específica' },
+  { label: 'Formas de pagamento', key: 'formas', subtitle: 'Atualização específica' },
+  { label: 'Configurações', key: 'configuracoes', subtitle: 'Atualização específica' },
+  { label: 'Usuários', key: 'usuarios', subtitle: 'Atualização específica' }
 ];
 
 const formatUnavailableMessage = (status?: number, message?: string) => {
@@ -292,8 +294,10 @@ export const SyncScreen: React.FC = () => {
             onPress={() => executeSingle(task.key)}
             disabled={isBusy}
           >
-            <Text style={styles.cardTitle}>{task.label}</Text>
-            <Text style={styles.cardSub}>Atualização específica</Text>
+            <View style={styles.cardBody}>
+              <Text style={styles.cardTitle}>{task.label}</Text>
+              <Text style={styles.cardSub}>{task.subtitle || 'Atualização específica'}</Text>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -377,16 +381,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: 22,
     padding: 14,
+    minHeight: 84,
     ...Shadows.card
+  },
+  cardBody: {
+    minHeight: 54,
+    justifyContent: 'space-between'
   },
   cardTitle: {
     color: Colors.text,
     fontWeight: '700',
-    marginBottom: 4
+    lineHeight: 24,
+    minHeight: 24
   },
   cardSub: {
     color: Colors.textMuted,
-    fontSize: 12
+    fontSize: 12,
+    lineHeight: 18,
+    minHeight: 18
   },
   logWrap: {
     backgroundColor: Colors.card,

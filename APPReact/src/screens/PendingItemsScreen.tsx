@@ -16,6 +16,9 @@ const formatQty = (value: number) => {
   return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(3);
 };
 
+const formatFractions = (fractions: NonNullable<ReturnType<typeof useApp>['cart'][number]['fracoes']>) =>
+  fractions.map((fraction, index) => `${index + 1}/${fractions.length} ${fraction.produtoDescricao}`).join(' | ');
+
 export const PendingItemsScreen: React.FC = () => {
   const navigation = useNavigation<Navigation>();
   const { cart, activeTable, getLineTotal, getCartTotal, removeFromCart } = useApp();
@@ -76,6 +79,9 @@ export const PendingItemsScreen: React.FC = () => {
               <Text style={styles.itemTitle}>{item.descricao}</Text>
               <Text style={styles.itemMeta}>Qtd: {formatQty(item.quantidade)}</Text>
               <Text style={styles.itemMeta}>Tamanho: {item.descricaoTamanho || item.tamanho || 'Padrão'}</Text>
+              {item.fracoes?.length ? (
+                <Text style={styles.itemMeta}>Frações: {formatFractions(item.fracoes)}</Text>
+              ) : null}
               {item.observacao ? <Text style={styles.itemMeta}>Obs.: {item.observacao}</Text> : null}
               {item.opcionais?.length ? (
                 <View style={styles.optionalsWrap}>

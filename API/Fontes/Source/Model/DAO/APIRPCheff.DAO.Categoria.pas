@@ -46,7 +46,6 @@ begin
   SelectCategorias;
   FQuery.SQL('where emp_001 = :idEmpresa')
     .SQL('and sit_001 = 4')
-    .SQL('and b_exibir_mobile=true')
     .SQL('order by cat_002')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .Open;

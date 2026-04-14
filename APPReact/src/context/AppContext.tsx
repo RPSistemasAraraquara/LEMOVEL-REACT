@@ -6,6 +6,7 @@ import {
   Category,
   defaultMobileSettings,
   hasConflictingOpeningSettings,
+  LaunchItemFractionPayload,
   LaunchItemPayload,
   loadMobileSettings,
   MobileAppSettings,
@@ -37,6 +38,7 @@ export type CartItem = Omit<MenuItem, 'opcionais'> & {
   fractionGroupId?: string;
   valorUnitario: number;
   opcionais: LaunchOptional[];
+  fracoes?: LaunchItemFractionPayload[];
 };
 
 type AppContextState = {
@@ -391,10 +393,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .sort((a, b) => a.id - b.id)
       .map(
         (item) =>
-          `${item.id}|${item.valorVenda}|${item.descricao}|${item.vendaPorTamanho ? 1 : 0}|${item.permiteFracao ? 1 : 0}|${item.possuiImagem ? 1 : 0}|${item.imagem ? item.imagem.length : 0}|${item.imagem_db ? item.imagem_db.length : 0}|${item.imagemLocalPath ? item.imagemLocalPath.length : 0}|${(item.opcionais || [])
+          `${item.id}|${item.idProduto}|${item.valorVenda}|${item.valorUnitario || 0}|${item.descricao}|${item.descricaoCurta || ''}|${item.codReferencia || ''}|${item.idCategoria || 0}|${item.b_venda_mobile === false ? 0 : 1}|${item.vendaPorTamanho ? 1 : 0}|${item.tamanhoPadrao || ''}|${item.tamanhoP || ''}|${item.tamanhoM || ''}|${item.tamanhoG || ''}|${item.tamanhoGG || ''}|${item.tamanhoExtra || ''}|${item.valorTamanhoP || 0}|${item.valorTamanhoM || 0}|${item.valorTamanhoG || 0}|${item.valorTamanhoGG || 0}|${item.valorTamanhoExtra || 0}|${item.usaQuantidadeDecimal ? 1 : 0}|${item.permiteFracao ? 1 : 0}|${item.possuiImagem ? 1 : 0}|${item.imagem ? item.imagem.length : 0}|${item.imagem_db ? item.imagem_db.length : 0}|${item.imagemLocalPath ? item.imagemLocalPath.length : 0}|${item.happyHourAtivar ? 1 : 0}|${item.happyHour?.valor || 0}|${item.happyHour?.horaInicial || ''}|${item.happyHour?.horaFinal || ''}|${item.happyHour?.tipoMesa ? 1 : 0}|${item.happyHour?.tipoComanda ? 1 : 0}|${item.happyHour?.segundaFeira ? 1 : 0}|${item.happyHour?.tercaFeira ? 1 : 0}|${item.happyHour?.quartaFeira ? 1 : 0}|${item.happyHour?.quintaFeira ? 1 : 0}|${item.happyHour?.sextaFeira ? 1 : 0}|${item.happyHour?.sabado ? 1 : 0}|${item.happyHour?.domingo ? 1 : 0}|${(item.opcionais || [])
             .map(
               (optional) =>
-                `${optional.idOpcional}:${optional.descricao}:${optional.valor}:${optional.opcionalP || ''}:${optional.opcionalM || ''}:${optional.opcionalG || ''}:${optional.opcionalGG || ''}:${optional.opcionalExtra || ''}`
+                `${optional.idOpcional}:${optional.descricao}:${optional.valor}:${optional.gratis ? 1 : 0}:${optional.opcionalP || ''}:${optional.opcionalM || ''}:${optional.opcionalG || ''}:${optional.opcionalGG || ''}:${optional.opcionalExtra || ''}:${optional.valorOpcionalP || 0}:${optional.valorOpcionalM || 0}:${optional.valorOpcionalG || 0}:${optional.valorOpcionalGG || 0}:${optional.valorOpcionalExtra || 0}`
             )
             .join(',')}`
       )
@@ -484,7 +486,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const getLineTotal = (item: CartItem) => {
-    const baseValue = item.valorUnitario * item.quantidade;
+    const baseValue = item.fracoes?.length
+      ? item.fracoes.reduce(
+          (acc, fraction) => acc + Number(fraction.valorTotal || 0) + Number(fraction.acrescimo || 0),
+          0
+        )
+      : item.valorUnitario * item.quantidade;
     const optionalValue = optionTotal(item);
     return roundTo2(baseValue + optionalValue + item.acrescimo - item.desconto);
   };
@@ -509,6 +516,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       descricao: optional.descricao,
       valor: optional.valor,
       gratis: optional.gratis
+    })),
+    fracoes: item.fracoes?.map((fraction) => ({
+      idProduto: fraction.idProduto,
+      produtoDescricao: fraction.produtoDescricao,
+      quantidade: fraction.quantidade,
+      valorUnitario: fraction.valorUnitario,
+      valorTotal: fraction.valorTotal,
+      acrescimo: fraction.acrescimo,
+      observacao: fraction.observacao,
+      descricaoTamanho: fraction.descricaoTamanho,
+      opcionais: fraction.opcionais.map((optional) => ({
+        idOpcional: optional.idOpcional,
+        descricao: optional.descricao,
+        valor: optional.valor,
+        gratis: optional.gratis
+      }))
     }))
   });
 
@@ -568,6 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Boolean(prev.permiteCancelarItemMobile) === Boolean(updated.permiteCancelarItemMobile) &&
         Boolean(prev.permitePreFechamentoMesaComanda) === Boolean(updated.permitePreFechamentoMesaComanda) &&
         Boolean(prev.permiteFechamentoMesaComanda) === Boolean(updated.permiteFechamentoMesaComanda) &&
+        Boolean(prev.permiteAlterarTaxa10) === Boolean(updated.permiteAlterarTaxa10) &&
         Boolean(prev.permiteJuntarMesaComanda) === Boolean(updated.permiteJuntarMesaComanda) &&
         Boolean(prev.permiteReabrirMesaComanda) === Boolean(updated.permiteReabrirMesaComanda) &&
         Boolean(prev.permitePagamentoParcial) === Boolean(updated.permitePagamentoParcial) &&
@@ -1115,7 +1139,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? undefined
       : nomeInformado || undefined;
 
-    let table = await api.openTableByMode(tableId, sanitizedName, mode);
+    const usaCatraca = appSettings.utilizaCatraca && mode === 'comanda';
+    let table = await api.openTableByMode(tableId, sanitizedName, mode, {
+      usaCatraca
+    });
     const openedMode = (item: TableOrder) => item.tipo || 'mesa';
     const fallbackMode = openedMode(table);
 

@@ -135,10 +135,16 @@ type
     FidUsuario: Integer;
     FimprimirPreFechamentoMobile: Boolean;
     FpreFechamentoMobileImpressaoInterna: Boolean;
+    FvalorTaxaServico: Currency;
+    FCobrarTaxaGarcom: Boolean;
   public
+    constructor Create;
+
     property idUsuario: Integer read FidUsuario write FidUsuario;
     property imprimirPreFechamentoMobile: Boolean read FimprimirPreFechamentoMobile write FimprimirPreFechamentoMobile;
     property preFechamentoMobileImpressaoInterna: Boolean read FpreFechamentoMobileImpressaoInterna write FpreFechamentoMobileImpressaoInterna;
+    property valorTaxaServico: Currency read FvalorTaxaServico write FvalorTaxaServico;
+    property CobrarTaxaGarcom: Boolean read FCobrarTaxaGarcom write FCobrarTaxaGarcom;
   end;
 
   TAPIRPCheffEntityVendaPostAbertura = class
@@ -219,6 +225,12 @@ type
 implementation
 
 { TAPIRPCheffEntityVendaPatchCouvert }
+
+constructor TAPIRPCheffEntityVendaPatchPreFechamento.Create;
+begin
+  inherited;
+  FCobrarTaxaGarcom := True;
+end;
 
 function TAPIRPCheffEntityVendaPatchCouvert.NumeroCouvert: Integer;
 begin

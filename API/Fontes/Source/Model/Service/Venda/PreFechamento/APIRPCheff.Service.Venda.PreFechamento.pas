@@ -49,14 +49,26 @@ var
   LValorTaxa: Currency;
   LPercentual: Currency;
 begin
+  FreeAndNil(FVenda.itens);
+  FVenda.itens := FDAO.VendaItemDAO.Listar(FVenda.idVenda);
+  LValorVenda := FVenda.TotalItens;
+
+  if (not FPatch.CobrarTaxaGarcom) or (FPatch.valorTaxaServico <= 0) then
+  begin
+    FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, 0, 0);
+    Exit;
+  end;
+
   if Assigned(FConfiguracao) and FConfiguracao.utilizaTaxaServico then
   begin
-    LValorVenda                     := FVenda.valor;
     LValorVendaSomenteProdutosTaxa  := FDAO.VendaItemDAO.ListarProdutosSomenteTaxaGarcom(FVenda.idVenda);
     LPercentual                     := FConfiguracao.percentualTaxaServico;
     LValorTaxa                      := SimpleRoundTo(LValorVendaSomenteProdutosTaxa * (LPercentual / 100), -2);
     FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, LValorTaxa, LPercentual);
+    Exit;
   end;
+
+  FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, 0, 0);
 end;
 
 procedure TAPIRPCheffServiceVendaPreFechamento.CarregarConfiguracao;

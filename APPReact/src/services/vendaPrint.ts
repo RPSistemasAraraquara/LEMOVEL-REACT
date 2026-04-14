@@ -25,7 +25,16 @@ export const resolveMachineType = (
   return 'tmpNenhum';
 };
 
-const parsePrintCommandsToText = (raw: string): string => {
+const stripPrinterMarkup = (value: string): string =>
+  String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/<[^>\n]+>/g, '')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+export const parsePrintCommandsToText = (raw: string): string => {
   const extractLines = (payload: unknown): string[] => {
     if (!payload) return [];
     if (Array.isArray(payload)) {
@@ -67,11 +76,7 @@ const parsePrintCommandsToText = (raw: string): string => {
     return [];
   };
 
-  const normalizeText = (value: string): string =>
-    value
-      .replace(/\r\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+  const normalizeText = (value: string): string => stripPrinterMarkup(value);
 
   const tryParse = (value: string): string => {
     const parsed = JSON.parse(value);
@@ -87,7 +92,7 @@ const parsePrintCommandsToText = (raw: string): string => {
     try {
       return tryParse(base);
     } catch {
-      return base;
+      return stripPrinterMarkup(base);
     }
   }
 
@@ -97,13 +102,13 @@ const parsePrintCommandsToText = (raw: string): string => {
       if (typeof unquoted === 'string') {
         return parsePrintCommandsToText(unquoted);
       }
-      return base;
+      return stripPrinterMarkup(base);
     } catch {
-      return base;
+      return stripPrinterMarkup(base);
     }
   }
 
-  return base;
+  return stripPrinterMarkup(base);
 };
 
 export const loadSalePrintContent = async (input: RPCheffSalePrintInput): Promise<string> => {

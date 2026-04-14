@@ -15,7 +15,13 @@ import {
   resolveConfiguredPaymentProvider,
   resolvePaymentProviderForMethod
 } from '../services/payment';
-import { executeSalePrint, loadSalePrintContent, printSaleContent, resolveMachineType } from '../services/vendaPrint';
+import {
+  executeSalePrint,
+  loadSalePrintContent,
+  parsePrintCommandsToText,
+  printSaleContent,
+  resolveMachineType
+} from '../services/vendaPrint';
 import { Colors, Radius, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 
@@ -97,87 +103,6 @@ const toDisplayStatus = (value?: string): string => {
   return 'Sem situação';
 };
 
-const parsePrintCommandsToText = (raw: string): string => {
-  const extractLines = (payload: any): string[] => {
-    if (!payload) return [];
-    if (Array.isArray(payload)) {
-      return payload.flatMap((item) => extractLines(item));
-    }
-
-    if (typeof payload === 'string') {
-      return [payload];
-    }
-
-    if (typeof payload !== 'object') {
-      return [];
-    }
-
-    const command = payload as Record<string, unknown>;
-    const type = String(command.type || '').toLowerCase();
-    const content = command.content;
-
-    if (type === 'line') {
-      return [String(content ?? '--------------------------------')];
-    }
-
-    if (type === 'text') {
-      return [String(content ?? '')];
-    }
-
-    if (Array.isArray(command.commands)) {
-      return extractLines(command.commands);
-    }
-
-    if (Array.isArray(command.data)) {
-      return extractLines(command.data);
-    }
-
-    if (content !== undefined && content !== null) {
-      return [String(content)];
-    }
-
-    return [];
-  };
-
-  const normalizeText = (value: string): string =>
-    value
-      .replace(/\r\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-  const tryParse = (value: string): string => {
-    const parsed = JSON.parse(value);
-    const lines = extractLines(parsed);
-    const text = normalizeText(lines.join('\n'));
-    return text || value;
-  };
-
-  const base = (raw || '').trim();
-  if (!base) return '';
-
-  if (base.startsWith('[') || base.startsWith('{')) {
-    try {
-      return tryParse(base);
-    } catch {
-      return base;
-    }
-  }
-
-  if ((base.startsWith('"[') && base.endsWith('"')) || (base.startsWith('"{') && base.endsWith('"'))) {
-    try {
-      const unquoted = JSON.parse(base);
-      if (typeof unquoted === 'string') {
-        return parsePrintCommandsToText(unquoted);
-      }
-      return base;
-    } catch {
-      return base;
-    }
-  }
-
-  return base;
-};
-
 const ClosureSection = ({
   eyebrow,
   title,
@@ -256,8 +181,11 @@ export const SaleClosureScreen: React.FC = () => {
   });
   const [companyCouvertConfig, setCompanyCouvertConfig] = useState({
     valorCouvertMasculino: 0,
-    valorCouvertFeminino: 0
+    valorCouvertFeminino: 0,
+    taxaServicoPct: 0,
+    utilizaTaxaServico: false
   });
+  const [cobrarTaxaGarcom, setCobrarTaxaGarcom] = useState(false);
   const activePaymentTokenRef = useRef<string | null>(null);
   const paymentSelectionBusyRef = useRef(false);
 
@@ -287,7 +215,11 @@ export const SaleClosureScreen: React.FC = () => {
       setPartialPayments(mode === 'final' ? mergedPartialPayments : []);
       setCompanyCouvertConfig({
         valorCouvertMasculino: Number(currentCompanyConfig?.valorCouvertMasculino || 0),
-        valorCouvertFeminino: Number(currentCompanyConfig?.valorCouvertFeminino || 0)
+        valorCouvertFeminino: Number(currentCompanyConfig?.valorCouvertFeminino || 0),
+        taxaServicoPct: Number(currentCompanyConfig?.taxaServicoPct || 0),
+        utilizaTaxaServico:
+          Boolean((currentCompanyConfig as any)?.taxaAdicionalMesa) ||
+          Number(currentCompanyConfig?.taxaServicoPct || 0) > 0
       });
       if (saleLoaded) {
         const totalVenda = saleLoaded.valorTotal ?? saleLoaded.valor ?? 0;
@@ -299,6 +231,11 @@ export const SaleClosureScreen: React.FC = () => {
         setDescontoValor(formatDiscountInput(valorDesconto));
         setDescontoPercentual(formatDiscountInput(percentualDesconto));
         setDiscountInputMode('value');
+        setCobrarTaxaGarcom(
+          Number(saleLoaded.valorTaxaServico || 0) > 0 ||
+            Boolean((currentCompanyConfig as any)?.taxaAdicionalMesa) ||
+            Number(currentCompanyConfig?.taxaServicoPct || 0) > 0
+        );
       }
     } finally {
       setLoading(false);
@@ -348,6 +285,7 @@ export const SaleClosureScreen: React.FC = () => {
   const originalFemCount = Number(sale?.numeroCouvertFeminino || 0);
   const originalMascCouvertTotal = Number(sale?.valorCouvertMasculino || 0);
   const originalFemCouvertTotal = Number(sale?.valorCouvertFeminino || 0);
+  const originalTaxaServico = Number(sale?.valorTaxaServico || 0);
   const unitMascCouvert =
     Number(companyCouvertConfig.valorCouvertMasculino || 0) > 0
       ? Number(companyCouvertConfig.valorCouvertMasculino || 0)
@@ -364,7 +302,8 @@ export const SaleClosureScreen: React.FC = () => {
   const currentCouvertTotal =
     parseInteger(masc) * unitMascCouvert +
     parseInteger(fem) * unitFemCouvert;
-  const total = Math.max(0, saleTotal - originalCouvertTotal + currentCouvertTotal);
+  const effectiveTaxaServico = cobrarTaxaGarcom ? originalTaxaServico : 0;
+  const total = Math.max(0, saleTotal - originalCouvertTotal - originalTaxaServico + currentCouvertTotal + effectiveTaxaServico);
   const partialPaid = partialPayments.reduce((acc, item) => acc + Number(item.valor || 0), 0);
   const descontoNum = discountInputMode === 'percent'
     ? calculateDiscountValueFromPercent(total, descontoPercentual)
@@ -405,6 +344,11 @@ export const SaleClosureScreen: React.FC = () => {
   const isFinalCloseAllowed = statusText.includes('pendente') || statusText.includes('prefechamento');
   const allowSave = mode === 'pre' ? isPreCloseAllowed : isFinalCloseAllowed;
   const isMachinePaymentRunning = paymentProcessingVisible || Boolean(activePaymentTokenRef.current);
+  const canToggleServiceTax = Boolean(user?.permiteAlterarTaxa10);
+  const shouldShowServiceTaxToggle =
+    companyCouvertConfig.utilizaTaxaServico ||
+    companyCouvertConfig.taxaServicoPct > 0 ||
+    originalTaxaServico > 0;
 
   useEffect(() => {
     if (configuredPaymentProvider !== 'pagbank') {
@@ -653,6 +597,8 @@ export const SaleClosureScreen: React.FC = () => {
             numeroPessoas,
             numeroCouvertMasculino: parseInteger(masc),
             numeroCouvertFeminino: parseInteger(fem),
+            valorTaxaServico: effectiveTaxaServico,
+            CobrarTaxaGarcom: cobrarTaxaGarcom,
             imprimirPreFechamentoMobile: false,
             preFechamentoMobileImpressaoInterna: false
           },
@@ -763,6 +709,8 @@ export const SaleClosureScreen: React.FC = () => {
         numeroPessoas,
         numeroCouvertMasculino: parseInteger(masc),
         numeroCouvertFeminino: parseInteger(fem),
+        valorTaxaServico: effectiveTaxaServico,
+        CobrarTaxaGarcom: cobrarTaxaGarcom,
         imprimirPreFechamentoMobile: previewRequested
           ? false
           : shouldUseLocalTerminalPrint
@@ -971,8 +919,7 @@ export const SaleClosureScreen: React.FC = () => {
         valor
       }));
 
-      const valorTaxaServico = Number(sale?.valorTaxaServico || 0);
-      const cobrarTaxaGarcom = valorTaxaServico > 0;
+      const valorTaxaServico = effectiveTaxaServico;
 
       await api.closeSale({
         idVenda,
@@ -1349,6 +1296,37 @@ export const SaleClosureScreen: React.FC = () => {
           </View>
         </View>
       </ClosureSection>
+
+      {shouldShowServiceTaxToggle ? (
+        <ClosureSection
+          eyebrow="Serviço"
+          title="Taxa de serviço"
+          subtitle="Volte a controlar a cobrança da taxa como no legado, sem alterar o restante do fechamento."
+        >
+          <View style={styles.summaryCard}>
+            <View style={styles.switchRow}>
+              <View style={styles.switchCopy}>
+                <Text style={styles.infoTitle}>Cobrar taxa de serviço</Text>
+                <Text style={styles.infoText}>
+                  {cobrarTaxaGarcom
+                    ? `Taxa aplicada no total: ${formatMoney(effectiveTaxaServico)}`
+                    : 'Taxa desconsiderada neste pré-fechamento/fechamento.'}
+                </Text>
+              </View>
+              <Switch
+                value={cobrarTaxaGarcom}
+                onValueChange={setCobrarTaxaGarcom}
+                disabled={!canToggleServiceTax}
+              />
+            </View>
+            {!canToggleServiceTax ? (
+              <Text style={styles.permissionHint}>
+                Seu usuário não possui permissão para alterar a taxa de serviço.
+              </Text>
+            ) : null}
+          </View>
+        </ClosureSection>
+      ) : null}
 
       {mode === 'pre' ? (
         <ClosureSection
@@ -1901,6 +1879,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
+  },
+  switchCopy: {
+    flex: 1,
+    paddingRight: 12
   },
   previewBox: {
     borderWidth: 1,

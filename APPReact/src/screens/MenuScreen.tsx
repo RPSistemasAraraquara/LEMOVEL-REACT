@@ -220,10 +220,7 @@ export const MenuScreen: React.FC = () => {
     }
   }, [categoriesEnabled, currentTableKey]);
 
-  const visibleProducts = useMemo(
-    () => products.filter((item) => item.b_venda_mobile !== false),
-    [products]
-  );
+  const visibleProducts = useMemo(() => products, [products]);
 
   const productsByCategory = useMemo(() => {
     const grouped = new Map<number, MenuItem[]>();
@@ -264,7 +261,21 @@ export const MenuScreen: React.FC = () => {
 
       const normalizedQuery = searchQuery.trim().toLowerCase();
       if (normalizedQuery) {
-        return visibleProducts.filter((item) => (item.descricao || '').toLowerCase().includes(normalizedQuery));
+        const hasExactCodeMatch = visibleProducts.some((item) => {
+          const productCode = String(item.codReferencia || '').trim().toLowerCase();
+          return productCode.length > 0 && productCode === normalizedQuery;
+        });
+
+        return visibleProducts.filter((item) => {
+          const description = String(item.descricao || '').toLowerCase();
+          const productCode = String(item.codReferencia || '').trim().toLowerCase();
+
+          if (hasExactCodeMatch) {
+            return productCode === normalizedQuery;
+          }
+
+          return description.includes(normalizedQuery) || (productCode.length > 0 && productCode.includes(normalizedQuery));
+        });
       }
 
       if (!categoriesEnabled) {
@@ -523,7 +534,7 @@ export const MenuScreen: React.FC = () => {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Pesquisar item, sabor ou atalho"
+            placeholder="Pesquisar item por descricao ou codigo"
             placeholderTextColor={Colors.textMuted}
             style={styles.searchInput}
           />

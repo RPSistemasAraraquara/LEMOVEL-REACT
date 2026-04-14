@@ -7,6 +7,7 @@ export type MenuItem = {
   idProduto: number;
   descricao: string;
   descricaoCurta?: string;
+  codReferencia?: string;
   imagem?: string;
   imagem_db?: string;
   imagemLocalPath?: string;
@@ -29,7 +30,24 @@ export type MenuItem = {
   valorTamanhoExtra?: number;
   usaQuantidadeDecimal?: boolean;
   permiteFracao?: boolean;
+  happyHourAtivar?: boolean;
+  happyHour?: ProductHappyHour;
   opcionais?: ProductOptional[];
+};
+
+export type ProductHappyHour = {
+  segundaFeira?: boolean;
+  tercaFeira?: boolean;
+  quartaFeira?: boolean;
+  quintaFeira?: boolean;
+  sextaFeira?: boolean;
+  sabado?: boolean;
+  domingo?: boolean;
+  tipoMesa?: boolean;
+  tipoComanda?: boolean;
+  horaInicial?: string | number;
+  horaFinal?: string | number;
+  valor?: number;
 };
 
 export type ProductSizeOption = {
@@ -63,6 +81,18 @@ export type LaunchOptionalPayload = {
   gratis: boolean;
 };
 
+export type LaunchItemFractionPayload = {
+  idProduto: number;
+  produtoDescricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  acrescimo: number;
+  observacao?: string;
+  descricaoTamanho?: string;
+  opcionais: LaunchOptionalPayload[];
+};
+
 export type LaunchItemPayload = {
   idProduto: number;
   quantidade: number;
@@ -77,6 +107,7 @@ export type LaunchItemPayload = {
   idMesaVinculada: number;
   idGarcom?: number;
   opcionais: LaunchOptionalPayload[];
+  fracoes?: LaunchItemFractionPayload[];
 };
 
 export type Category = {
@@ -168,6 +199,7 @@ export type SaleClosureLine = {
 export type SaleClosurePayload = {
   idVenda: number;
   idUsuario: number;
+  numeroPessoas?: number;
   numeroCouvertMasculino?: number;
   numeroCouvertFeminino?: number;
   valorDesconto?: number;
@@ -198,6 +230,8 @@ export type SaleCouvertPayload = {
   numeroPessoas: number;
   numeroCouvertMasculino?: number;
   numeroCouvertFeminino?: number;
+  valorTaxaServico?: number;
+  CobrarTaxaGarcom?: boolean;
 };
 
 export type SyncTaskResult = {
@@ -239,6 +273,7 @@ export type UserProfile = {
   permiteCancelarItemMobile?: boolean;
   permitePreFechamentoMesaComanda?: boolean;
   permiteFechamentoMesaComanda?: boolean;
+  permiteAlterarTaxa10?: boolean;
   permiteJuntarMesaComanda?: boolean;
   permiteReabrirMesaComanda?: boolean;
   permitePagamentoParcial?: boolean;
@@ -313,6 +348,7 @@ const fallbackProfile: UserProfile = {
   permiteCancelarItemMobile: false,
   permitePreFechamentoMesaComanda: false,
   permiteFechamentoMesaComanda: false,
+  permiteAlterarTaxa10: false,
   permiteJuntarMesaComanda: false,
   permiteReabrirMesaComanda: false,
   permitePagamentoParcial: false,
@@ -1139,6 +1175,231 @@ function parseOptional(value: any): ProductOptional {
   };
 }
 
+function hasHappyHourSourceMetadata(value: any): boolean {
+  const nested = resolveField(value, ['happyHour', 'happy_hour']);
+  if (nested && typeof nested === 'object') {
+    return true;
+  }
+
+  const keys = [
+    'happyHourAtivar',
+    'happy_hour_ativar',
+    'hh_ativar',
+    'hh_dia_seg',
+    'hh_dia_ter',
+    'hh_dia_qua',
+    'hh_dia_qui',
+    'hh_dia_sex',
+    'hh_dia_sab',
+    'hh_dia_dom',
+    'hh_inicial',
+    'hh_final',
+    'hh_valor'
+  ];
+
+  return keys.some((key) => resolveField(value, [key]) !== undefined);
+}
+
+function parseHappyHour(value: any): ProductHappyHour {
+  const nested = resolveField(value, ['happyHour', 'happy_hour']);
+  const hasNestedSource = Boolean(nested && typeof nested === 'object');
+  const source = hasNestedSource ? nested : value;
+
+  return {
+    segundaFeira: parseBoolean(resolveField(source, ['segundaFeira', 'segunda_feira', 'hh_dia_seg']), false),
+    tercaFeira: parseBoolean(resolveField(source, ['tercaFeira', 'terca_feira', 'hh_dia_ter']), false),
+    quartaFeira: parseBoolean(resolveField(source, ['quartaFeira', 'quarta_feira', 'hh_dia_qua']), false),
+    quintaFeira: parseBoolean(resolveField(source, ['quintaFeira', 'quinta_feira', 'hh_dia_qui']), false),
+    sextaFeira: parseBoolean(resolveField(source, ['sextaFeira', 'sexta_feira', 'hh_dia_sex']), false),
+    sabado: parseBoolean(resolveField(source, ['sabado', 'sábado', 'hh_dia_sab']), false),
+    domingo: parseBoolean(resolveField(source, ['domingo', 'hh_dia_dom']), false),
+    tipoMesa: parseBoolean(resolveField(source, ['tipoMesa', 'tipo_mesa', 'hh_tipo_mesa']), false),
+    tipoComanda: parseBoolean(resolveField(source, ['tipoComanda', 'tipo_comanda', 'hh_tipo_comanda']), false),
+    horaInicial: (() => {
+      const raw = resolveField(source, ['horaInicial', 'hora_inicial', 'hh_inicial']);
+      if (typeof raw === 'number') return raw;
+      if (typeof raw === 'string') return raw.trim();
+      return undefined;
+    })(),
+    horaFinal: (() => {
+      const raw = resolveField(source, ['horaFinal', 'hora_final', 'hh_final']);
+      if (typeof raw === 'number') return raw;
+      if (typeof raw === 'string') return raw.trim();
+      return undefined;
+    })(),
+    valor: parseNumber(
+      resolveField(source, hasNestedSource ? ['valor', 'hh_valor'] : ['hh_valor', 'valorHappyHour', 'valor_happy_hour']),
+      0
+    )
+  };
+}
+
+function normalizeSizeValue(value: unknown): number {
+  const asNumber = Number(String(value || 0).replace(',', '.'));
+  return Number.isFinite(asNumber) ? asNumber : 0;
+}
+
+function parseTimeToMinutes(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const normalized = value >= 0 && value <= 1 ? value : Math.abs(value % 1);
+    return Math.round(normalized * 24 * 60);
+  }
+
+  const raw = sanitizeText(value, '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const numeric = Number(raw.replace(',', '.'));
+  if (Number.isFinite(numeric)) {
+    const normalized = numeric >= 0 && numeric <= 1 ? numeric : Math.abs(numeric % 1);
+    return Math.round(normalized * 24 * 60);
+  }
+
+  const match = raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
+    return null;
+  }
+
+  return hours * 60 + minutes + Math.round(seconds / 60);
+}
+
+function currentTimeInMinutes(referenceDate: Date): number {
+  return referenceDate.getHours() * 60 + referenceDate.getMinutes();
+}
+
+function isHappyHourDayEnabled(item: MenuItem, referenceDate: Date): boolean {
+  const happyHour = item.happyHour;
+  if (!happyHour) {
+    return false;
+  }
+
+  switch (referenceDate.getDay()) {
+    case 0:
+      return Boolean(happyHour.domingo);
+    case 1:
+      return Boolean(happyHour.segundaFeira);
+    case 2:
+      return Boolean(happyHour.tercaFeira);
+    case 3:
+      return Boolean(happyHour.quartaFeira);
+    case 4:
+      return Boolean(happyHour.quintaFeira);
+    case 5:
+      return Boolean(happyHour.sextaFeira);
+    case 6:
+      return Boolean(happyHour.sabado);
+    default:
+      return false;
+  }
+}
+
+function isHappyHourSaleTypeEnabled(
+  item: MenuItem,
+  saleType?: 'mesa' | 'comanda'
+): boolean {
+  const happyHour = item.happyHour;
+  if (!happyHour) {
+    return false;
+  }
+
+  const mesaEnabled = happyHour.tipoMesa === true;
+  const comandaEnabled = happyHour.tipoComanda === true;
+  if (!mesaEnabled && !comandaEnabled) {
+    return true;
+  }
+
+  if (saleType === 'mesa') {
+    return mesaEnabled;
+  }
+
+  if (saleType === 'comanda') {
+    return comandaEnabled;
+  }
+
+  return mesaEnabled || comandaEnabled;
+}
+
+export function hasMenuItemHappyHourMetadata(item?: MenuItem | null): boolean {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+
+  return item.happyHourAtivar !== undefined || item.happyHour !== undefined;
+}
+
+export function isMenuItemHappyHourActive(
+  item: MenuItem,
+  referenceDate = new Date(),
+  saleType?: 'mesa' | 'comanda'
+): boolean {
+  if (!item.happyHourAtivar || !item.happyHour) {
+    return false;
+  }
+
+  if (!isHappyHourSaleTypeEnabled(item, saleType)) {
+    return false;
+  }
+
+  if (!isHappyHourDayEnabled(item, referenceDate)) {
+    return false;
+  }
+
+  const startMinutes = parseTimeToMinutes(item.happyHour.horaInicial);
+  const endMinutes = parseTimeToMinutes(item.happyHour.horaFinal);
+  if (startMinutes === null || endMinutes === null) {
+    return false;
+  }
+
+  const nowMinutes = currentTimeInMinutes(referenceDate);
+  return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+}
+
+export function getMenuItemLaunchUnitPrice(
+  item: MenuItem,
+  sizeCode = '',
+  options?: {
+    enableHappyHour?: boolean;
+    referenceDate?: Date;
+    saleType?: 'mesa' | 'comanda';
+  }
+): number {
+  const referenceDate = options?.referenceDate ?? new Date();
+  if (options?.enableHappyHour !== false && isMenuItemHappyHourActive(item, referenceDate, options?.saleType)) {
+    return Number(item.happyHour?.valor || 0);
+  }
+
+  if (!item.vendaPorTamanho && !item.permiteFracao) {
+    return Number(item.valorUnitario || item.valorVenda || 0);
+  }
+
+  const candidates: Record<string, unknown> = {
+    P: item.valorTamanhoP,
+    M: item.valorTamanhoM,
+    G: item.valorTamanhoG,
+    GG: item.valorTamanhoGG,
+    E: item.valorTamanhoExtra,
+    EXTRA: item.valorTamanhoExtra
+  };
+
+  const key = String(sizeCode || '').toUpperCase();
+  const direct = normalizeSizeValue(candidates[key]);
+  if (direct > 0) return direct;
+
+  const padrao = String(item.tamanhoPadrao || '').toUpperCase();
+  const fallback = normalizeSizeValue(candidates[padrao]);
+  if (fallback > 0) return fallback;
+
+  return Number(item.valorUnitario || item.valorVenda || 0);
+}
+
 function parseMenuItem(value: any): MenuItem {
   const normalizedLocalImage = normalizeImageValue(resolveField(value, ['imagemLocalPath', 'imagem_local_path']));
   const normalizedImage = normalizeImageValue(resolveField(value, ['imagem', 'imagem_db', 'imagemDb']));
@@ -1158,11 +1419,17 @@ function parseMenuItem(value: any): MenuItem {
     : rawOptionals && typeof rawOptionals === 'object'
       ? [rawOptionals]
       : [];
+  const hasHappyHourMetadata = hasHappyHourSourceMetadata(value);
   const item: MenuItem = {
     id: parseNumber(resolveField(value, ['idProduto', 'id']), 0),
     idProduto: parseNumber(resolveField(value, ['idProduto', 'id']), 0),
     descricao: String(value?.descricao ?? ''),
     descricaoCurta: value?.descricaoCurta ? String(value.descricaoCurta) : undefined,
+    codReferencia: (() => {
+      const rawCode = resolveField(value, ['codReferencia', 'cod_referencia', 'codigoReferencia', 'codigo_referencia', 'mat_004']);
+      const normalizedCode = rawCode === undefined || rawCode === null ? '' : String(rawCode).trim();
+      return normalizedCode || undefined;
+    })(),
     imagem: normalizedLocalImage || normalizedImage,
     imagem_db: storedImagePayload,
     imagemLocalPath: normalizedLocalImage,
@@ -1214,6 +1481,10 @@ function parseMenuItem(value: any): MenuItem {
       resolveField(value, ['usaQuantidadeDecimal', 'usaQuantidadeDecimal', 'usa_quantidade_decimal']),
       false
     ),
+    happyHourAtivar: hasHappyHourMetadata
+      ? parseBoolean(resolveField(value, ['happyHourAtivar', 'happy_hour_ativar', 'hh_ativar']), false)
+      : undefined,
+    happyHour: hasHappyHourMetadata ? parseHappyHour(value) : undefined,
     permiteFracao: parseBoolean(
       resolveField(value, [
         'permiteFracao',
@@ -1256,6 +1527,10 @@ function parseUserProfile(value: any): UserProfile {
     permiteFechamentoMesaComanda: parseBoolean(
       value?.permiteFechamentoMesaComanda ?? value?.b_permite_fechamento_mesa_comanda,
       Boolean(fallbackProfile.permiteFechamentoMesaComanda)
+    ),
+    permiteAlterarTaxa10: parseBoolean(
+      value?.permiteAlterarTaxa10 ?? value?.b_permite_alterar_taxa10,
+      Boolean(fallbackProfile.permiteAlterarTaxa10)
     ),
     permiteJuntarMesaComanda: parseBoolean(
       value?.permiteJuntarMesaComanda ?? value?.PermiteJuntarMesaComanda ?? value?.b_permite_juntar_mesa_comanda,
@@ -1903,6 +2178,14 @@ export class ApiClient {
     this.clearGetCacheByPrefix(`/empresa/${this.idEmpresa}/produto`);
   }
 
+  private clearProductGetCache() {
+    this.clearGetCacheByPrefix(`/empresa/${this.idEmpresa}/produto`);
+  }
+
+  private clearCategoryGetCache() {
+    this.clearGetCacheByPrefix(`/empresa/${this.idEmpresa}/categoria`);
+  }
+
   private clearCatalogMemoryCache() {
     this.cachedCatalogCategories = null;
     this.cachedCatalogProducts = null;
@@ -2535,17 +2818,51 @@ export class ApiClient {
     await saveMobileSettings(normalized);
   }
 
+  private async resolveCatalogImagePreference(): Promise<boolean> {
+    try {
+      const settings = await loadMobileSettings();
+      return settings.exibirImagem !== false;
+    } catch {
+      return defaultMobileSettings.exibirImagem;
+    }
+  }
+
   async syncPartial(task: string): Promise<SyncTaskResult> {
     const taskCode = String(task || '').toLowerCase();
 
     try {
-      if (taskCode === 'catalogo' || taskCode === 'produtos' || taskCode === 'categorias') {
+      if (taskCode === 'catalogo') {
+        const shouldLoadImages = await this.resolveCatalogImagePreference();
         this.clearMenuGetCache();
-        const [categories, products] = await Promise.all([this.listCategories(), this.listProducts(true)]);
+        const [categories, products] = await Promise.all([
+          this.listCategories({ requireRemote: true }),
+          this.listProducts(shouldLoadImages, { requireRemote: true })
+        ]);
         return {
           key: task,
           status: categories.length > 0 || products.length > 0 ? 'ok' : 'skip',
-          message: `Catálogo: ${categories.length} categorias | ${products.length} produtos`
+          message: `Catálogo: ${categories.length} categorias | ${products.length} produtos${shouldLoadImages ? ' | imagens ativas' : ' | imagens desativadas'}`
+        };
+      }
+
+      if (taskCode === 'produtos' || taskCode === 'produto') {
+        const shouldLoadImages = await this.resolveCatalogImagePreference();
+        this.clearProductGetCache();
+        const products = await this.listProducts(shouldLoadImages, { requireRemote: true });
+        return {
+          key: task,
+          status: products.length > 0 ? 'ok' : 'skip',
+          message: `${products.length} produtos atualizados com opcionais${shouldLoadImages ? ' | imagens ativas' : ' | imagens desativadas'}`
+        };
+      }
+
+      if (taskCode === 'categorias' || taskCode === 'categoria') {
+        this.clearCategoryGetCache();
+        const categories = await this.listCategories({ requireRemote: true });
+        return {
+          key: task,
+          status: categories.length > 0 ? 'ok' : 'skip',
+          message: `${categories.length} categorias atualizadas`
         };
       }
 
@@ -2633,7 +2950,7 @@ export class ApiClient {
     };
   }
 
-  async listCategories(): Promise<Category[]> {
+  async listCategories(options: { requireRemote?: boolean } = {}): Promise<Category[]> {
     const cachedCategories = await this.loadCachedCategories();
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/categoria`);
@@ -2645,12 +2962,15 @@ export class ApiClient {
       }));
       await this.saveCachedCategories(categories);
       return categories;
-    } catch {
+    } catch (error) {
+      if (options.requireRemote) {
+        throw error;
+      }
       return cachedCategories.length ? cachedCategories : fallbackCategories;
     }
   }
 
-  async listProducts(exibirImagem = true): Promise<MenuItem[]> {
+  async listProducts(exibirImagem = true, options: { requireRemote?: boolean } = {}): Promise<MenuItem[]> {
     const cachedProducts = await this.loadCachedProducts();
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=${exibirImagem ? 'true' : 'false'}`, {
@@ -2662,7 +2982,10 @@ export class ApiClient {
       const products = await this.materializeProductImages(mergedProducts, cachedProducts);
       await this.saveCachedProducts(products);
       return products;
-    } catch {
+    } catch (error) {
+      if (options.requireRemote) {
+        throw error;
+      }
       return cachedProducts.length ? cachedProducts : fallbackProducts;
     }
   }
@@ -2758,12 +3081,12 @@ export class ApiClient {
     }
   }
 
-  async openComanda(comandaId: number, nomeMesaComanda?: string): Promise<TableOrder> {
+  async openComanda(comandaId: number, nomeMesaComanda?: string, usaCatraca = false): Promise<TableOrder> {
     try {
       const terminal = await this.resolveTerminalName();
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
-        terminal
+        terminalAbertura: terminal
       };
       if (nomeInformado) {
         body.nomeMesaComanda = nomeInformado;
@@ -2772,6 +3095,11 @@ export class ApiClient {
         `rpCheff/v1/empresa/${this.idEmpresa}/comanda/${comandaId}/abertura`,
         {
           method: 'POST',
+          headers: usaCatraca
+            ? {
+                usaCatraca: 'true'
+              }
+            : undefined,
           body: JSON.stringify(body)
         }
       );
@@ -2795,15 +3123,18 @@ export class ApiClient {
   async openTableByMode(
     tableId: number,
     nomeMesaComanda?: string,
-    mode: 'mesa' | 'comanda' | 'mesaComanda' = 'mesa'
+    mode: 'mesa' | 'comanda' | 'mesaComanda' = 'mesa',
+    options: {
+      usaCatraca?: boolean;
+    } = {}
   ): Promise<TableOrder> {
     const nomeInformado = String(nomeMesaComanda || '');
     if (mode === 'comanda') {
-      return this.openComanda(tableId, nomeMesaComanda);
+      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca));
     }
 
     if (mode === 'mesaComanda' && /comanda|c[aã]rd/i.test(nomeInformado)) {
-      return this.openComanda(tableId, nomeMesaComanda);
+      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca));
     }
 
     return this.openTable(tableId, nomeMesaComanda);

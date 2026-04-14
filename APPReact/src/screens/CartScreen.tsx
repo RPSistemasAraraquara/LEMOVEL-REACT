@@ -20,6 +20,12 @@ export const CartScreen: React.FC = () => {
   const hasOpenSale = Boolean(activeTable?.idVenda && activeTable.idVenda !== 0);
 
   const formatQuantity = (value: number) => (Number.isInteger(value) ? value.toString() : value.toFixed(3));
+  const formatFractions = (value: typeof cart[number]) =>
+    value.fracoes?.length
+      ? value.fracoes
+          .map((fraction, index) => `${index + 1}/${value.fracoes?.length} ${fraction.produtoDescricao}`)
+          .join(' | ')
+      : '';
 
   const sendOrder = async () => {
     if (sending) return;
@@ -97,6 +103,7 @@ export const CartScreen: React.FC = () => {
                 <Text style={styles.name}>{item.descricao}</Text>
                 <Text style={styles.desc}>Qtd: {formatQuantity(item.quantidade)}</Text>
                 {!!item.vendaPorTamanho && <Text style={styles.desc}>Tamanho: {item.descricaoTamanho || item.tamanho}</Text>}
+                {!!item.fracoes?.length && <Text style={styles.desc}>Frações: {formatFractions(item)}</Text>}
                 {!!item.observacao && <Text style={styles.desc}>Obs.: {item.observacao}</Text>}
                 {item.opcionais.length > 0 && (
                   <Text style={styles.desc}>Opcionais: {item.opcionais.map((op) => `${op.descricao}${op.valor > 0 ? ` (+R$ ${op.valor.toFixed(2)})` : ''}`).join(', ') || '-'}</Text>

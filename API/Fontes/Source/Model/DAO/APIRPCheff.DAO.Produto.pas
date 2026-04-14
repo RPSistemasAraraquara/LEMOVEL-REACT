@@ -172,7 +172,6 @@ begin
   FQuery.SQL('select imagem_db')
     .SQL('from materiais')
     .SQL('where emp_001 = :idEmpresa')
-    .SQL('and b_venda_mobile=true')
     .SQL('and mat_001 = :idProduto')
     .SQL('and sit_001 = 4')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
@@ -187,7 +186,6 @@ function TAPIRPCheffDAOProduto.Buscar(AIdProduto: Integer): TAPIRPCheffEntityPro
 begin
   SelectProdutos;
   FQuery.SQL('where emp_001 = :idEmpresa')
-  .SQL('and b_venda_mobile=true')
     .SQL('and mat_001 = :idProduto')
     .SQL('and sit_001 = 4')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
@@ -283,12 +281,9 @@ var
 begin
   SelectProdutos;
   FQuery.SQL('where emp_001 = :idEmpresa')
-  .SQL('and b_venda_mobile=true')
     .SQL('and sit_001 = 4')
-    .SQL('and b_carrossel = :carrossel')
     .SQL('order by mat_003')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
-    .ParamAsBoolean('carrossel', False)
     .Open;
   Result := DataSetToList(FQuery.DataSet);
   try
@@ -306,14 +301,11 @@ function TAPIRPCheffDAOProduto.Lista(AIdCategoria: Integer): TObjectList<TAPIRPC
 begin
   SelectProdutos;
   FQuery.SQL('where emp_001 = :idEmpresa')
-    .SQL('and b_venda_mobile=true')
     .SQL('and cat_001 = :idCategoria')
     .SQL('and sit_001 = 4')
-    .SQL('and b_carrossel = :carrossel')
     .SQL('order by mat_003')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .ParamAsInteger('idCategoria', AIdCategoria)
-    .ParamAsBoolean('carrossel', False)
     .Open;
   Result := DataSetToList(FQuery.DataSet);
 end;

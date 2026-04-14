@@ -3,7 +3,7 @@ import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput,
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
-import { formatTableStatusLabel, MenuItem, ProductOptional, TableOrder } from '../services/api';
+import { formatTableStatusLabel, getMenuItemLaunchUnitPrice, MenuItem, ProductOptional, TableOrder } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { useApp } from '../context/AppContext';
 import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
@@ -25,8 +25,13 @@ const normalizeSizeValue = (value: unknown): number => {
   return Number.isFinite(asNumber) ? asNumber : 0;
 };
 
-const getSizeOptions = (product: MenuItem): SizeOption[] => {
-  const defaultPrice = Number(product.valorVenda || product.valorUnitario || 0);
+const roundTo2 = (value: number) => Number(Number(value || 0).toFixed(2));
+
+const getSizeOptions = (
+  product: MenuItem,
+  getPriceBySize: (item: MenuItem, sizeCode: string) => number
+): SizeOption[] => {
+  const defaultPrice = getPriceBySize(product, String(product.tamanhoPadrao || ''));
   const hasSizeByFlow = product.vendaPorTamanho || product.permiteFracao;
   if (!hasSizeByFlow) {
     return [{
@@ -37,11 +42,11 @@ const getSizeOptions = (product: MenuItem): SizeOption[] => {
   }
 
   const items: SizeOption[] = [
-    { code: 'P', label: product.tamanhoP || 'P', value: normalizeSizeValue(product.valorTamanhoP) },
-    { code: 'M', label: product.tamanhoM || 'M', value: normalizeSizeValue(product.valorTamanhoM) },
-    { code: 'G', label: product.tamanhoG || 'G', value: normalizeSizeValue(product.valorTamanhoG) },
-    { code: 'GG', label: product.tamanhoGG || 'GG', value: normalizeSizeValue(product.valorTamanhoGG) },
-    { code: 'E', label: product.tamanhoExtra || 'E', value: normalizeSizeValue(product.valorTamanhoExtra) }
+    { code: 'P', label: product.tamanhoP || 'P', value: getPriceBySize(product, 'P') },
+    { code: 'M', label: product.tamanhoM || 'M', value: getPriceBySize(product, 'M') },
+    { code: 'G', label: product.tamanhoG || 'G', value: getPriceBySize(product, 'G') },
+    { code: 'GG', label: product.tamanhoGG || 'GG', value: getPriceBySize(product, 'GG') },
+    { code: 'E', label: product.tamanhoExtra || 'E', value: getPriceBySize(product, 'E') }
   ];
 
   const filtered = items.filter((item) => item.value > 0 || item.label.trim().length > 0);
@@ -230,15 +235,6 @@ export const FractionLaunchScreen: React.FC = () => {
   const fractionQuantity = 1 / totalParts;
   const fractionQuantityLabel = fractionQuantity.toFixed(3);
   const selectedSizeFromRoute = route.params?.size;
-
-  const [selectedSize, setSelectedSize] = useState(() => {
-    const options = getSizeOptions(product);
-    return getDefaultSize(product, options, selectedSizeFromRoute);
-  });
-  const [observacao, setObservacao] = useState('');
-  const [fractionSearch, setFractionSearch] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(0);
-  const [selectedOptionalQty, setSelectedOptionalQty] = useState<Record<number, number>>({});
   const routeTable = useMemo<TableOrder | null>(() => {
     if (!routeTableId) return null;
     return {
@@ -249,6 +245,26 @@ export const FractionLaunchScreen: React.FC = () => {
       tipo: routeTableType
     };
   }, [routeTableId, routeTableComandaId, routeTableName, routeTableType]);
+  const [activeVenda, setActiveVenda] = useState<TableOrder | null>(activeTable || routeTable);
+  const tableBindingSource = activeVenda || activeTable || routeTable;
+  const happyHourSaleType = useMemo<'mesa' | 'comanda'>(
+    () => tableBindingSource?.tipo || (appSettings.modoExibicao === 'comanda' ? 'comanda' : 'mesa'),
+    [appSettings.modoExibicao, tableBindingSource?.tipo]
+  );
+  const getPriceBySize = useCallback((item: MenuItem, sizeCode: string) => {
+    return getMenuItemLaunchUnitPrice(item, sizeCode, {
+      saleType: happyHourSaleType
+    });
+  }, [happyHourSaleType]);
+
+  const [selectedSize, setSelectedSize] = useState(() => {
+    const options = getSizeOptions(product, getPriceBySize);
+    return getDefaultSize(product, options, selectedSizeFromRoute);
+  });
+  const [observacao, setObservacao] = useState('');
+  const [fractionSearch, setFractionSearch] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(0);
+  const [selectedOptionalQty, setSelectedOptionalQty] = useState<Record<number, number>>({});
 
   const [fractions, setFractions] = useState<Array<number | null>>(() => {
     const result = Array.from({ length: totalParts }, () => null as number | null);
@@ -265,7 +281,7 @@ export const FractionLaunchScreen: React.FC = () => {
     };
   }, [pauseAutoRefresh, resumeAutoRefresh]);
 
-  const sizeOptions = useMemo(() => getSizeOptions(product), [product]);
+  const sizeOptions = useMemo(() => getSizeOptions(product, getPriceBySize), [getPriceBySize, product]);
   const shouldShowSize = sizeOptions.length > 1 || product?.vendaPorTamanho;
   const selectedSizeLabel = useMemo(
     () => sizeOptions.find((item) => item.code === selectedSize)?.label || selectedSize,
@@ -471,8 +487,6 @@ export const FractionLaunchScreen: React.FC = () => {
     changeFraction(index, idProduto);
   };
 
-  const [activeVenda, setActiveVenda] = useState<TableOrder | null>(activeTable || routeTable);
-  const tableBindingSource = activeVenda || activeTable || routeTable;
   const requiresLinkedMesa = appSettings.vincularComandaComMesa && tableBindingSource?.tipo === 'comanda';
   const preferredLinkedMesaId = useMemo(() => {
     const storedMesaId = Number(linkedMesaSelection?.idMesa || 0);
@@ -584,27 +598,44 @@ export const FractionLaunchScreen: React.FC = () => {
       });
 
       const fractionGroupId = `frac-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      for (let index = 0; index < fractionItems.length; index += 1) {
-        const selected = fractionItems[index];
-        if (!selected) continue;
+      const fractionPayload = fractionItems.flatMap((selected, index) => {
+        if (!selected) {
+          return [];
+        }
 
         const basePrice = getPriceBySize(selected, selectedSize);
         const unitPrice = appSettings.cobrarMaiorValorFracionado ? maxUnitPrice : basePrice;
+        const scaledOptionals = roundTo2(
+          opc.reduce((subtotal, optional) => subtotal + (optional.gratis ? 0 : optional.valor * fractionQuantity), 0)
+        );
 
-        addToCart({
-          ...selected,
+        return [{
+          idProduto: selected.idProduto,
+          produtoDescricao: selected.descricao,
           quantidade: fractionQuantity,
-          descricaoTamanho: `${selectedSizeLabel} (${index + 1}/${totalParts})`,
-          tamanho: selectedSize,
-          desconto: 0,
-          acrescimo: 0,
-          observacao: observacao.trim() || undefined,
-          idMesaVinculada: linkedMesaId,
-          fractionGroupId,
           valorUnitario: unitPrice,
+          valorTotal: roundTo2(unitPrice * fractionQuantity),
+          acrescimo: scaledOptionals,
+          observacao: observacao.trim() || undefined,
+          descricaoTamanho: `${selectedSizeLabel} (${index + 1}/${totalParts})`,
           opcionais: opc
-        });
-      }
+        }];
+      });
+
+      addToCart({
+        ...product,
+        quantidade: 1,
+        descricaoTamanho: selectedSizeLabel,
+        tamanho: selectedSize,
+        desconto: 0,
+        acrescimo: 0,
+        observacao: observacao.trim() || undefined,
+        idMesaVinculada: linkedMesaId,
+        fractionGroupId,
+        valorUnitario: appSettings.cobrarMaiorValorFracionado ? maxUnitPrice : getPriceBySize(product, selectedSize),
+        opcionais: [],
+        fracoes: fractionPayload
+      });
 
       goToProducts(navigation, returnCategoryId);
     } catch (error: unknown) {

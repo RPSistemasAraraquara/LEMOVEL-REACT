@@ -2,15 +2,19 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { Colors, Radius, Shadows, Space, Typography } from '../theme';
-import { getProductImageSource, MenuItem, resolveImageUri } from '../services/api';
+import { getMenuItemLaunchUnitPrice, getProductImageSource, MenuItem, resolveImageUri } from '../services/api';
 
 export const FoodCard: React.FC<{
   item: MenuItem;
   onOpen: () => void;
 }> = ({ item, onOpen }) => {
-  const { appSettings } = useApp();
+  const { appSettings, activeTable } = useApp();
   const label = item.descricaoCurta?.trim() || '';
-  const price = item.valorVenda || item.valorUnitario || 0;
+  const happyHourSaleType =
+    activeTable?.tipo || (appSettings.modoExibicao === 'comanda' ? 'comanda' : 'mesa');
+  const price = getMenuItemLaunchUnitPrice(item, String(item.tamanhoPadrao || ''), {
+    saleType: happyHourSaleType
+  });
   const showImageSlot = appSettings.exibirImagem;
   const localImageUri = resolveImageUri(item.imagemLocalPath || item.imagem || item.imagem_db);
   const imageSource =
@@ -89,7 +93,18 @@ export const MemoFoodCard = React.memo(
     (prev.item.imagem?.length || 0) === (next.item.imagem?.length || 0) &&
     (prev.item.imagem_db?.length || 0) === (next.item.imagem_db?.length || 0) &&
     (prev.item.imagemLocalPath?.length || 0) === (next.item.imagemLocalPath?.length || 0) &&
-    prev.item.idCategoria === next.item.idCategoria
+    prev.item.idCategoria === next.item.idCategoria &&
+    prev.item.happyHourAtivar === next.item.happyHourAtivar &&
+    (prev.item.happyHour?.valor || 0) === (next.item.happyHour?.valor || 0) &&
+    String(prev.item.happyHour?.horaInicial || '') === String(next.item.happyHour?.horaInicial || '') &&
+    String(prev.item.happyHour?.horaFinal || '') === String(next.item.happyHour?.horaFinal || '') &&
+    Boolean(prev.item.happyHour?.segundaFeira) === Boolean(next.item.happyHour?.segundaFeira) &&
+    Boolean(prev.item.happyHour?.tercaFeira) === Boolean(next.item.happyHour?.tercaFeira) &&
+    Boolean(prev.item.happyHour?.quartaFeira) === Boolean(next.item.happyHour?.quartaFeira) &&
+    Boolean(prev.item.happyHour?.quintaFeira) === Boolean(next.item.happyHour?.quintaFeira) &&
+    Boolean(prev.item.happyHour?.sextaFeira) === Boolean(next.item.happyHour?.sextaFeira) &&
+    Boolean(prev.item.happyHour?.sabado) === Boolean(next.item.happyHour?.sabado) &&
+    Boolean(prev.item.happyHour?.domingo) === Boolean(next.item.happyHour?.domingo)
 );
 
 const styles = StyleSheet.create({
