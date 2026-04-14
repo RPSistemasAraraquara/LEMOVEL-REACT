@@ -45,6 +45,7 @@ desktop.ini
 
 # Misc build/test folders
 /build/
+/build-ipad-sim-arm64/
 /.cache/
 /coverage/
 
