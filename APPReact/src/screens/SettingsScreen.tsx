@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,24 @@ import {
 } from '../services/api';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
+import {
+  executeGetNetCheckSubsellers,
+  executeGetNetRefund,
+  executeGetNetStatus,
+  executeGetNetTerminalInfo,
+  loadLastGetNetSubsellers,
+  loadLastGetNetTransaction
+} from '../services/payment';
+import {
+  beepGetNetPosDigitalSuccess,
+  getGetNetPaymentEnvironment,
+  getGetNetPosDigitalInfo,
+  searchGetNetPosDigitalCard,
+  searchGetNetPosDigitalMifareUid,
+  turnOffGetNetPosDigitalLeds,
+  turnOnGetNetPosDigitalLeds
+} from '../services/getnetPosDigital';
+import type { StoredGetNetSubsellers, StoredGetNetTransaction } from '../services/machineSettingsDb';
 
 type DisplayMode = 'mesa' | 'comanda' | 'mesaComanda';
 
@@ -58,21 +77,61 @@ type SettingsState = {
   sincronizarAposLogin: boolean;
   modoExibicao: DisplayMode;
   utilizaMaquininhaStone: boolean;
-  tipoIntegracao: 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo';
+  tipoIntegracao: 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo' | 'getnet';
   modeloMaquininha: string;
 };
 
 const IMPRESSORA_MODELOS = ['Padrão ESC/POS', 'POS-58', 'POS-80', 'Termica TSP100', 'Outro'];
 const IMPRESSAO_PAGINAS = ['CP437', 'Windows-1252', 'ISO-8859-1', 'UTF-8'];
 const BLUETOOTH_LIST = ['Nenhuma', 'BT: Impressora Sala', 'BT: Impressora Cozinha', 'BT: Impressora Entrada'];
-type IntegrationValue = 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo';
+type IntegrationValue = 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo' | 'getnet';
+type GetNetModelValue = 'DX8000' | 'P2' | 'P3' | 'P4' | 'N910' | 'APOSA8';
 
 const INTEGRACAO_OPTIONS: Array<{ label: string; value: IntegrationValue }> = [
   { label: 'Vero', value: 'vero' },
   { label: 'Stone', value: 'stone' },
   { label: 'PagBank', value: 'pagbank' },
-  { label: 'Cielo', value: 'cielo' }
+  { label: 'Cielo', value: 'cielo' },
+  { label: 'GetNet', value: 'getnet' }
 ];
+
+const GETNET_MODEL_OPTIONS: GetNetModelValue[] = ['DX8000', 'P2', 'P3', 'P4', 'N910', 'APOSA8'];
+
+const normalizeGetNetModel = (value: unknown, fallback: GetNetModelValue = 'P2'): GetNetModelValue => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+
+  if (
+    normalized === 'DX8000' ||
+    normalized === 'INGENICO DX8000' ||
+    normalized === 'INGENICO-DX8000' ||
+    normalized === 'DX 8000'
+  ) {
+    return 'DX8000';
+  }
+  if (normalized === 'P2' || normalized === 'P3' || normalized === 'P4') return normalized;
+  if (normalized === 'N910' || normalized === 'NEWLAND N910' || normalized === 'NEWLAND-N910') return 'N910';
+  if (
+    normalized === 'APOSA8' ||
+    normalized === 'APOS A8' ||
+    normalized === 'INGENICO APOS A8' ||
+    normalized === 'A8'
+  ) {
+    return 'APOSA8';
+  }
+
+  return fallback;
+};
+
+const getMachineModelLabel = (value: IntegrationValue): string => {
+  if (value === 'stone') return 'Stone';
+  if (value === 'pagbank') return 'PagBank';
+  if (value === 'cielo') return 'Cielo';
+  if (value === 'getnet') return 'P2';
+  if (value === 'vero') return 'Vero';
+  return 'false';
+};
 
 const toNumberString = (value: number, fallback: string) => (Number.isFinite(value) ? String(value) : fallback);
 
@@ -105,7 +164,10 @@ const toSettingsState = (settings: MobileAppSettings): SettingsState => ({
   modoExibicao: settings.modoExibicao,
   utilizaMaquininhaStone: settings.utilizaMaquininhaStone,
   tipoIntegracao: settings.tipoIntegracao,
-  modeloMaquininha: settings.modeloMaquininha
+  modeloMaquininha:
+    settings.tipoIntegracao === 'getnet'
+      ? normalizeGetNetModel(settings.modeloMaquininha)
+      : settings.modeloMaquininha
 });
 
 const toMobileAppSettings = (
@@ -143,7 +205,10 @@ const toMobileAppSettings = (
   modoExibicao: values.modoExibicao,
   utilizaMaquininhaStone: values.utilizaMaquininhaStone || values.tipoIntegracao !== 'nenhum',
   tipoIntegracao: values.tipoIntegracao,
-  modeloMaquininha: values.modeloMaquininha
+  modeloMaquininha:
+    values.tipoIntegracao === 'getnet'
+      ? normalizeGetNetModel(values.modeloMaquininha)
+      : values.modeloMaquininha
 });
 
 export const SettingsScreen: React.FC = () => {
@@ -157,11 +222,44 @@ export const SettingsScreen: React.FC = () => {
   const [cardScale] = useState(() => new Animated.Value(0.92));
   const [settings, setSettings] = useState<SettingsState>(() => toSettingsState(appSettings));
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [consultandoGetNet, setConsultandoGetNet] = useState(false);
+  const [executandoGetNetAcao, setExecutandoGetNetAcao] = useState<'status' | 'refund' | 'subsellers' | null>(null);
+  const [executandoPosDigitalAcao, setExecutandoPosDigitalAcao] = useState<
+    'sdk' | 'environment' | 'ledOn' | 'ledOff' | 'beep' | 'card' | 'mifare' | null
+  >(null);
+  const [ultimaGetNet, setUltimaGetNet] = useState<StoredGetNetTransaction | null>(null);
+  const [ultimoGetNetSubsellers, setUltimoGetNetSubsellers] = useState<StoredGetNetSubsellers | null>(null);
 
   useEffect(() => {
     setEmpresa(String(appSettings.empresaId || 1));
     setSettings(toSettingsState(appSettings));
   }, [appSettings]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadLastTransaction = async () => {
+      const [stored, storedSubsellers] = await Promise.all([
+        loadLastGetNetTransaction(),
+        loadLastGetNetSubsellers()
+      ]);
+      if (active) {
+        setUltimaGetNet(stored);
+        setUltimoGetNetSubsellers(storedSubsellers);
+      }
+    };
+
+    loadLastTransaction().catch(() => {
+      if (active) {
+        setUltimaGetNet(null);
+        setUltimoGetNetSubsellers(null);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -202,6 +300,7 @@ export const SettingsScreen: React.FC = () => {
         if (option.value === 'stone') return companyInfo?.utilizaIntegracaoStone !== false;
         if (option.value === 'pagbank') return companyInfo?.utilizaIntegracaoPagBank !== false;
         if (option.value === 'cielo') return companyInfo?.utilizaIntegracaoCielo !== false;
+        if (option.value === 'getnet') return companyInfo?.utilizaIntegracaoGetNet !== false;
         return true;
       }),
     [companyInfo]
@@ -251,17 +350,26 @@ export const SettingsScreen: React.FC = () => {
       ...prev,
       utilizaMaquininhaStone: value,
       sincronizarAposLogin: value ? true : prev.sincronizarAposLogin,
-      tipoIntegracao: value ? (prev.tipoIntegracao === 'nenhum' ? 'stone' : prev.tipoIntegracao) : 'nenhum',
+      tipoIntegracao: value
+        ? (prev.tipoIntegracao === 'nenhum' ? (integrationOptions[0]?.value || 'stone') : prev.tipoIntegracao)
+        : 'nenhum',
       modeloMaquininha: value
         ? !prev.modeloMaquininha || prev.modeloMaquininha === 'false'
-          ? 'Stone'
+          ? getMachineModelLabel(prev.tipoIntegracao === 'nenhum' ? (integrationOptions[0]?.value || 'stone') : prev.tipoIntegracao)
           : prev.modeloMaquininha
         : 'false'
     }));
   };
 
   const setIntegracao = (value: IntegrationValue) => {
-    setValue('tipoIntegracao', value);
+    setSettings((prev) => ({
+      ...prev,
+      tipoIntegracao: value,
+      modeloMaquininha:
+        value === 'getnet'
+          ? normalizeGetNetModel(prev.modeloMaquininha)
+          : getMachineModelLabel(value)
+    }));
   };
 
   const save = async () => {
@@ -343,6 +451,258 @@ export const SettingsScreen: React.FC = () => {
 
   const testPrinter = () => {
     Alert.alert('Teste de impressão', 'Simulação de impressão enviada com sucesso.');
+  };
+
+  const testGetNetTerminalInfo = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'A consulta da GetNet está disponível somente no Android.');
+      return;
+    }
+
+    const currentSettings = toMobileAppSettings(settingMemo, empresa, appSettings);
+    setConsultandoGetNet(true);
+    try {
+      const terminalInfo = await executeGetNetTerminalInfo({
+        settings: currentSettings
+      });
+
+      const lines = [
+        `EC: ${terminalInfo.ec || '-'}`,
+        `Número de série: ${terminalInfo.numSerie || '-'}`,
+        `Número lógico: ${terminalInfo.numLogic || '-'}`,
+        `Versão: ${terminalInfo.version || '-'}`,
+        `CNPJ: ${terminalInfo.cnpj || '-'}`,
+        `Razão social: ${terminalInfo.razaoSocial || '-'}`,
+        `Cidade: ${terminalInfo.cidade || '-'}`,
+        terminalInfo.nome ? `Nome EC: ${terminalInfo.nome}` : ''
+      ].filter(Boolean);
+
+      Alert.alert('Dados do terminal GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível consultar os dados do terminal GetNet.');
+    } finally {
+      setConsultandoGetNet(false);
+    }
+  };
+
+  const consultLastGetNetStatus = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'A consulta da GetNet está disponível somente no Android.');
+      return;
+    }
+
+    const currentSettings = toMobileAppSettings(settingMemo, empresa, appSettings);
+    setExecutandoGetNetAcao('status');
+    try {
+      const result = await executeGetNetStatus({
+        settings: currentSettings
+      });
+      setUltimaGetNet(result.transaction);
+
+      const lines = [
+        `Mensagem: ${result.message || '-'}`,
+        `CallerId: ${result.transaction.callerId || '-'}`,
+        `Valor: ${result.transaction.amount || '-'}`,
+        `NSU: ${result.transaction.nsu || '-'}`,
+        `CV: ${result.transaction.cvNumber || '-'}`,
+        `Bandeira: ${result.transaction.brand || '-'}`,
+        `Tipo: ${result.transaction.type || '-'}`,
+        `Entrada: ${result.transaction.inputType || '-'}`,
+        `Status: ${result.pending ? 'Pendente' : result.approved ? 'Aprovado' : result.cancelled ? 'Cancelado' : result.denied ? 'Negado' : 'Sem confirmação'}`,
+        `Estornada: ${result.refunded ? 'Sim' : 'Nao'}`
+      ];
+
+      Alert.alert('Status da última transação GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível consultar o status da última transação GetNet.');
+    } finally {
+      setExecutandoGetNetAcao(null);
+    }
+  };
+
+  const refundLastGetNetTransaction = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'O estorno da GetNet está disponível somente no Android.');
+      return;
+    }
+
+    const currentSettings = toMobileAppSettings(settingMemo, empresa, appSettings);
+    setExecutandoGetNetAcao('refund');
+    try {
+      const result = await executeGetNetRefund({
+        settings: currentSettings
+      });
+      if (result.transaction) {
+        setUltimaGetNet(result.transaction);
+      }
+
+      Alert.alert(
+        'Estorno GetNet',
+        [`Mensagem: ${result.message || '-'}`, `Valor: ${result.amount || '-'}`].join('\n')
+      );
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível estornar a última transação GetNet.');
+    } finally {
+      setExecutandoGetNetAcao(null);
+    }
+  };
+
+  const refreshGetNetSubsellers = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'A consulta de Subsellers da GetNet está disponível somente no Android.');
+      return;
+    }
+
+    const currentSettings = toMobileAppSettings(settingMemo, empresa, appSettings);
+    setExecutandoGetNetAcao('subsellers');
+    try {
+      const result = await executeGetNetCheckSubsellers({
+        settings: currentSettings
+      });
+      setUltimoGetNetSubsellers(result.payload);
+
+      Alert.alert(
+        'Subsellers GetNet',
+        [
+          `Marketplace: ${result.payload.marketPlaceId || '-'}`,
+          `Qtd. Subsellers: ${result.payload.subsellers.length}`
+        ].join('\n')
+      );
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível consultar os Subsellers da GetNet.');
+    } finally {
+      setExecutandoGetNetAcao(null);
+    }
+  };
+
+  const consultGetNetPosDigitalInfo = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'A consulta PosDigital da GetNet está disponível somente no Android.');
+      return;
+    }
+
+    setExecutandoPosDigitalAcao('sdk');
+    try {
+      const info = await getGetNetPosDigitalInfo();
+      const lines = [
+        `SDK: ${info.sdkVersion || '-'}`,
+        `BC: ${info.bcVersion || '-'}`,
+        `SO: ${info.osVersion || '-'}`,
+        `Android: ${info.androidOSVersion || '-'}`,
+        `Serial: ${info.serialNumber || '-'}`,
+        `Modelo: ${info.model || '-'}`,
+        `Fabricante: ${info.manufacturer || '-'}`,
+        `IMEI: ${info.imei || '-'}`,
+        `ICCID: ${info.iccid || '-'}`
+      ];
+      Alert.alert('PosDigital GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível consultar a PosDigital da GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const inspectGetNetPaymentEnvironment = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Aviso', 'A verificação do ambiente de pagamento GetNet está disponível somente no Android.');
+      return;
+    }
+
+    setExecutandoPosDigitalAcao('environment');
+    try {
+      const environment = await getGetNetPaymentEnvironment();
+      const handler = environment.paymentHandlerPackage
+        ? `${environment.paymentHandlerPackage}${environment.paymentHandlerClassName ? ` / ${environment.paymentHandlerClassName}` : ''}`
+        : '-';
+      const lines = [
+        `Modo: ${environment.simulationMode ? 'SIMULACAO (Rebatedor)' : 'Sem simulacao detectada'}`,
+        `Handler atual: ${handler}`,
+        `PosDigital: ${environment.posDigitalInstalled ? 'Instalado' : 'Nao instalado'}`,
+        `Devkit: ${environment.devkitInstalled ? 'Instalado' : 'Nao instalado'}`,
+        `Rebatedor: ${environment.rebatedorInstalled ? 'Instalado' : 'Nao instalado'}`
+      ];
+      if (environment.simulationMode) {
+        lines.push('O pagamento real fica bloqueado neste app enquanto o Rebatedor for o responsavel pelo deeplink GetNet.');
+      }
+      Alert.alert('Ambiente de pagamento GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível verificar o ambiente de pagamento GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const turnOnGetNetLeds = async () => {
+    setExecutandoPosDigitalAcao('ledOn');
+    try {
+      await turnOnGetNetPosDigitalLeds();
+      Alert.alert('GetNet', 'LEDs ligados com sucesso.');
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível ligar os LEDs da GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const turnOffGetNetLeds = async () => {
+    setExecutandoPosDigitalAcao('ledOff');
+    try {
+      await turnOffGetNetPosDigitalLeds();
+      Alert.alert('GetNet', 'LEDs desligados com sucesso.');
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível desligar os LEDs da GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const beepGetNet = async () => {
+    setExecutandoPosDigitalAcao('beep');
+    try {
+      await beepGetNetPosDigitalSuccess();
+      Alert.alert('GetNet', 'Beep executado com sucesso.');
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível executar o beep da GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const searchGetNetCard = async () => {
+    setExecutandoPosDigitalAcao('card');
+    try {
+      const result = await searchGetNetPosDigitalCard();
+      const lines = [
+        `Tipo: ${result.type || '-'}`,
+        `PAN: ${result.pan || '-'}`,
+        `Track2: ${result.track2 || '-'}`,
+        `Validade: ${result.expireDate || '-'}`,
+        result.message ? `Mensagem: ${result.message}` : ''
+      ].filter(Boolean);
+      Alert.alert('Leitura de cartão GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível ler o cartão na GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
+  };
+
+  const searchGetNetMifare = async () => {
+    setExecutandoPosDigitalAcao('mifare');
+    try {
+      const result = await searchGetNetPosDigitalMifareUid();
+      const lines = [
+        `UID: ${result.uid || result.uidHex || '-'}`,
+        result.uidBase64 ? `UID Base64: ${result.uidBase64}` : '',
+        typeof result.cardType === 'number' ? `Tipo: ${result.cardType}` : ''
+      ].filter(Boolean);
+      Alert.alert('Leitura Mifare GetNet', lines.join('\n'));
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Não foi possível ler o cartão Mifare na GetNet.');
+    } finally {
+      setExecutandoPosDigitalAcao(null);
+    }
   };
 
   return (
@@ -575,6 +935,147 @@ export const SettingsScreen: React.FC = () => {
                 </Pressable>
               ))}
             </View>
+            {settingMemo.tipoIntegracao === 'getnet' ? (
+              <>
+                <FieldSelect
+                  label="Modelo GetNet"
+                  value={normalizeGetNetModel(settingMemo.modeloMaquininha)}
+                  options={GETNET_MODEL_OPTIONS}
+                  onChange={(value) => setComboValue('modeloMaquininha', normalizeGetNetModel(value))}
+                />
+                <Pressable
+                  onPress={testGetNetTerminalInfo}
+                  style={[styles.secondaryBtn, consultandoGetNet ? styles.disabledBtn : null]}
+                  disabled={consultandoGetNet}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {consultandoGetNet ? 'Consultando terminal GetNet...' : 'Consultar dados do terminal GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={consultGetNetPosDigitalInfo}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'sdk' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'sdk'
+                      ? 'Consultando PosDigital GetNet...'
+                      : 'Consultar SDK PosDigital GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={inspectGetNetPaymentEnvironment}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'environment' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'environment'
+                      ? 'Verificando ambiente de pagamento GetNet...'
+                      : 'Verificar ambiente de pagamento GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={turnOnGetNetLeds}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'ledOn' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'ledOn' ? 'Ligando LEDs GetNet...' : 'Ligar LEDs GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={turnOffGetNetLeds}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'ledOff' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'ledOff' ? 'Desligando LEDs GetNet...' : 'Desligar LEDs GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={beepGetNet}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'beep' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'beep' ? 'Executando beep GetNet...' : 'Beep de sucesso GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={searchGetNetCard}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'card' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'card' ? 'Lendo cartão GetNet...' : 'Ler cartão GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={searchGetNetMifare}
+                  style={[styles.secondaryBtn, executandoPosDigitalAcao === 'mifare' ? styles.disabledBtn : null]}
+                  disabled={executandoPosDigitalAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoPosDigitalAcao === 'mifare' ? 'Lendo Mifare GetNet...' : 'Ler cartão Mifare GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={consultLastGetNetStatus}
+                  style={[styles.secondaryBtn, executandoGetNetAcao === 'status' ? styles.disabledBtn : null]}
+                  disabled={executandoGetNetAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoGetNetAcao === 'status'
+                      ? 'Consultando status da GetNet...'
+                      : 'Consultar status da última transação'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={refreshGetNetSubsellers}
+                  style={[styles.secondaryBtn, executandoGetNetAcao === 'subsellers' ? styles.disabledBtn : null]}
+                  disabled={executandoGetNetAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoGetNetAcao === 'subsellers'
+                      ? 'Consultando Subsellers GetNet...'
+                      : 'Atualizar Subsellers GetNet'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={refundLastGetNetTransaction}
+                  style={[styles.secondaryBtn, executandoGetNetAcao === 'refund' ? styles.disabledBtn : null]}
+                  disabled={executandoGetNetAcao !== null}
+                >
+                  <Text style={styles.secondaryBtnText}>
+                    {executandoGetNetAcao === 'refund' ? 'Solicitando estorno na GetNet...' : 'Estornar última transação GetNet'}
+                  </Text>
+                </Pressable>
+                {ultimaGetNet ? (
+                  <View style={styles.machineInfoCard}>
+                    <Text style={styles.machineInfoTitle}>Última transação GetNet</Text>
+                    <Text style={styles.machineInfoText}>CallerId: {ultimaGetNet.callerId || '-'}</Text>
+                    <Text style={styles.machineInfoText}>Valor: {ultimaGetNet.amount || '-'}</Text>
+                    <Text style={styles.machineInfoText}>NSU: {ultimaGetNet.nsu || '-'}</Text>
+                    <Text style={styles.machineInfoText}>CV: {ultimaGetNet.cvNumber || '-'}</Text>
+                    <Text style={styles.machineInfoText}>Bandeira: {ultimaGetNet.brand || '-'}</Text>
+                    <Text style={styles.machineInfoText}>Atualizado em: {ultimaGetNet.updatedAt || '-'}</Text>
+                  </View>
+                ) : null}
+                {ultimoGetNetSubsellers ? (
+                  <View style={styles.machineInfoCard}>
+                    <Text style={styles.machineInfoTitle}>Subsellers GetNet</Text>
+                    <Text style={styles.machineInfoText}>Marketplace: {ultimoGetNetSubsellers.marketPlaceId || '-'}</Text>
+                    <Text style={styles.machineInfoText}>Qtd. subsellers: {ultimoGetNetSubsellers.subsellers.length}</Text>
+                    <Text style={styles.machineInfoText}>Atualizado em: {ultimoGetNetSubsellers.updatedAt || '-'}</Text>
+                    {ultimoGetNetSubsellers.subsellers.slice(0, 3).map((item) => (
+                      <Text key={`subs-${item.id}-${item.document}`} style={styles.machineInfoText}>
+                        {item.name || 'Sem nome'} · {item.document || 'Sem documento'}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </View>
         ) : null}
       </Section>
@@ -798,10 +1299,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary
   },
+  machineInfoCard: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft
+  },
+  machineInfoTitle: {
+    color: Colors.text,
+    fontWeight: '800',
+    marginBottom: 8
+  },
+  machineInfoText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4
+  },
   saveWrap: {
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 24
+  },
+  disabledBtn: {
+    opacity: 0.65
   },
   saveButton: {
     backgroundColor: Colors.primary,
@@ -880,8 +1402,5 @@ const styles = StyleSheet.create({
   alertBtnText: {
     color: '#fff',
     fontWeight: '700'
-  },
-  disabledBtn: {
-    opacity: 0.7
   }
 });

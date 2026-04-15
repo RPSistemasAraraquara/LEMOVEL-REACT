@@ -8,6 +8,7 @@ import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { api, normalizeSaleStatus, PaymentMethod, Sale, SalePayment } from '../services/api';
 import {
   abortActivePayment,
+  ensureGetNetReadyForLivePayment,
   executePayment,
   formatPaymentProviderLabel,
   preparePaymentProvider,
@@ -322,8 +323,10 @@ export const SaleClosureScreen: React.FC = () => {
   const adjustedPeople = Math.max(normalizedPeople, coupledCount);
   const configuredPaymentProvider = resolveConfiguredPaymentProvider(appSettings);
   const usePagBankPrinter = configuredPaymentProvider === 'pagbank';
-  const useStoneOrCieloPrinter =
-    configuredPaymentProvider === 'stone' || configuredPaymentProvider === 'cielo';
+  const useStoneCieloOrGetNetPrinter =
+    configuredPaymentProvider === 'stone' ||
+    configuredPaymentProvider === 'cielo' ||
+    configuredPaymentProvider === 'getnet';
   const printOnlyAtClose = tableType === 'mesa'
     ? Boolean(appSettings.imprimirMesaAposFechamento)
     : tableType === 'comanda'
@@ -701,8 +704,9 @@ export const SaleClosureScreen: React.FC = () => {
 
       const previewRequested = previewBeforePrint && shouldPrintPreClosure;
       const shouldUseLocalPagBankPrint = usePagBankPrinter && shouldPrintPreClosure && !previewRequested;
-      const shouldUseLocalStoneOrCieloPrint = useStoneOrCieloPrinter && shouldPrintPreClosure && !previewRequested;
-      const shouldUseLocalTerminalPrint = shouldUseLocalPagBankPrint || shouldUseLocalStoneOrCieloPrint;
+      const shouldUseLocalStoneCieloOrGetNetPrint =
+        useStoneCieloOrGetNetPrinter && shouldPrintPreClosure && !previewRequested;
+      const shouldUseLocalTerminalPrint = shouldUseLocalPagBankPrint || shouldUseLocalStoneCieloOrGetNetPrint;
       const shouldRequestPreClosePrintContent = previewRequested || shouldUseLocalTerminalPrint;
       const previewResponse = await api.preCloseSale(idVenda, {
         idUsuario,
@@ -945,7 +949,7 @@ export const SaleClosureScreen: React.FC = () => {
       if (printOnlyAtClose) {
         try {
           showPrintProcessing(
-            usePagBankPrinter || useStoneOrCieloPrinter
+            usePagBankPrinter || useStoneCieloOrGetNetPrinter
               ? 'Processando impressão do fechamento...'
               : 'Enviando impressão do fechamento...'
           );
@@ -955,7 +959,7 @@ export const SaleClosureScreen: React.FC = () => {
             usarRotaMaquininha: true
           });
           closePrintMessage =
-            usePagBankPrinter || useStoneOrCieloPrinter
+            usePagBankPrinter || useStoneCieloOrGetNetPrinter
               ? ' Impressão enviada para a maquininha.'
               : ' Impressão enviada com sucesso.';
         } catch (printError: any) {
@@ -1064,6 +1068,20 @@ export const SaleClosureScreen: React.FC = () => {
       return;
     }
 
+    if (paymentProvider === 'getnet') {
+      try {
+        await ensureGetNetReadyForLivePayment(appSettings);
+      } catch (error: any) {
+        paymentSelectionBusyRef.current = false;
+        const message =
+          error?.message ||
+          'Terminal GetNet em modo simulacao. Instale ou homologue o aplicativo oficial de pagamento antes de fechar a venda.';
+        setActionStatus({ kind: 'error', message });
+        Alert.alert('Modo simulação GetNet', message);
+        return;
+      }
+    }
+
     const linha = pagamentos[lineIndex];
     let valorSelecionado = parseMoney(linha?.valor || '0');
 
@@ -1133,7 +1151,7 @@ export const SaleClosureScreen: React.FC = () => {
           ...next[lineIndex],
           codigo: pagamentoProcessado.method.codigo,
           valor: valorSelecionado.toFixed(2),
-          processed: paymentProvider !== 'manual',
+          processed: true,
           provider: pagamentoProcessado.provider,
           sfiCodigo: processedSfiCodigo,
           nsu: pagamentoProcessado.nsu
@@ -1375,7 +1393,7 @@ export const SaleClosureScreen: React.FC = () => {
                     onPress={async () => {
                       try {
                         setActionStatus({ kind: 'info', message: 'Enviando impressão...' });
-                        if (usePagBankPrinter || useStoneOrCieloPrinter) {
+                        if (usePagBankPrinter || useStoneCieloOrGetNetPrinter) {
                           showPrintProcessing('Processando impressão...');
                           await printSaleContent({
                             content: previewRawPrintContent || previewText,

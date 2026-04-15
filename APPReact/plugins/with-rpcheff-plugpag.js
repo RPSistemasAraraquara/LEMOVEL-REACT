@@ -15,7 +15,9 @@ const PAGBANK_PACKAGES = [
   'br.com.uol.pagseguro.plugpagservice',
   'br.com.uol.pagseguro.terminallibservice',
   'br.com.uol.pagseguro.plugpag.libterminal.appservice',
-  'com.ads.lio.uriappclient'
+  'com.ads.lio.uriappclient',
+  'com.getnet.posdigital.service',
+  'br.com.getnet.posdigital'
 ];
 
 const QUERY_SCHEMES = [
@@ -23,6 +25,7 @@ const QUERY_SCHEMES = [
   'cancel-app',
   'printer-app',
   'reprinter-app',
+  'getnet',
   'lio',
   'orderpay',
   'ordercancel',
@@ -166,6 +169,18 @@ function addProviderAndMeta(manifest) {
       $: {
         'android:name': 'cs_integration_type',
         'android:value': 'uri'
+      }
+    });
+  }
+
+  const hasGetNetPriorityMeta = app['meta-data'].some(
+    (item) => item && item.$ && item.$['android:name'] === 'priority_pay'
+  );
+  if (!hasGetNetPriorityMeta) {
+    app['meta-data'].push({
+      $: {
+        'android:name': 'priority_pay',
+        'android:value': '1'
       }
     });
   }
@@ -382,6 +397,7 @@ function withRPCheffPlugPag(config) {
     addUsesPermission(manifest, 'android.permission.READ_EXTERNAL_STORAGE');
     addUsesPermission(manifest, 'android.permission.WRITE_EXTERNAL_STORAGE');
     addUsesPermission(manifest, 'br.com.uol.pagseguro.permission.MANAGE_PAYMENTS');
+    addUsesPermission(manifest, 'com.getnet.posdigital.service.POSDIGITAL');
     addUsesFeature(manifest, '0x00020000', true);
     addQueryPackagesAndIntents(manifest);
     addProviderAndMeta(manifest);
@@ -428,6 +444,7 @@ function withRPCheffPlugPag(config) {
         'RPCheffPlugPagModule.java',
         'RPCheffStoneModule.java',
         'RPCheffCieloModule.java',
+        'RPCheffGetNetPosDigitalModule.java',
         'RPCheffPlugPagPackage.java'
       ];
 

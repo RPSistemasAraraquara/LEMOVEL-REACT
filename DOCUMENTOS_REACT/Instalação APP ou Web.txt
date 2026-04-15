@@ -1,0 +1,26 @@
+cd APPReact
+npm run android:dx8000
+
+-------------------------------------------
+React WEB
+
+
+
+cd APPReact
+npx expo start --web --port 8082
+
+
+
+cd APPReact
+npm run web -- --port 8082
+
+
+
+cd APPReact
+npm run web -- --port 8082
+
+
+
+-------------------------------------------
+
+

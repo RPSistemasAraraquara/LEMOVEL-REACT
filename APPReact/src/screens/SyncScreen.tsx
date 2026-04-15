@@ -115,10 +115,20 @@ export const SyncScreen: React.FC = () => {
     };
   }, [isBusy, progressAnim]);
 
-  const runPostSyncRefresh = async (includePermissions = false) => {
+  const runPostSyncRefresh = async (
+    includePermissions = false,
+    options: { preferCachedMenu?: boolean; preferCachedPermissions?: boolean } = {}
+  ) => {
     const refreshTasks: Array<{ label: string; execute: () => Promise<unknown> }> = [
-      ...(includePermissions ? [{ label: 'Permissões do usuário', execute: refreshCurrentUserPermissions }] : []),
-      { label: 'Cardápio', execute: refreshMenu },
+      ...(includePermissions
+        ? [
+            {
+              label: 'Permissões do usuário',
+              execute: () => refreshCurrentUserPermissions({ preferCache: options.preferCachedPermissions })
+            }
+          ]
+        : []),
+      { label: 'Cardápio', execute: () => refreshMenu({ preferCache: options.preferCachedMenu }) },
       { label: 'Painel', execute: () => refreshDashboard(undefined, { force: true }) }
     ];
 
@@ -141,6 +151,8 @@ export const SyncScreen: React.FC = () => {
   };
 
   const hasSyncTaskErrors = (items?: SyncTaskResult[]) => items?.some((item) => item.status === 'error') ?? false;
+  const didSyncTaskSucceed = (items: SyncTaskResult[] | undefined, key: string) =>
+    items?.some((item) => String(item.key).toLowerCase() === key && item.status !== 'error') ?? false;
 
   const executeFull = async () => {
     if (isBusy) {
@@ -160,7 +172,12 @@ export const SyncScreen: React.FC = () => {
 
       append('Iniciando sincronização completa...');
       const result = await api.syncAll();
-      const refreshIssues = await runPostSyncRefresh(true);
+      const canUseCachedMenu = didSyncTaskSucceed(result.details, 'catalogo');
+      const canUseCachedPermissions = didSyncTaskSucceed(result.details, 'usuarios');
+      const refreshIssues = await runPostSyncRefresh(true, {
+        preferCachedMenu: canUseCachedMenu,
+        preferCachedPermissions: canUseCachedPermissions
+      });
       appendSyncSummary(result);
       refreshIssues.forEach((item) => append(`Atualização pendente: ${item}`));
 
@@ -207,7 +224,17 @@ export const SyncScreen: React.FC = () => {
         return;
       }
 
-      const refreshIssues = await runPostSyncRefresh(String(key).toLowerCase() === 'usuarios');
+      const normalizedKey = String(key).toLowerCase();
+      const shouldPreferCachedMenu =
+        normalizedKey === 'catalogo' ||
+        normalizedKey === 'produtos' ||
+        normalizedKey === 'produto' ||
+        normalizedKey === 'categorias' ||
+        normalizedKey === 'categoria';
+      const refreshIssues = await runPostSyncRefresh(normalizedKey === 'usuarios', {
+        preferCachedMenu: shouldPreferCachedMenu,
+        preferCachedPermissions: normalizedKey === 'usuarios'
+      });
       const marker = result.status === 'skip' ? '•' : '✓';
       append(`${marker} ${result.message}`);
       refreshIssues.forEach((item) => append(`Atualização pendente: ${item}`));

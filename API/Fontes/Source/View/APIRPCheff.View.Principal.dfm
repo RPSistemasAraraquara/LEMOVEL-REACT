@@ -2,7 +2,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
   Left = 0
   Top = 0
   BorderStyle = bsDialog
-  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 10.0.0.0'
+  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 11.0.0.0'
   ClientHeight = 375
   ClientWidth = 629
   Color = clBtnFace

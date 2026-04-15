@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { api, MachinePaymentType, MobileAppSettings } from './api';
 import {
   executeCieloReceiptPrint,
+  executeGetNetReceiptPrint,
   executePlugPagReceiptPrint,
   executeStoneReceiptPrint,
   resolveConfiguredPaymentProvider
@@ -117,7 +118,7 @@ export const loadSalePrintContent = async (input: RPCheffSalePrintInput): Promis
   const suppressInternalWindowsPrint =
     Platform.OS === 'android' &&
     input.usarRotaMaquininha !== false &&
-    (provider === 'stone' || provider === 'cielo');
+    (provider === 'stone' || provider === 'cielo' || provider === 'getnet');
   return api.getSalePrint(input.idVenda, {
     numeroColunas: input.appSettings.impressaoColunas,
     impressaoInterna: suppressInternalWindowsPrint ? false : input.appSettings.utilizaImpressoraInterna,
@@ -168,6 +169,10 @@ export const printSaleContent = async ({
 
     await executeCieloReceiptPrint({
       content: printableContent,
+      settings: appSettings
+    });
+  } else if (Platform.OS === 'android' && provider === 'getnet') {
+    await executeGetNetReceiptPrint({
       settings: appSettings
     });
   }

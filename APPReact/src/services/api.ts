@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { NativeModules, Platform } from 'react-native';
+import { loadStoredMachineSettings, saveStoredMachineSettings } from './machineSettingsDb';
 
 export type MenuItem = {
   id: number;
@@ -247,6 +248,21 @@ export type SyncResult = {
   details?: SyncTaskResult[];
 };
 
+type CategoryListOptions = {
+  requireRemote?: boolean;
+  preferCache?: boolean;
+};
+
+type ProductListOptions = {
+  requireRemote?: boolean;
+  preferCache?: boolean;
+};
+
+type UserListOptions = {
+  requireRemote?: boolean;
+  preferCache?: boolean;
+};
+
 export type TableOrder = {
   idMesa: number;
   idComanda?: number;
@@ -297,6 +313,7 @@ export type CompanyInfo = {
   utilizaIntegracaoStone?: boolean;
   utilizaIntegracaoCielo?: boolean;
   utilizaIntegracaoPagBank?: boolean;
+  utilizaIntegracaoGetNet?: boolean;
 };
 
 export type MobileAppSettings = {
@@ -328,7 +345,7 @@ export type MobileAppSettings = {
   sincronizarAposLogin: boolean;
   modoExibicao: 'mesa' | 'comanda' | 'mesaComanda';
   utilizaMaquininhaStone: boolean;
-  tipoIntegracao: 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo';
+  tipoIntegracao: 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo' | 'getnet';
   modeloMaquininha: string;
   usuario?: string;
   senha?: string;
@@ -855,6 +872,7 @@ function parsePaymentIntegration(values: Record<string, unknown>): MobileAppSett
       normalized === 'stone' ||
       normalized === 'pagbank' ||
       normalized === 'cielo' ||
+      normalized === 'getnet' ||
       normalized === 'plugpag' ||
       normalized === 'tmpplugpag' ||
       normalized === 'tmplugpag'
@@ -871,6 +889,7 @@ function parsePaymentIntegration(values: Record<string, unknown>): MobileAppSett
       if (parsedIndex === 2) return 'stone';
       if (parsedIndex === 3) return 'pagbank';
       if (parsedIndex === 4) return 'cielo';
+      if (parsedIndex === 5) return 'getnet';
       return 'nenhum';
     }
   }
@@ -880,12 +899,15 @@ function parsePaymentIntegration(values: Record<string, unknown>): MobileAppSett
     if (rawIntegration === 2) return 'stone';
     if (rawIntegration === 3) return 'pagbank';
     if (rawIntegration === 4) return 'cielo';
+    if (rawIntegration === 5) return 'getnet';
   }
 
   if (parseBoolean(values.utilizaIntegracaoCielo, false)) return 'cielo';
   if (parseBoolean(values.utilizaIntegracaoPagBank, false)) return 'pagbank';
+  if (parseBoolean(values.utilizaIntegracaoGetNet, false)) return 'getnet';
   if (parseBoolean(values.rp_movel_integracao_cielo, false)) return 'cielo';
   if (parseBoolean(values.rp_movel_integracao_pagbank, false)) return 'pagbank';
+  if (parseBoolean(values.rp_movel_integracao_getnet, false)) return 'getnet';
   if (parseBoolean(values.utilizaIntegracaoStone, false) || parseBoolean(values.rp_movel_integracao_stone, false)) {
     return 'stone';
   }
@@ -998,17 +1020,39 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
 
 export const loadMobileSettings = async (): Promise<MobileAppSettings> => {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultMobileSettings;
+  const storedMachineSettings = await loadStoredMachineSettings();
+  if (!raw) {
+    if (!storedMachineSettings) {
+      return defaultMobileSettings;
+    }
+    return normalizeMobileSettings({
+      ...defaultMobileSettings,
+      ...storedMachineSettings
+    });
+  }
   try {
-    return normalizeMobileSettings(JSON.parse(raw));
+    return normalizeMobileSettings({
+      ...JSON.parse(raw),
+      ...(storedMachineSettings || {})
+    });
   } catch {
-    return defaultMobileSettings;
+    return storedMachineSettings
+      ? normalizeMobileSettings({
+          ...defaultMobileSettings,
+          ...storedMachineSettings
+        })
+      : defaultMobileSettings;
   }
 };
 
 export const saveMobileSettings = async (payload: MobileAppSettings): Promise<void> => {
   const data = normalizeMobileSettings(payload);
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  await saveStoredMachineSettings({
+    utilizaMaquininhaStone: data.utilizaMaquininhaStone,
+    tipoIntegracao: data.tipoIntegracao,
+    modeloMaquininha: data.modeloMaquininha
+  });
 };
 
 type StoredMenuItem = Omit<MenuItem, 'imagem' | 'imagemLocalPath'> & {
@@ -1696,6 +1740,10 @@ function parseCompanyInfo(value: any): CompanyInfo {
     utilizaIntegracaoPagBank: parseBoolean(
       value?.utilizaIntegracaoPagBank ?? value?.rp_movel_integracao_pagbank,
       true
+    ),
+    utilizaIntegracaoGetNet: parseBoolean(
+      value?.utilizaIntegracaoGetNet ?? value?.rp_movel_integracao_getnet,
+      true
     )
   };
 }
@@ -1716,6 +1764,9 @@ export function applyCompanyPolicyToSettings(
     tipoIntegracao = 'nenhum';
   }
   if (tipoIntegracao === 'pagbank' && !company.utilizaIntegracaoPagBank) {
+    tipoIntegracao = 'nenhum';
+  }
+  if (tipoIntegracao === 'getnet' && !company.utilizaIntegracaoGetNet) {
     tipoIntegracao = 'nenhum';
   }
 
@@ -2080,6 +2131,7 @@ export class ApiClient {
   private readonly inFlightGet: Map<string, Promise<unknown>> = new Map();
   private cachedCatalogCategories: Category[] | null = null;
   private cachedCatalogProducts: MenuItem[] | null = null;
+  private cachedUsers: UserProfile[] | null = null;
   private catalogSchemaReadyKey: string | null = null;
 
   constructor(private baseUrl: string, private idEmpresa = 1) {}
@@ -2189,6 +2241,7 @@ export class ApiClient {
   private clearCatalogMemoryCache() {
     this.cachedCatalogCategories = null;
     this.cachedCatalogProducts = null;
+    this.cachedUsers = null;
     this.catalogSchemaReadyKey = null;
   }
 
@@ -2783,13 +2836,23 @@ export class ApiClient {
     return resolvedUser;
   }
 
-  async listUsers(): Promise<UserProfile[]> {
+  async listUsers(options: UserListOptions = {}): Promise<UserProfile[]> {
+    if (options.preferCache && this.cachedUsers) {
+      return this.cachedUsers;
+    }
+
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/usuario`);
       if (!Array.isArray(payload)) throw new Error('Resposta inválida da API');
-      return payload.map(parseUserProfile);
-    } catch {
-      return [];
+      const users = payload.map(parseUserProfile);
+      this.cachedUsers = users;
+      return users;
+    } catch (error) {
+      if (options.requireRemote) {
+        throw error;
+      }
+
+      return this.cachedUsers || [];
     }
   }
 
@@ -2892,14 +2955,11 @@ export class ApiClient {
       }
 
       if (taskCode === 'usuarios') {
-        const responsePayload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/usuario`);
-        if (!Array.isArray(responsePayload)) {
-          throw new Error('Resposta inválida');
-        }
+        const users = await this.listUsers({ requireRemote: true });
         return {
           key: task,
           status: 'ok',
-          message: `${responsePayload.length} usuários carregados`
+          message: `${users.length} usuários carregados`
         };
       }
 
@@ -2930,10 +2990,7 @@ export class ApiClient {
   async syncAll(): Promise<SyncResult> {
     const timestamp = new Date().toISOString();
     const tasks = ['catalogo', 'mesas', 'formas', 'configuracoes', 'usuarios'];
-    const details: SyncTaskResult[] = [];
-    for (const task of tasks) {
-      details.push(await this.syncPartial(task));
-    }
+    const details = await Promise.all(tasks.map((task) => this.syncPartial(task)));
     const status: SyncResult['status'] =
       details.every((item) => item.status === 'ok') ? 'ok' : 'partial';
 
@@ -2950,8 +3007,12 @@ export class ApiClient {
     };
   }
 
-  async listCategories(options: { requireRemote?: boolean } = {}): Promise<Category[]> {
+  async listCategories(options: CategoryListOptions = {}): Promise<Category[]> {
     const cachedCategories = await this.loadCachedCategories();
+    if (options.preferCache) {
+      return cachedCategories;
+    }
+
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/categoria`);
       if (!Array.isArray(payload)) throw new Error('Erro na API');
@@ -2970,8 +3031,12 @@ export class ApiClient {
     }
   }
 
-  async listProducts(exibirImagem = true, options: { requireRemote?: boolean } = {}): Promise<MenuItem[]> {
+  async listProducts(exibirImagem = true, options: ProductListOptions = {}): Promise<MenuItem[]> {
     const cachedProducts = await this.loadCachedProducts();
+    if (options.preferCache) {
+      return cachedProducts;
+    }
+
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=${exibirImagem ? 'true' : 'false'}`, {
         timeoutMs: 60000
@@ -3047,13 +3112,17 @@ export class ApiClient {
     return this.listTables();
   }
 
-  async openTable(tableId: number, nomeMesaComanda?: string): Promise<TableOrder> {
+  async openTable(tableId: number, nomeMesaComanda?: string, idUsuario = 0): Promise<TableOrder> {
     try {
       const terminal = await this.resolveTerminalName();
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
       };
+      const headers: Record<string, string> = {};
+      if (Number(idUsuario || 0) > 0) {
+        headers.idUsuario = String(Math.trunc(Number(idUsuario)));
+      }
       if (nomeInformado) {
         body.nomeMesaComanda = nomeInformado;
       }
@@ -3061,6 +3130,7 @@ export class ApiClient {
         `rpCheff/v1/empresa/${this.idEmpresa}/mesa/${tableId}/abertura`,
         {
           method: 'POST',
+          headers,
           body: JSON.stringify(body)
         }
       );
@@ -3081,13 +3151,25 @@ export class ApiClient {
     }
   }
 
-  async openComanda(comandaId: number, nomeMesaComanda?: string, usaCatraca = false): Promise<TableOrder> {
+  async openComanda(
+    comandaId: number,
+    nomeMesaComanda?: string,
+    usaCatraca = false,
+    idUsuario = 0
+  ): Promise<TableOrder> {
     try {
       const terminal = await this.resolveTerminalName();
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
       };
+      const headers: Record<string, string> = {};
+      if (usaCatraca) {
+        headers.usaCatraca = 'true';
+      }
+      if (Number(idUsuario || 0) > 0) {
+        headers.idUsuario = String(Math.trunc(Number(idUsuario)));
+      }
       if (nomeInformado) {
         body.nomeMesaComanda = nomeInformado;
       }
@@ -3095,11 +3177,7 @@ export class ApiClient {
         `rpCheff/v1/empresa/${this.idEmpresa}/comanda/${comandaId}/abertura`,
         {
           method: 'POST',
-          headers: usaCatraca
-            ? {
-                usaCatraca: 'true'
-              }
-            : undefined,
+          headers,
           body: JSON.stringify(body)
         }
       );
@@ -3126,18 +3204,19 @@ export class ApiClient {
     mode: 'mesa' | 'comanda' | 'mesaComanda' = 'mesa',
     options: {
       usaCatraca?: boolean;
+      idUsuario?: number;
     } = {}
   ): Promise<TableOrder> {
     const nomeInformado = String(nomeMesaComanda || '');
     if (mode === 'comanda') {
-      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca));
+      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca), Number(options.idUsuario || 0));
     }
 
     if (mode === 'mesaComanda' && /comanda|c[aã]rd/i.test(nomeInformado)) {
-      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca));
+      return this.openComanda(tableId, nomeMesaComanda, Boolean(options.usaCatraca), Number(options.idUsuario || 0));
     }
 
-    return this.openTable(tableId, nomeMesaComanda);
+    return this.openTable(tableId, nomeMesaComanda, Number(options.idUsuario || 0));
   }
 
   async launchItem(idVenda: number, item: LaunchItemPayload): Promise<LaunchItemPayload> {

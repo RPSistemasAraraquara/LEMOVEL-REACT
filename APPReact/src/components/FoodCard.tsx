@@ -40,9 +40,6 @@ export const FoodCard: React.FC<{
           ) : (
             <View style={styles.imagePlaceholder} />
           )}
-          <View style={styles.imageBadge}>
-            <Text style={styles.imageBadgeText}>R$ {price.toFixed(2)}</Text>
-          </View>
         </View>
       ) : null}
       <View style={styles.cardBody}>
@@ -151,22 +148,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 122,
     backgroundColor: Colors.primarySoft
-  },
-  imageBadge: {
-    position: 'absolute',
-    left: 12,
-    bottom: 12,
-    backgroundColor: 'rgba(255, 253, 249, 0.92)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(27, 79, 114, 0.08)'
-  },
-  imageBadgeText: {
-    color: Colors.primary,
-    fontWeight: '900',
-    fontSize: 12
   },
   cardBody: {
     flex: 1,

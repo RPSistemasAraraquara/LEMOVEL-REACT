@@ -70,12 +70,12 @@ type AppContextState = {
   ensureActiveTable: () => TableOrder;
   ensureOpenSale: () => TableOrder;
   login: (login: string, senha: string) => Promise<UserProfile>;
-  refreshCurrentUserPermissions: () => Promise<void>;
+  refreshCurrentUserPermissions: (options?: { preferCache?: boolean }) => Promise<void>;
   refreshDashboard: (
     forcedMode?: 'mesa' | 'comanda' | 'mesaComanda',
     options?: { force?: boolean }
   ) => Promise<void>;
-  refreshMenu: () => Promise<void>;
+  refreshMenu: (options?: { preferCache?: boolean }) => Promise<void>;
   addToCart: (item: Omit<CartItem, 'lineId'>) => void;
   removeFromCart: (lineId: string) => void;
   clearCart: () => void;
@@ -557,13 +557,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshCurrentUserPermissions = async () => {
+  const refreshCurrentUserPermissions = async (options: { preferCache?: boolean } = {}) => {
     const currentUser = userRef.current;
     if (!currentUser) {
       return;
     }
 
-    const users = await api.listUsers();
+    const users = await api.listUsers({ preferCache: options.preferCache });
     if (!users.length) {
       return;
     }
@@ -821,20 +821,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshMenu = async () => {
+  const refreshMenu = async (options: { preferCache?: boolean } = {}) => {
     if (refreshMenuInFlightRef.current) {
       return queueRefreshMenu(0);
     }
 
     const now = Date.now();
     const timeSinceLastRefresh = now - lastMenuRefreshAtRef.current;
-    if (timeSinceLastRefresh < AUTO_MENU_REFRESH_THROTTLE_MS) {
+    if (!options.preferCache && timeSinceLastRefresh < AUTO_MENU_REFRESH_THROTTLE_MS) {
       return queueRefreshMenu(AUTO_MENU_REFRESH_THROTTLE_MS - timeSinceLastRefresh);
     }
 
     const refreshMenuTask = (async () => {
-      const categoriesPromise = api.listCategories();
-      const productsPromise = api.listProducts(false);
+      const categoriesPromise = api.listCategories({ preferCache: options.preferCache });
+      const productsPromise = api.listProducts(false, { preferCache: options.preferCache });
 
       const cats = await categoriesPromise;
       const categoryFingerprint = categoriesFingerprint(cats);
@@ -1140,8 +1140,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       : nomeInformado || undefined;
 
     const usaCatraca = appSettings.utilizaCatraca && mode === 'comanda';
+    const idUsuarioAbertura = Number(userRef.current?.idUsuario || 0);
     let table = await api.openTableByMode(tableId, sanitizedName, mode, {
-      usaCatraca
+      usaCatraca,
+      idUsuario: idUsuarioAbertura
     });
     const openedMode = (item: TableOrder) => item.tipo || 'mesa';
     const fallbackMode = openedMode(table);

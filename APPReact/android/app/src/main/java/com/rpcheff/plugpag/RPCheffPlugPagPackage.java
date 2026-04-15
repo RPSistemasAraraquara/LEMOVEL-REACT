@@ -17,6 +17,7 @@ public class RPCheffPlugPagPackage implements ReactPackage {
     modules.add(new RPCheffPlugPagModule(reactContext));
     modules.add(new RPCheffStoneModule(reactContext));
     modules.add(new RPCheffCieloModule(reactContext));
+    modules.add(new RPCheffGetNetPosDigitalModule(reactContext));
     return modules;
   }
 

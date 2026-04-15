@@ -1,0 +1,110 @@
+[
+  {
+    "id": "STAT",
+    "label": "Estatística",
+    "icon": "drawable/ic_info",
+    "message": "Com este serviço o desenvolvedor pode obter informações de utilização do hardware.\n\nHá exemplos de uso na classe StatActivity contida no projeto de exemplo."
+  },
+  {
+    "id": "PAPERG",
+    "label": "getPaperStatus",
+    "code": "PosDigital.getInstance().getStatistic().getPaperStatus(IStatCallback.Stub())",
+    "message": "Obtém o total geral de consumo de papel."
+  },
+  {
+    "id": "PAPERAPP",
+    "label": "getAppPaperStatus",
+    "code": "PosDigital.getInstance().getStatistic().getAppPaperStatus(IStatCallback.Stub())",
+    "message": "Obtém o consumo de papel por app."
+  },
+  {
+    "id": "MAGG",
+    "label": "getMagStatus",
+    "code": "PosDigital.getInstance().getStatistic().getMagStatus(IStatCallback.Stub())",
+    "message": "Obtém o total geral, sucesso, de passagens de tarja magnética."
+  },
+  {
+    "id": "MAGAPP",
+    "label": "getAllAppMagStatus",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppMagStatus(IStatCallback.Stub())",
+    "message": "Obtém todas as passagens de tarja magnética com sucesso por aplicativo."
+  },
+  {
+    "id": "MAGGFAIL",
+    "label": "getMagStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getMagStatusFail(IStatCallback.Stub())",
+    "message": "Obtém o total geral de falhas de tarja magnética."
+  },
+  {
+    "id": "MAGAPPFAIL",
+    "label": "getAllAppMagStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppMagStatusFail(IStatCallback.Stub())",
+    "message": "Obtém todas as falhas, de tarja magnética, por aplicativo."
+  },
+  {
+    "id": "CHIPG",
+    "label": "getChipStatus",
+    "code": "PosDigital.getInstance().getStatistic().getChipStatus(IStatCallback.Stub())",
+    "message": "Obtém o total geral, sucesso, de inserções de chip."
+  },
+  {
+    "id": "CHIPAPP",
+    "label": "getAllAppChipStatus",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppChipStatus(IStatCallback.Stub())",
+    "message": "Obtém todas as inserções de chip, com sucesso, por aplicativo."
+  },
+  {
+    "id": "CHIPGFAIL",
+    "label": "getChipStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getChipStatusFail(IStatCallback.Stub())",
+    "message": "Obtém totas as falhas de inserções de chip."
+  },
+  {
+    "id": "CHIPAPPFAIL",
+    "label": "getAllAppChipStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppChipStatusFail(IStatCallback.Stub())",
+    "message": "Obtém todas as falhas, de inserções de chip, por aplicativo."
+  },
+  {
+    "id": "NFCG",
+    "label": "getNfcStatus",
+    "code": "PosDigital.getInstance().getStatistic().getNfcStatus(IStatCallback.Stub())",
+    "message": "Obtém o total geral, sucesso, de aproximações de chip."
+  },
+  {
+    "id": "NFCAPP",
+    "label": "getAllAppNfcStatus",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppNfcStatus(IStatCallback.Stub())",
+    "message": "Obtém todas as aproximações de chip, com sucesso, por aplicativo."
+  },
+  {
+    "id": "NFCGFAIL",
+    "label": "getNfcStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getNfcStatusFail(IStatCallback.Stub())",
+    "message": "Obtém totas as falhas de aproximações de chip."
+  },
+  {
+    "id": "NFCAPPFAIL",
+    "label": "getAllAppNfcStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getAllAppNfcStatusFail(IStatCallback.Stub())",
+    "message": "Obtém todas as falhas, de aproximações de chip, por aplicativo."
+  },
+  {
+    "id": "MIFAREG",
+    "label": "getMifareStatus",
+    "code": "PosDigital.getInstance().getStatistic().getMifareStatus(IStatCallback.Stub())",
+    "message": "Obtém a quantidade de aproximações de cartão mifare."
+  },
+  {
+    "id": "MIFAREGFAIL",
+    "label": "getMifareStatusFail",
+    "code": "PosDigital.getInstance().getStatistic().getMifareStatusFail(IStatCallback.Stub())",
+    "message": "Obtém a quantidade de falhas nas aproximações de cartão mifare."
+  },
+  {
+    "id": "ALLBYAPP",
+    "label": "getAllStatisticsByApp",
+    "code": "PosDigital.getInstance().getStatistic().getAllStatisticsByApp(IStatCallback.Stub())",
+    "message": "Obtém todas as estatísticas de sucesso e falha das leituras de chip, nfc e tarja por app."
+  }
+]
