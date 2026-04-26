@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OpenTableNameModal } from '../components/OpenTableNameModal';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { useApp } from '../context/AppContext';
-import { api, getProductImageSource, normalizeSaleStatus, resolveImageUri, Sale, SaleLine } from '../services/api';
+import { api, getProductImageSource, logSyncDiagnostic, normalizeSaleStatus, resolveImageUri, Sale, SaleLine, SaleLineOptional } from '../services/api';
 import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -295,6 +295,8 @@ export const SaleManagerScreen: React.FC = () => {
     message: '',
     type: 'warning'
   });
+  const loadSalePromiseRef = React.useRef<Promise<void> | null>(null);
+  const loadSaleKeyRef = React.useRef('');
 
   const productImageUriById = useMemo(() => {
     const map = new Map<number, string>();
@@ -454,14 +456,27 @@ export const SaleManagerScreen: React.FC = () => {
     }
   };
 
-  const loadSale = async () => {
+  const loadSale = React.useCallback(async () => {
     if (!idVenda) {
       setSale(null);
       return;
     }
+    const loadKey = String(idVenda);
+    const currentLoad = loadSalePromiseRef.current;
+    if (currentLoad && loadSaleKeyRef.current === loadKey) {
+      logSyncDiagnostic(`gestao venda carregar reutilizando idVenda=${idVenda}`);
+      return currentLoad;
+    }
+
+    const startedAt = Date.now();
+    logSyncDiagnostic(`gestao venda carregar inicio idVenda=${idVenda}`);
     setLoading(true);
-    try {
+    loadSaleKeyRef.current = loadKey;
+    const loadPromise = (async () => {
       const data = await api.getSale(idVenda, true);
+      if (loadSaleKeyRef.current !== loadKey) {
+        return;
+      }
       if (!data) {
         setSale(null);
         return;
@@ -470,17 +485,31 @@ export const SaleManagerScreen: React.FC = () => {
       setCouvertMasc(String(data.numeroCouvertMasculino || 0));
       setCouvertFem(String(data.numeroCouvertFeminino || 0));
       setPersonCount(String(data.numeroPessoas || 0));
+      logSyncDiagnostic(
+        `gestao venda carregar fim idVenda=${idVenda} itens=${data.itens?.length || 0} em ${Date.now() - startedAt}ms`
+      );
+    })();
+    loadSalePromiseRef.current = loadPromise;
+    try {
+      await loadPromise;
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Não foi possível carregar a venda.');
     } finally {
-      setLoading(false);
+      if (loadSalePromiseRef.current === loadPromise) {
+        loadSalePromiseRef.current = null;
+        loadSaleKeyRef.current = '';
+        setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    loadSale();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idVenda]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const dashboardMode = activeTable?.tipo === 'comanda' ? 'comanda' : activeTable?.tipo === 'mesa' ? 'mesa' : undefined;
+      void loadSale();
+      void refreshDashboard(dashboardMode, { force: true }).catch(() => null);
+    }, [idVenda, activeTable?.tipo, loadSale])
+  );
 
   const onSaveCouvert = async () => {
     if (!idVenda) return;
@@ -619,7 +648,42 @@ export const SaleManagerScreen: React.FC = () => {
     if (!Number.isFinite(numeric)) return '0';
     return Number.isInteger(numeric) ? numeric.toString() : numeric.toFixed(3);
   };
-  const visibleItems = (sale?.itens || []).filter((line) => line.situacao !== 'cancelada');
+  const getOptionalText = (optional: SaleLineOptional): string => {
+    const description = String(optional.descricao || '').trim();
+    const value = Number(optional.valor || 0);
+    if (optional.gratis) {
+      return `${description} (gratis)`;
+    }
+
+    if (Number.isFinite(value) && value > 0) {
+      return `${description} (${formatMoney(value)})`;
+    }
+
+    return description;
+  };
+  const renderLineOptionals = (line: SaleLine) => {
+    const optionals = (line.opcionais || []).filter((optional) => String(optional.descricao || '').trim());
+    if (optionals.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.optionalsList}>
+        {optionals.map((optional, index) => (
+          <Text
+            key={`${line.numeroItem}-${optional.idOpcional}-${index}`}
+            style={styles.optionalText}
+          >
+            + {getOptionalText(optional)}
+          </Text>
+        ))}
+      </View>
+    );
+  };
+  const visibleItems = useMemo(
+    () => (sale?.itens || []).filter((line) => line.situacao !== 'cancelada'),
+    [sale?.itens]
+  );
   const visibleItemGroups = useMemo(() => {
     const consumed = new Set<number>();
 
@@ -674,9 +738,11 @@ export const SaleManagerScreen: React.FC = () => {
   const openPreClosure = () => {
     if (!idVenda) return;
     if (!user?.permitePreFechamentoMesaComanda) {
+      logSyncDiagnostic(`fluxo fechamento abrir pre negado permissao idVenda=${idVenda}`, 2);
       showPermissionDenied('Sem permissão para fazer pré-fechamento.');
       return;
     }
+    logSyncDiagnostic(`fluxo fechamento abrir pre idVenda=${idVenda} mesa=${activeTable?.idMesa || 0} tipo=${activeTable?.tipo || 'mesa'}`);
     navigation.navigate('Fechamento', {
       idVenda,
       idUsuario: user?.idUsuario,
@@ -690,9 +756,11 @@ export const SaleManagerScreen: React.FC = () => {
   const openFinalClosure = () => {
     if (!idVenda) return;
     if (!user?.permiteFechamentoMesaComanda) {
+      logSyncDiagnostic(`fluxo fechamento abrir final negado permissao idVenda=${idVenda}`, 2);
       showPermissionDenied('Sem permissão para fazer fechamento.');
       return;
     }
+    logSyncDiagnostic(`fluxo fechamento abrir final idVenda=${idVenda} mesa=${activeTable?.idMesa || 0} tipo=${activeTable?.tipo || 'mesa'}`);
     navigation.navigate('Fechamento', {
       idVenda,
       idUsuario: user?.idUsuario,
@@ -706,9 +774,11 @@ export const SaleManagerScreen: React.FC = () => {
   const openPartialPayment = () => {
     if (!idVenda) return;
     if (!user?.permitePagamentoParcial) {
+      logSyncDiagnostic(`fluxo pagamento parcial abrir negado permissao idVenda=${idVenda}`, 2);
       showPermissionDenied('Sem permissão para pagamento parcial.');
       return;
     }
+    logSyncDiagnostic(`fluxo pagamento parcial abrir idVenda=${idVenda} mesa=${activeTable?.idMesa || 0} tipo=${activeTable?.tipo || 'mesa'}`);
     navigation.navigate('Pagamento', { idVenda });
   };
 
@@ -718,7 +788,7 @@ export const SaleManagerScreen: React.FC = () => {
       showPermissionDenied('Sem permissão para juntar mesas.');
       return;
     }
-    navigation.navigate('JuntarMesa', { idVendaDestino: idVenda });
+    navigation.navigate('JuntarMesa', { idVendaDestino: idVenda, tableType: activeTable?.tipo });
   };
 
   const getLineWaiterName = (line: SaleLine): string | null => {
@@ -739,6 +809,8 @@ export const SaleManagerScreen: React.FC = () => {
   };
 
   const canManageSale = Boolean(activeTable && idVenda);
+  const canShowPreClosureButton = Boolean(user?.permitePreFechamentoMesaComanda);
+  const canShowFinalClosureButton = Boolean(user?.permiteFechamentoMesaComanda);
 
   const renderVisibleItemGroup = ({ item: group }: { item: VisibleItemGroup }) => {
     const lineImageSource = resolveLineImageSource(group.primaryLine);
@@ -778,6 +850,7 @@ export const SaleManagerScreen: React.FC = () => {
                     {getVisibleLineObservation(fractionLine) ? (
                       <Text style={styles.lineText}>Obs: {getVisibleLineObservation(fractionLine)}</Text>
                     ) : null}
+                    {renderLineOptionals(fractionLine)}
                     <Text style={styles.lineText}>{formatMoney(fractionLine.valorTotal)}</Text>
                   </View>
                 ))}
@@ -795,6 +868,7 @@ export const SaleManagerScreen: React.FC = () => {
               {getVisibleLineObservation(group.primaryLine) ? (
                 <Text style={styles.lineText}>Obs: {getVisibleLineObservation(group.primaryLine)}</Text>
               ) : null}
+              {renderLineOptionals(group.primaryLine)}
               <Text style={styles.linePrice}>{formatMoney(group.primaryLine.valorTotal)}</Text>
             </>
           )}
@@ -947,20 +1021,24 @@ export const SaleManagerScreen: React.FC = () => {
       ListFooterComponent={
         canManageSale ? (
           <View style={styles.actionGrid}>
-            <Pressable
-              style={styles.actionCard}
-              onPress={openPreClosure}
-            >
-              <Text style={styles.actionTitle}>Pré fechamento</Text>
-              <Text style={styles.actionHint}>Atualizar pessoas/couvert e liberar pré-fechamento</Text>
-            </Pressable>
-            <Pressable
-              style={styles.actionCard}
-              onPress={openFinalClosure}
-            >
-              <Text style={styles.actionTitle}>Fechar venda</Text>
-              <Text style={styles.actionHint}>Seleciona pagamentos e aplica desconto</Text>
-            </Pressable>
+            {canShowPreClosureButton ? (
+              <Pressable
+                style={styles.actionCard}
+                onPress={openPreClosure}
+              >
+                <Text style={styles.actionTitle}>Pré fechamento</Text>
+                <Text style={styles.actionHint}>Atualizar pessoas/couvert e liberar pré-fechamento</Text>
+              </Pressable>
+            ) : null}
+            {canShowFinalClosureButton ? (
+              <Pressable
+                style={styles.actionCard}
+                onPress={openFinalClosure}
+              >
+                <Text style={styles.actionTitle}>Fechar venda</Text>
+                <Text style={styles.actionHint}>Seleciona pagamentos e aplica desconto</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.actionCard}
               onPress={openPartialPayment}
@@ -976,7 +1054,8 @@ export const SaleManagerScreen: React.FC = () => {
                     activeTable?.tipo === 'comanda'
                       ? Number(activeTable?.idComanda || activeTable?.idMesa || 0)
                       : Number(activeTable?.idMesa || 0),
-                  idVenda
+                  idVenda,
+                  tableType: activeTable?.tipo
                 })
               }
             >
@@ -1317,6 +1396,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 2
+  },
+  optionalsList: {
+    marginTop: 4,
+    gap: 2
+  },
+  optionalText: {
+    color: Colors.text,
+    fontSize: 12,
+    fontWeight: '600'
   },
   linePrice: {
     color: Colors.text,

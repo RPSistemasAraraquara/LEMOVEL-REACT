@@ -1,0 +1,6 @@
+--------- beginning of main
+--------- beginning of system
+04-26 06:41:41.867 I/ReactNativeJS(11432): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:41:41.867 I/ReactNativeJS(11432): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:41:41.886 I/ReactNativeJS(11432): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 19ms
+04-26 06:41:41.886 I/ReactNativeJS(11432): [RP_SYNC] menu prewarm fim origem=inicial-focus em 19ms

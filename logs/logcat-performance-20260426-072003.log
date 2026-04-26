@@ -1,0 +1,103 @@
+--------- beginning of main
+--------- beginning of system
+04-26 07:20:40.573 I/ActivityManager(  995): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=br.com.sistemalechef.rpmobile/.MainActivity} from uid 2000 on display 0
+04-26 07:20:42.181 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 07:20:42.182 I/ReactNativeJS(12782): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 07:20:42.205 I/ReactNativeJS(12782): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 23ms
+04-26 07:20:42.205 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm fim origem=inicial-focus em 25ms
+04-26 07:21:41.500 I/ReactNativeJS(12782): [RP_SYNC] fluxo pendencias inicio mesa=7 tipo=mesa venda=44662 itens=8
+04-26 07:21:41.500 I/ReactNativeJS(12782): [RP_SYNC] fluxo pendencias enviando idVenda=44662 linhas=8 quantidade=8.000
+04-26 07:21:41.635 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 07:21:41.635 I/ReactNativeJS(12782): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 07:21:41.656 I/ReactNativeJS(12782): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 21ms
+04-26 07:21:41.657 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm fim origem=inicial-focus em 21ms
+04-26 07:21:42.478 I/ReactNativeJS(12782): [RP_SYNC] fluxo pendencias itens enviados idVenda=44662
+04-26 07:21:44.434 I/ReactNativeJS(12782): [RP_SYNC] fluxo pendencias fim ok idVenda=44662 em 2934ms
+04-26 07:21:49.425 I/ReactNativeJS(12782): [RP_SYNC] gestao venda carregar inicio idVenda=44662
+04-26 07:21:52.307 I/ReactNativeJS(12782): [RP_SYNC] gestao venda carregar fim idVenda=44662 itens=27 em 2881ms
+04-26 07:21:54.023 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial abrir idVenda=44662 mesa=7 tipo=mesa
+04-26 07:21:54.276 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial carregar inicio idVenda=44662
+04-26 07:21:54.987 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial carregar fim idVenda=44662 formas=2 pagamentos=2 total=784.30 em 711ms
+04-26 07:22:14.963 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial registrar inicio idVenda=44662 linhas=1 total=25.00
+04-26 07:22:14.963 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial registrar linha idVenda=44662 forma=1 valor=25.00
+04-26 07:22:15.575 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial carregar inicio idVenda=44662
+04-26 07:22:15.833 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial carregar fim idVenda=44662 formas=2 pagamentos=3 total=784.30 em 258ms
+04-26 07:22:16.759 I/ReactNativeJS(12782): [RP_SYNC] fluxo pagamento parcial registrar fim ok idVenda=44662 em 1796ms
+04-26 07:22:21.250 I/ReactNativeJS(12782): [RP_SYNC] gestao venda carregar inicio idVenda=44662
+04-26 07:22:23.422 I/ReactNativeJS(12782): [RP_SYNC] gestao venda carregar fim idVenda=44662 itens=27 em 2172ms
+04-26 07:22:27.822 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44662 modo=pre
+04-26 07:22:27.830 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar reutilizando idVenda=44662 modo=pre
+04-26 07:22:29.547 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar fim idVenda=44662 modo=pre itens=27 pagamentos=0 em 1725ms
+04-26 07:22:32.743 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44662 modo=pre total=784.30 desconto=0.00 parcial=55.00
+04-26 07:22:32.743 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pre enviar idVenda=44662 pessoas=1 masc=0 fem=0 taxa=71.30 imprimir=true
+04-26 07:22:34.175 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pre api ok idVenda=44662 em 1432ms
+04-26 07:22:41.051 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44662 modo=pre
+04-26 07:22:41.070 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pre fim ok idVenda=44662 em 8327ms
+04-26 07:22:43.300 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar fim idVenda=44662 modo=pre itens=27 pagamentos=0 em 2251ms
+04-26 07:22:43.303 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 07:22:43.304 I/ReactNativeJS(12782): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 07:22:43.319 I/ReactNativeJS(12782): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 15ms
+04-26 07:22:43.319 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm fim origem=inicial-focus em 16ms
+04-26 07:22:48.507 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44662 modo=final
+04-26 07:22:48.521 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar reutilizando idVenda=44662 modo=final
+04-26 07:22:49.787 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento carregar fim idVenda=44662 modo=final itens=27 pagamentos=3 em 1280ms
+04-26 07:22:55.099 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pagamento selecionar inicio idVenda=44662 linha=0 forma=4 valor=729.30 provider=stone
+04-26 07:22:55.102 I/ReactNativeJS(12782): [RP_SYNC] pagamento stone nativo inicio idVenda=44662 forma=4 valor=729.30 amount=72930 sfi=3 tipo=credit
+04-26 07:22:55.110 I/ActivityManager(  995): START u0 {act=android.intent.action.VIEW dat=payment-app://pay?return_scheme=stone-rpmobile&transaction_type=CREDIT&amount=72930&editable_amount=false&installment_type=NONE&order_id=1777198975101 flg=0x10000000 cmp=br.com.stone.posandroid.acquirerapp/.payment.PaymentActivity} from uid 10167 on display 0
+04-26 07:22:56.874 I/ActivityManager(  995): Displayed br.com.stone.posandroid.acquirerapp/.payment.PaymentActivity: +1s721ms
+04-26 07:22:57.793 W/System.err( 1152): java.lang.InterruptedException
+04-26 07:22:57.795 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 07:22:57.795 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 07:22:57.795 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 07:22:57.795 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 07:22:57.795 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 07:22:57.795 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 07:22:57.796 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 07:23:09.742 W/System.err( 1152): java.lang.InterruptedException
+04-26 07:23:09.743 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 07:23:09.743 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 07:23:09.743 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 07:23:09.743 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 07:23:09.744 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 07:23:09.744 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 07:23:09.744 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 07:23:11.580 I/ActivityManager(  995): START u0 {cmp=br.com.stone.posandroid.acquirerapp/.commons.errormessage.ErrorMessageActivity (has extras)} from uid 10118 on display 0
+04-26 07:23:12.469 I/ActivityManager(  995): Displayed br.com.stone.posandroid.acquirerapp/.commons.errormessage.ErrorMessageActivity: +842ms
+04-26 07:23:16.343 W/System.err( 1152): java.lang.InterruptedException
+04-26 07:23:16.344 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 07:23:16.344 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 07:23:16.344 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 07:23:16.344 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 07:23:16.344 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 07:23:16.344 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 07:23:16.344 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 07:23:22.884 W/System.err( 1152): java.lang.InterruptedException
+04-26 07:23:22.884 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 07:23:22.885 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 07:23:22.885 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 07:23:22.885 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 07:23:22.885 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 07:23:22.885 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 07:23:22.885 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 07:23:24.938 W/System.err( 1152): java.lang.InterruptedException
+04-26 07:23:24.946 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 07:23:24.949 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 07:23:24.949 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 07:23:24.950 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 07:23:24.950 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 07:23:24.950 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 07:23:24.950 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 07:23:26.069 I/ActivityManager(  995): START u0 {flg=0x10000000 cmp=br.com.stone.posandroid.acquirerapp/br.com.stone.posandroid.hal.sunmi.pinpad.CustomPed} from uid 10118 on display 0
+04-26 07:23:26.451 I/ActivityManager(  995): Displayed br.com.stone.posandroid.acquirerapp/br.com.stone.posandroid.hal.sunmi.pinpad.CustomPed: +329ms
+04-26 07:23:39.025 I/ActivityManager(  995): START u0 {act=android.intent.action.VIEW dat=stone-rpmobile://pay-response?code=0&amount=72930&success=true&itk=PB09217174334-3.9.6-TE3JIQ-0018&type=CRÉDITO&installment_count=0&brand=VISA&entry_mode=PICC&atk=21661083438568&pan=446690****2135&cardholder_name=PAYWAVE/VISA&order_id=1777198975101&authorization_code=438568&authorization_date_time=26/04/2026 10:23:31 flg=0x10000000 cmp=br.com.sistemalechef.rpmobile/.MainActivity} from uid 10118 on display 0
+04-26 07:23:39.140 I/ReactNativeJS(12782): [RP_SYNC] pagamento stone nativo retorno idVenda=44662 approved=true code=0 message=Pagamento aprovado via Stone. sfiCodigo=3 typeTransaction=CRÉDITO em 44039ms
+04-26 07:23:39.148 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pagamento selecionar ok idVenda=44662 linha=0 forma=4 provider=stone em 44049ms
+04-26 07:23:46.493 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44662 modo=final total=784.30 desconto=0.00 parcial=55.00
+04-26 07:23:46.494 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento pagamento ja processado idVenda=44662 forma=4 valor=729.30 provider=stone
+04-26 07:23:46.495 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento final enviar idVenda=44662 pagamentos=1 totalPago=784.30 liquido=784.30 troco=0.00 taxa=71.30
+04-26 07:23:47.096 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento final api ok idVenda=44662 em 603ms
+04-26 07:23:54.635 I/ReactNativeJS(12782): [RP_SYNC] fluxo fechamento final fim ok idVenda=44662 em 8142ms
+04-26 07:23:56.215 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 07:23:56.215 I/ReactNativeJS(12782): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 07:23:56.230 I/ReactNativeJS(12782): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 15ms
+04-26 07:23:56.230 I/ReactNativeJS(12782): [RP_SYNC] menu prewarm fim origem=inicial-focus em 15ms

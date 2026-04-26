@@ -1,0 +1,56 @@
+--------- beginning of main
+--------- beginning of system
+04-25 15:26:24.359 I/ReactNativeJS(32604): Running "main"
+04-25 18:42:18.556 I/ReactNativeJS(32604): [RP_SYNC] syncAll inicio tasks=catalogo,mesas,formas,configuracoes,usuarios
+04-25 18:42:18.556 I/ReactNativeJS(32604): [RP_SYNC] etapa catalogo inicio
+04-25 18:42:18.557 I/ReactNativeJS(32604): [RP_SYNC] etapa mesas inicio
+04-25 18:42:18.559 I/ReactNativeJS(32604): [RP_SYNC] etapa formas inicio
+04-25 18:42:18.564 I/ReactNativeJS(32604): [RP_SYNC] etapa configuracoes inicio
+04-25 18:42:19.948 I/ReactNativeJS(32604): [RP_SYNC] menu prewarm adiado origem=inicial-focus: syncAll em andamento
+04-25 18:42:21.635 I/ReactNativeJS(32604): [RP_SYNC] produtos remoto count=215 exibirImagem=false preserveCachedImages=false em 2004ms
+04-25 18:42:21.993 I/ReactNativeJS(32604): [RP_SYNC] etapa formas ok em 3434ms | 2 formas de pagamento atualizadas
+04-25 18:42:21.993 I/ReactNativeJS(32604): [RP_SYNC] etapa usuarios inicio
+04-25 18:42:21.997 I/ReactNativeJS(32604): [RP_SYNC] etapa configuracoes ok em 3433ms | Configurações de mesa/comanda carregadas
+04-25 18:42:22.185 I/ReactNativeJS(32604): [RP_SYNC] etapa mesas ok em 3628ms | 200 mesas atualizadas
+04-25 18:42:24.109 I/ReactNativeJS(32604): [RP_SYNC] etapa usuarios ok em 2116ms | 5 usuários carregados
+04-25 18:42:25.433 I/ReactNativeJS(32604): [RP_SYNC] produtos prontos inalterado count=215 em 5802ms
+04-25 18:42:25.433 I/ReactNativeJS(32604): [RP_SYNC] etapa catalogo ok em 6877ms | Catálogo: 19 categorias | 215 produtos | imagens por demanda
+04-25 18:42:25.434 I/ReactNativeJS(32604): [RP_SYNC] syncAll fim status=ok em 6878ms
+04-25 18:42:28.300 I/ReactNativeJS(32604): [RP_SYNC] ui Verificando disponibilidade da API: http://192.168.15.35:9000
+04-25 18:42:31.094 I/ReactNativeJS(32604): [RP_SYNC] ui Iniciando sincronização completa...
+04-25 18:42:31.095 I/ReactNativeJS(32604): [RP_SYNC] syncAll inicio tasks=catalogo,mesas,formas,configuracoes,usuarios
+04-25 18:42:31.095 I/ReactNativeJS(32604): [RP_SYNC] etapa catalogo inicio
+04-25 18:42:31.095 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronizando etapa: catalogo
+04-25 18:42:31.096 I/ReactNativeJS(32604): [RP_SYNC] etapa mesas inicio
+04-25 18:42:31.096 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronizando etapa: mesas
+04-25 18:42:31.103 I/ReactNativeJS(32604): [RP_SYNC] etapa formas inicio
+04-25 18:42:31.103 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronizando etapa: formas
+04-25 18:42:31.110 I/ReactNativeJS(32604): [RP_SYNC] etapa configuracoes inicio
+04-25 18:42:31.111 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronizando etapa: configuracoes
+04-25 18:42:31.811 I/ReactNativeJS(32604): [RP_SYNC] produtos remoto count=215 exibirImagem=false preserveCachedImages=false em 213ms
+04-25 18:42:32.286 I/ReactNativeJS(32604): [RP_SYNC] ui ✓ formas (1.2s): 2 formas de pagamento atualizadas
+04-25 18:42:32.286 I/ReactNativeJS(32604): [RP_SYNC] etapa formas ok em 1182ms | 2 formas de pagamento atualizadas
+04-25 18:42:32.286 I/ReactNativeJS(32604): [RP_SYNC] etapa usuarios inicio
+04-25 18:42:32.286 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronizando etapa: usuarios
+04-25 18:42:32.392 I/ReactNativeJS(32604): [RP_SYNC] ui ✓ configuracoes (1.3s): Configurações de mesa/comanda carregadas
+04-25 18:42:32.392 I/ReactNativeJS(32604): [RP_SYNC] etapa configuracoes ok em 1281ms | Configurações de mesa/comanda carregadas
+04-25 18:42:32.400 I/ReactNativeJS(32604): [RP_SYNC] ui ✓ mesas (1.3s): 200 mesas atualizadas
+04-25 18:42:32.401 I/ReactNativeJS(32604): [RP_SYNC] etapa mesas ok em 1304ms | 200 mesas atualizadas
+04-25 18:42:35.797 I/ReactNativeJS(32604): [RP_SYNC] ui ✓ usuarios (3.5s): 5 usuários carregados
+04-25 18:42:35.797 I/ReactNativeJS(32604): [RP_SYNC] etapa usuarios ok em 3511ms | 5 usuários carregados
+04-25 18:42:35.798 I/ReactNativeJS(32604): [RP_SYNC] produtos prontos inalterado count=215 em 4201ms
+04-25 18:42:40.522 I/ReactNativeJS(32604): [RP_SYNC] ui ✓ catalogo (9.4s): Catálogo: 19 categorias | 215 produtos | imagens por demanda
+04-25 18:42:40.523 I/ReactNativeJS(32604): [RP_SYNC] etapa catalogo ok em 9427ms | Catálogo: 19 categorias | 215 produtos | imagens por demanda
+04-25 18:42:40.523 I/ReactNativeJS(32604): [RP_SYNC] syncAll fim status=ok em 9428ms
+04-25 18:42:40.525 I/ReactNativeJS(32604): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-25 18:42:40.527 I/ReactNativeJS(32604): [RP_SYNC] ui Atualização Permissões do usuário em 3ms
+04-25 18:42:46.249 I/ReactNativeJS(32604): [RP_SYNC] cache produtos sqlite compacto count=215 em 5722ms
+04-25 18:42:46.250 I/ReactNativeJS(32604): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 5725ms
+04-25 18:42:46.251 I/ReactNativeJS(32604): [RP_SYNC] ui Atualização Cardápio em 5.7s
+04-25 18:42:46.276 I/ReactNativeJS(32604): [RP_SYNC] ui Sincronização concluída em 2026-04-25T21:42:31.095Z | status: ok
+04-25 18:42:49.302 I/ReactNativeJS(32604): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-25 18:42:49.302 I/ReactNativeJS(32604): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-25 18:42:49.317 I/ReactNativeJS(32604): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 15ms
+04-25 18:42:49.318 I/ReactNativeJS(32604): [RP_SYNC] menu prewarm fim origem=inicial-focus em 15ms
+04-25 18:42:50.027 I/ReactNativeJS(32604): [RP_SYNC] ui Atualização Painel em segundo plano em 3.8s
+04-25 18:43:03.833 I/ReactNativeJS(32604): 'VirtualizedList: You have a large list that is slow to update - make sure your renderItem function renders components that follow React performance best practices like PureComponent, shouldComponentUpdate, etc.', { dt: 777, prevDt: 969, contentLength: 2185.5 }

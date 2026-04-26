@@ -1,0 +1,7 @@
+--------- beginning of main
+--------- beginning of system
+04-25 18:49:33.625 I/ReactNativeJS( 9057): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-25 18:49:33.626 I/ReactNativeJS( 9057): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-25 18:49:33.641 I/ReactNativeJS( 9057): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 15ms
+04-25 18:49:33.641 I/ReactNativeJS( 9057): [RP_SYNC] menu prewarm fim origem=inicial-focus em 16ms
+04-25 18:50:19.891 I/ReactNativeJS( 9057): 'VirtualizedList: You have a large list that is slow to update - make sure your renderItem function renders components that follow React performance best practices like PureComponent, shouldComponentUpdate, etc.', { dt: 1625, prevDt: 810, contentLength: 4158.5 }

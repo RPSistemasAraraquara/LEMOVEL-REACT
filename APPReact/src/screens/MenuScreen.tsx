@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Modal,
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -14,7 +17,7 @@ import { CommonActions, RouteProp, useIsFocused, useNavigation, useRoute } from 
 import { CategoryChip } from '../components/CategoryChip';
 import { MemoFoodCard } from '../components/FoodCard';
 import { useApp } from '../context/AppContext';
-import { MenuItem, normalizeSaleStatus } from '../services/api';
+import { api, logSyncDiagnostic, MenuItem, normalizeSaleStatus } from '../services/api';
 import { RootStackParams, TabParams } from '../navigation/AppNavigator';
 import { Colors, Radius, Shadows, Space } from '../theme';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -23,19 +26,83 @@ import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 type MenuNavigation = NativeStackNavigationProp<RootStackParams>;
 type MenuRoute = RouteProp<TabParams, 'Cardapio'>;
 
+type BarcodeScanningResult = {
+  data?: string | null;
+};
+
+const getCameraViewComponent = (): React.ComponentType<any> | null => {
+  try {
+    const module = require('expo-camera') as { CameraView?: React.ComponentType<any> };
+    return module.CameraView || null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeBarcodeReference = (value: unknown): string => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return '';
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return normalized.replace(/^0+/, '') || '0';
+  }
+
+  return normalized;
+};
+
+const findProductByBarcodeInList = (items: MenuItem[], rawCode: string) => {
+  const normalizedCode = normalizeBarcodeReference(rawCode);
+  if (!normalizedCode) {
+    return null;
+  }
+
+  return items.find(
+    (item) =>
+      item.b_venda_mobile !== false &&
+      normalizeBarcodeReference(item.codReferencia) === normalizedCode
+  ) || null;
+};
+
+const getMenuItemIdentity = (item: MenuItem) => Number(item.idProduto || item.id || 0);
+
+const getLogErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error || 'erro desconhecido');
+
 let lastLaunchedCategoryContext: { tableKey: string; categoryId: number } | null = null;
+
+const MENU_IMAGE_RESUME_DELAY_MS = 120;
+
+const getMenuCardHeight = (showImageSlot: boolean, compactLayout: boolean) => {
+  if (showImageSlot) {
+    return compactLayout ? 250 : 316;
+  }
+
+  return compactLayout ? 166 : 206;
+};
 
 export const MenuScreen: React.FC = () => {
   const navigation = useNavigation<MenuNavigation>();
   const route = useRoute<MenuRoute>();
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
+  const compactLayout = width <= 380;
   const [gridWidth, setGridWidth] = useState(0);
   const [categoryBootstrapped, setCategoryBootstrapped] = useState(false);
   const [selectedMenuCategoryId, setSelectedMenuCategoryId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [productCameraOpen, setProductCameraOpen] = useState(false);
+  const [productCameraLoading, setProductCameraLoading] = useState(false);
+  const [productManualOpen, setProductManualOpen] = useState(false);
+  const [productManualText, setProductManualText] = useState('');
+  const [deferCardImages, setDeferCardImages] = useState(false);
+  const [CameraViewComponent, setCameraViewComponent] = useState<React.ComponentType<any> | null>(null);
   const lastTableKeyRef = React.useRef<string | null>(null);
   const lastHandledRouteParamsRef = React.useRef<MenuRoute['params'] | undefined>(undefined);
+  const productCameraBusyRef = React.useRef(false);
+  const cardImageResumeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     categories,
     products,
@@ -58,6 +125,24 @@ export const MenuScreen: React.FC = () => {
     message: '',
     type: 'warning'
   });
+  const showSweetAlert = useCallback((title: string, message: string, type: SweetAlertType = 'warning') => {
+    setSweetAlert({
+      visible: true,
+      title,
+      message,
+      type
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (cardImageResumeTimerRef.current) {
+        clearTimeout(cardImageResumeTimerRef.current);
+        cardImageResumeTimerRef.current = null;
+      }
+    },
+    []
+  );
 
   const categoriesEnabled = appSettings.utilizaCategorias;
   const realCategories = useMemo(
@@ -94,6 +179,10 @@ export const MenuScreen: React.FC = () => {
     () => currentStatusNormalized.includes('pendente'),
     [currentStatusNormalized]
   );
+  const happyHourSaleType = useMemo<'mesa' | 'comanda'>(
+    () => activeTable?.tipo || (appSettings.modoExibicao === 'comanda' ? 'comanda' : 'mesa'),
+    [activeTable?.tipo, appSettings.modoExibicao]
+  );
   const currentStatusLabel = useMemo(() => {
     if (currentStatusNormalized.includes('prefechamento') || currentStatusNormalized.includes('pre-fechamento')) {
       return 'Pré-fechamento';
@@ -119,10 +208,29 @@ export const MenuScreen: React.FC = () => {
 
   useEffect(() => {
     if (categories.length === 0 || products.length === 0) {
-      refreshMenu().catch(() => null);
+      const startedAt = Date.now();
+      logSyncDiagnostic(`menu tela carga inicial cache cats=${categories.length} produtos=${products.length}`);
+      refreshMenu({ preferCache: true })
+        .then(() => {
+          logSyncDiagnostic(`menu tela cache pronto em ${Date.now() - startedAt}ms`);
+        })
+        .catch((error) => {
+          logSyncDiagnostic(`menu tela cache falhou: ${getLogErrorMessage(error)}`, 2);
+          return refreshMenu().catch((remoteError) => {
+            logSyncDiagnostic(`menu tela remoto falhou: ${getLogErrorMessage(remoteError)}`, 2);
+          });
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, Platform.OS === 'android' ? 140 : 90);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!categoriesEnabled || !isFocused || routeSelectedCategoryId === null) {
@@ -220,11 +328,11 @@ export const MenuScreen: React.FC = () => {
     }
   }, [categoriesEnabled, currentTableKey]);
 
-  const visibleProducts = useMemo(() => products, [products]);
-
-  const productsByCategory = useMemo(() => {
+  const { productSearchIndex, productsByCategory } = useMemo(() => {
     const grouped = new Map<number, MenuItem[]>();
-    for (const item of visibleProducts) {
+    const searchIndex = new Map<number, { description: string; code: string }>();
+    for (const item of products) {
+      const productId = getMenuItemIdentity(item);
       const categoryId = Number(item.idCategoria || 0);
       const current = grouped.get(categoryId);
       if (current) {
@@ -232,9 +340,17 @@ export const MenuScreen: React.FC = () => {
       } else {
         grouped.set(categoryId, [item]);
       }
+
+      searchIndex.set(productId, {
+        description: String(item.descricao || '').toLowerCase(),
+        code: normalizeBarcodeReference(item.codReferencia)
+      });
     }
-    return grouped;
-  }, [visibleProducts]);
+    return {
+      productSearchIndex: searchIndex,
+      productsByCategory: grouped
+    };
+  }, [products]);
 
   const firstCategoryId = realCategories[0]?.id ?? null;
   const effectiveCategoryId = categoriesEnabled
@@ -255,35 +371,46 @@ export const MenuScreen: React.FC = () => {
 
   const filtered = useMemo(
     () => {
-      if (visibleProducts.length === 0) {
+      if (products.length === 0) {
         return [];
       }
 
-      const normalizedQuery = searchQuery.trim().toLowerCase();
+      const trimmedQuery = debouncedSearchQuery.trim();
+      const normalizedQuery = trimmedQuery.toLowerCase();
+      const normalizedCodeQuery = normalizeBarcodeReference(trimmedQuery);
       if (normalizedQuery) {
-        const hasExactCodeMatch = visibleProducts.some((item) => {
-          const productCode = String(item.codReferencia || '').trim().toLowerCase();
-          return productCode.length > 0 && productCode === normalizedQuery;
-        });
-
-        return visibleProducts.filter((item) => {
-          const description = String(item.descricao || '').toLowerCase();
-          const productCode = String(item.codReferencia || '').trim().toLowerCase();
-
-          if (hasExactCodeMatch) {
-            return productCode === normalizedQuery;
+        let hasExactCodeMatch = false;
+        for (const item of products) {
+          const indexed = productSearchIndex.get(getMenuItemIdentity(item));
+          if (indexed?.code && indexed.code === normalizedCodeQuery) {
+            hasExactCodeMatch = true;
+            break;
           }
+        }
 
-          return description.includes(normalizedQuery) || (productCode.length > 0 && productCode.includes(normalizedQuery));
-        });
+        const result: MenuItem[] = [];
+        for (const item of products) {
+          const indexed = productSearchIndex.get(getMenuItemIdentity(item));
+          const productCode = indexed?.code || '';
+          const description = indexed?.description || '';
+          const matched = hasExactCodeMatch
+            ? productCode === normalizedCodeQuery
+            : description.includes(normalizedQuery) ||
+              (productCode.length > 0 && productCode.includes(normalizedCodeQuery));
+
+          if (matched) {
+            result.push(item);
+          }
+        }
+        return result;
       }
 
       if (!categoriesEnabled) {
-        return visibleProducts;
+        return products;
       }
 
       if (realCategories.length === 0) {
-        return visibleProducts;
+        return products;
       }
 
       if (effectiveCategoryId === null) {
@@ -293,7 +420,7 @@ export const MenuScreen: React.FC = () => {
       const categoryItems = productsByCategory.get(effectiveCategoryId) || [];
       return categoryItems;
     },
-    [categoriesEnabled, effectiveCategoryId, productsByCategory, realCategories.length, searchQuery, visibleProducts]
+    [categoriesEnabled, debouncedSearchQuery, effectiveCategoryId, productSearchIndex, products, productsByCategory, realCategories.length]
   );
 
   const menuColumns = useMemo(() => {
@@ -316,16 +443,52 @@ export const MenuScreen: React.FC = () => {
     return Math.max(140, Math.floor((availableWidth - spacing) / menuColumns));
   }, [gridWidth, width, menuColumns]);
 
-  const openLaunchScreen = useCallback((item: MenuItem) => {
-    const showSweetAlert = (title: string, message: string, type: SweetAlertType = 'warning') => {
-      setSweetAlert({
-        visible: true,
-        title,
-        message,
-        type
-      });
-    };
+  const cardHeight = useMemo(
+    () => getMenuCardHeight(appSettings.exibirImagem, compactLayout),
+    [appSettings.exibirImagem, compactLayout]
+  );
+  const menuRowHeight = useMemo(() => cardHeight + Space.sm, [cardHeight]);
+  const getMenuItemLayout = useCallback(
+    (_data: ArrayLike<MenuItem[]> | null | undefined, index: number) => ({
+      length: menuRowHeight,
+      offset: menuRowHeight * index,
+      index
+    }),
+    [menuRowHeight]
+  );
 
+  const menuRows = useMemo(() => {
+    const rows: MenuItem[][] = [];
+    for (let index = 0; index < filtered.length; index += menuColumns) {
+      rows.push(filtered.slice(index, index + menuColumns));
+    }
+    return rows;
+  }, [filtered, menuColumns]);
+
+  const pauseCardImages = useCallback(() => {
+    if (cardImageResumeTimerRef.current) {
+      clearTimeout(cardImageResumeTimerRef.current);
+      cardImageResumeTimerRef.current = null;
+    }
+    setDeferCardImages((prev) => (prev ? prev : true));
+  }, []);
+
+  const resumeCardImages = useCallback(() => {
+    if (cardImageResumeTimerRef.current) {
+      clearTimeout(cardImageResumeTimerRef.current);
+    }
+
+    cardImageResumeTimerRef.current = setTimeout(() => {
+      cardImageResumeTimerRef.current = null;
+      setDeferCardImages((prev) => (prev ? false : prev));
+    }, Platform.OS === 'android' ? MENU_IMAGE_RESUME_DELAY_MS : 0);
+  }, []);
+
+  const findProductByBarcode = useCallback((rawCode: string) => {
+    return findProductByBarcodeInList(products, rawCode);
+  }, [products]);
+
+  const openLaunchScreen = useCallback((item: MenuItem) => {
     if (!activeTable) {
       const msg = 'Selecione uma mesa antes de lançar itens.';
       setLaunchWarning(msg);
@@ -394,24 +557,100 @@ export const MenuScreen: React.FC = () => {
     navigation,
     openTableByCard,
     realCategories,
-    setActiveTable
+    setActiveTable,
+    showSweetAlert
   ]);
 
-  const keyExtractor = useCallback((item: MenuItem) => String(item.idProduto), []);
+  const openProductByBarcode = useCallback(async (code: string) => {
+    const normalized = normalizeBarcodeReference(code);
+    if (!normalized) {
+      return;
+    }
 
-  const renderMenuItem = useCallback(
-    ({ item, index }: { item: MenuItem; index: number }) => (
-      <View
-        style={[
-          styles.menuCell,
-          { width: cardWidth },
-          index % menuColumns !== menuColumns - 1 ? styles.menuCellSpacing : null
-        ]}
-      >
-        <MemoFoodCard item={item} onOpen={() => openLaunchScreen(item)} />
-      </View>
-    ),
-    [cardWidth, menuColumns, openLaunchScreen]
+    if (!activeTable) {
+      showSweetAlert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens por código.', 'error');
+      return;
+    }
+
+    if (!canLaunchByStatus) {
+      showSweetAlert(
+        'Atenção',
+        `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${currentStatusLabel}.`,
+        'warning'
+      );
+      return;
+    }
+
+    let found = findProductByBarcode(normalized);
+    if (!found) {
+      setProductCameraLoading(true);
+      try {
+        const latestProducts = await api.listProducts(false, { requireRemote: true, forceRemote: true, compact: true });
+        found = findProductByBarcodeInList(latestProducts, normalized);
+        await refreshMenu({ preferCache: true }).catch(() => null);
+      } catch {
+        // Mantem a mensagem padrao quando a API nao confirma o produto no catalogo.
+      } finally {
+        setProductCameraLoading(false);
+      }
+    }
+
+    if (!found) {
+      showSweetAlert('Produto não encontrado', `Não existe produto cadastrado com o código de barras: ${normalized}`);
+      return;
+    }
+
+    setProductCameraOpen(false);
+    setProductManualOpen(false);
+    setProductManualText('');
+    openLaunchScreen(found);
+  }, [activeTable, canLaunchByStatus, currentStatusLabel, findProductByBarcode, openLaunchScreen, refreshMenu, showSweetAlert]);
+
+  const menuRowKeyExtractor = useCallback((row: MenuItem[], index: number) => {
+    const rowKey = row.map((item) => getMenuItemIdentity(item)).join(':');
+    return rowKey || `row-${index}`;
+  }, []);
+
+  const renderMenuRow = useCallback(
+    ({ item: row }: { item: MenuItem[]; index: number }) => {
+      return (
+        <View style={[styles.menuRow, { height: cardHeight }]}>
+          {row.map((item, columnIndex) => (
+            <View
+              key={`${getMenuItemIdentity(item)}-${columnIndex}`}
+              style={[
+                styles.menuCell,
+                { width: cardWidth, height: cardHeight },
+                columnIndex < menuColumns - 1 ? styles.menuCellSpacing : null
+              ]}
+            >
+              <MemoFoodCard
+                item={item}
+                onOpenItem={openLaunchScreen}
+                compactLayout={compactLayout}
+                showImageSlot={appSettings.exibirImagem}
+                deferImageLoad={deferCardImages}
+                happyHourSaleType={happyHourSaleType}
+                baseUrl={appSettings.baseUrl}
+                empresaId={appSettings.empresaId}
+              />
+            </View>
+          ))}
+        </View>
+      );
+    },
+    [
+      appSettings.baseUrl,
+      appSettings.empresaId,
+      appSettings.exibirImagem,
+      cardHeight,
+      cardWidth,
+      compactLayout,
+      deferCardImages,
+      happyHourSaleType,
+      menuColumns,
+      openLaunchScreen
+    ]
   );
 
   const goToInitial = async () => {
@@ -476,6 +715,81 @@ export const MenuScreen: React.FC = () => {
     navigation.navigate('ItensPendentes', params as never);
   };
 
+  const onProductScanner = useCallback(async (result: BarcodeScanningResult) => {
+    if (productCameraBusyRef.current) {
+      return;
+    }
+
+    const value = result?.data?.trim();
+    if (!value) {
+      return;
+    }
+
+    productCameraBusyRef.current = true;
+    setProductCameraLoading(true);
+    try {
+      await openProductByBarcode(value);
+    } finally {
+      productCameraBusyRef.current = false;
+      setProductCameraLoading(false);
+    }
+  }, [openProductByBarcode]);
+
+  const onCameraProduct = useCallback(async () => {
+    if (!activeTable) {
+      showSweetAlert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens por código.', 'error');
+      return;
+    }
+
+    if (!canLaunchByStatus) {
+      showSweetAlert(
+        'Atenção',
+        `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${currentStatusLabel}.`,
+        'warning'
+      );
+      return;
+    }
+
+    const loadedCameraView = CameraViewComponent || getCameraViewComponent();
+    if (!loadedCameraView || Platform.OS === 'web') {
+      setProductManualText('');
+      setProductManualOpen(true);
+      return;
+    }
+
+    if (!CameraViewComponent) {
+      setCameraViewComponent(() => loadedCameraView);
+    }
+
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Permitir acesso à câmera',
+            message: 'Necessário para ler o código de barras do produto.',
+            buttonPositive: 'Permitir',
+            buttonNegative: 'Cancelar'
+          }
+        );
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setProductManualText('');
+          setProductManualOpen(true);
+          return;
+        }
+      }
+    } catch {
+      setProductManualText('');
+      setProductManualOpen(true);
+      return;
+    }
+
+    productCameraBusyRef.current = false;
+    setProductCameraLoading(false);
+    setProductCameraOpen(true);
+  }, [activeTable, canLaunchByStatus, CameraViewComponent, currentStatusLabel, showSweetAlert]);
+
   const mesaLabel = activeTable
     ? `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`
     : 'Mesa --';
@@ -504,22 +818,43 @@ export const MenuScreen: React.FC = () => {
         text: '#C88738'
       };
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compactLayout ? styles.containerCompact : null]}>
       <ScreenRouteLabel />
       <View pointerEvents="none" style={styles.heroGlowPrimary} />
       <View pointerEvents="none" style={styles.heroGlowSecondary} />
 
-      <View style={styles.heroCard}>
-        <View style={styles.heroTopRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={goToInitial} activeOpacity={0.9}>
+      <View style={[styles.heroCard, compactLayout ? styles.heroCardCompact : null]}>
+        <View style={[styles.heroTopRow, compactLayout ? styles.heroTopRowCompact : null]}>
+          <TouchableOpacity
+            style={[styles.backBtn, compactLayout ? styles.heroButtonCompact : null]}
+            onPress={goToInitial}
+            activeOpacity={0.9}
+          >
             <Text style={styles.backBtnText}>Voltar</Text>
           </TouchableOpacity>
-          <View style={styles.heroTopActions}>
-            <TouchableOpacity style={styles.viewBtn} onPress={openPendingItems} activeOpacity={0.9}>
+          <View style={[styles.heroTopActions, compactLayout ? styles.heroTopActionsCompact : null]}>
+            <TouchableOpacity
+              style={[styles.viewBtn, compactLayout ? styles.heroButtonCompact : null]}
+              onPress={openPendingItems}
+              activeOpacity={0.9}
+            >
               <Text style={styles.viewBtnText}>Itens</Text>
               <Text style={styles.viewBtnCount}>{cart.length}</Text>
             </TouchableOpacity>
-            <View style={[styles.heroStatusBadge, { borderColor: statusPalette.border, backgroundColor: statusPalette.soft }]}>
+            <TouchableOpacity
+              style={[styles.barcodeBtn, compactLayout ? styles.heroButtonCompact : null]}
+              onPress={() => void onCameraProduct()}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.barcodeBtnText}>Cod Barra</Text>
+            </TouchableOpacity>
+            <View
+              style={[
+                styles.heroStatusBadge,
+                compactLayout ? styles.heroButtonCompact : null,
+                { borderColor: statusPalette.border, backgroundColor: statusPalette.soft }
+              ]}
+            >
               <Text style={[styles.heroStatusValue, { color: statusPalette.text }]}>{currentStatusLabel}</Text>
             </View>
           </View>
@@ -529,7 +864,7 @@ export const MenuScreen: React.FC = () => {
           <Text style={styles.heroTitle}>{mesaLabel}</Text>
         </View>
 
-        <View style={styles.searchWrap}>
+        <View style={[styles.searchWrap, compactLayout ? styles.searchWrapCompact : null]}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput
             value={searchQuery}
@@ -546,21 +881,105 @@ export const MenuScreen: React.FC = () => {
         </View>
 
       </View>
+
+      <Modal visible={productCameraOpen} transparent animationType="fade" onRequestClose={() => setProductCameraOpen(false)}>
+        <View style={styles.readerOverlay}>
+          <View style={styles.readerPanel}>
+            <Text style={styles.readerTitle}>Leitor de produto</Text>
+            <Text style={styles.readerDesc}>Aponte para o código de barras do produto.</Text>
+            <View style={styles.cameraFrame}>
+              {CameraViewComponent ? (
+                <CameraViewComponent
+                  style={styles.cameraView}
+                  onBarcodeScanned={productCameraLoading ? undefined : onProductScanner}
+                />
+              ) : (
+                <View style={styles.cameraDisabledWrap}>
+                  <Text style={styles.cameraDisabledText}>Leitor por câmera indisponível.</Text>
+                  <Text style={styles.cameraDisabledText}>Use o botão Digitar código.</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.readerActions}>
+              <TouchableOpacity
+                style={styles.readerButton}
+                onPress={() => setProductCameraOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.readerButtonText}>Fechar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.readerButton, styles.readerButtonPrimary]}
+                onPress={() => {
+                  setProductCameraOpen(false);
+                  setProductManualText('');
+                  setProductManualOpen(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.readerButtonTextPrimary}>Digitar código</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={productManualOpen} transparent animationType="slide" onRequestClose={() => setProductManualOpen(false)}>
+        <View style={styles.readerOverlay}>
+          <View style={styles.readerPanel}>
+            <Text style={styles.readerTitle}>Código do produto</Text>
+            <Text style={styles.readerDesc}>Digite o código do produto para lançar.</Text>
+            <TextInput
+              style={styles.readerInput}
+              value={productManualText}
+              onChangeText={setProductManualText}
+              placeholder="Ex: 123 ou REF001"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={() => void openProductByBarcode(productManualText)}
+            />
+            <View style={styles.readerActions}>
+              <TouchableOpacity
+                style={styles.readerButton}
+                onPress={() => setProductManualOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.readerButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.readerButton, styles.readerButtonPrimary]}
+                onPress={() => void openProductByBarcode(productManualText)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.readerButtonTextPrimary}>Lançar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <FlatList
         onLayout={(event) => {
           const nextWidth = Math.floor(event.nativeEvent.layout.width);
           setGridWidth((prev) => (prev === nextWidth ? prev : nextWidth));
         }}
-        data={filtered}
-        keyExtractor={keyExtractor}
-        numColumns={menuColumns}
+        data={menuRows}
+        keyExtractor={menuRowKeyExtractor}
         key={`menu-grid-${menuColumns}`}
-        columnWrapperStyle={menuColumns > 1 ? styles.menuColumnWrapper : undefined}
-        initialNumToRender={6}
-        maxToRenderPerBatch={Math.max(menuColumns * 2, 8)}
-        updateCellsBatchingPeriod={45}
-        windowSize={5}
+        getItemLayout={getMenuItemLayout}
+        initialNumToRender={Platform.OS === 'android' ? 3 : 4}
+        maxToRenderPerBatch={Platform.OS === 'android' ? 3 : 6}
+        updateCellsBatchingPeriod={Platform.OS === 'android' ? 70 : 45}
+        windowSize={Platform.OS === 'android' ? 3 : 5}
         removeClippedSubviews={true}
+        onScrollBeginDrag={pauseCardImages}
+        onMomentumScrollBegin={pauseCardImages}
+        onScrollEndDrag={resumeCardImages}
+        onMomentumScrollEnd={resumeCardImages}
+        scrollEventThrottle={32}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.listIntro}>
             {!canLaunchByStatus ? (
@@ -575,13 +994,19 @@ export const MenuScreen: React.FC = () => {
                 <Text style={styles.warningText}>{launchWarning}</Text>
               </View>
             ) : null}
-            <View style={styles.categoryPanel}>
-              <View style={styles.categoryPanelHeader}>
+            <View style={[styles.categoryPanel, compactLayout ? styles.categoryPanelCompact : null]}>
+              <View style={[styles.categoryPanelHeader, compactLayout ? styles.categoryPanelHeaderCompact : null]}>
                 <View>
-                  <Text style={styles.categoryPanelEyebrow}>NAVEGAÇÃO</Text>
-                  <Text style={styles.categoryPanelTitle}>{activeCategoryLabel}</Text>
+                  <Text style={[styles.categoryPanelEyebrow, compactLayout ? styles.categoryPanelEyebrowCompact : null]}>
+                    NAVEGAÇÃO
+                  </Text>
+                  <Text style={[styles.categoryPanelTitle, compactLayout ? styles.categoryPanelTitleCompact : null]}>
+                    {activeCategoryLabel}
+                  </Text>
                 </View>
-                <Text style={styles.categoryPanelMeta}>{filtered.length} itens</Text>
+                <Text style={[styles.categoryPanelMeta, compactLayout ? styles.categoryPanelMetaCompact : null]}>
+                  {filtered.length} itens
+                </Text>
               </View>
               {categoriesEnabled && realCategories.length > 0 ? (
                 <CategorySlider
@@ -597,7 +1022,7 @@ export const MenuScreen: React.FC = () => {
         }
         ListHeaderComponentStyle={styles.categoryListHeader}
         contentContainerStyle={styles.listContent}
-        renderItem={renderMenuItem}
+        renderItem={renderMenuRow}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Nada encontrado por aqui</Text>
@@ -693,6 +1118,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     padding: Space.md
   },
+  containerCompact: {
+    paddingHorizontal: 8,
+    paddingTop: 8
+  },
   heroGlowPrimary: {
     position: 'absolute',
     top: -60,
@@ -721,16 +1150,32 @@ const styles = StyleSheet.create({
     gap: 10,
     ...Shadows.card
   },
+  heroCardCompact: {
+    borderRadius: 22,
+    padding: 10,
+    marginBottom: 10,
+    gap: 8
+  },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.sm
   },
+  heroTopRowCompact: {
+    alignItems: 'flex-start',
+    gap: 6
+  },
   heroTopActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
+  },
+  heroTopActionsCompact: {
+    flex: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 6
   },
   backBtn: {
     borderRadius: 18,
@@ -757,6 +1202,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     ...Shadows.soft
+  },
+  barcodeBtn: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(27, 79, 114, 0.18)',
+    backgroundColor: '#F3F8FC',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    ...Shadows.soft
+  },
+  heroButtonCompact: {
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 7
+  },
+  barcodeBtnText: {
+    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: 12
   },
   viewBtnText: {
     color: Colors.accent,
@@ -799,6 +1263,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     ...Shadows.soft
+  },
+  searchWrapCompact: {
+    borderRadius: 14,
+    paddingHorizontal: 10
   },
   searchIcon: {
     color: Colors.textMuted,
@@ -848,12 +1316,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.md,
     ...Shadows.card
   },
+  categoryPanelCompact: {
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 10
+  },
   categoryPanelHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: Space.sm,
     marginBottom: Space.sm
+  },
+  categoryPanelHeaderCompact: {
+    marginBottom: 8
   },
   categoryPanelEyebrow: {
     color: Colors.accent,
@@ -862,16 +1338,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 4
   },
+  categoryPanelEyebrowCompact: {
+    fontSize: 10,
+    marginBottom: 2
+  },
   categoryPanelTitle: {
     color: Colors.text,
     fontSize: 18,
     fontWeight: '900'
+  },
+  categoryPanelTitleCompact: {
+    fontSize: 16
   },
   categoryPanelMeta: {
     color: Colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     paddingTop: 18
+  },
+  categoryPanelMetaCompact: {
+    paddingTop: 14,
+    fontSize: 11
   },
   categoryPanelEmpty: {
     color: Colors.textMuted,
@@ -892,6 +1379,94 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
     lineHeight: 17
+  },
+  readerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 20, 30, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Space.md
+  },
+  readerPanel: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Space.md,
+    gap: Space.md,
+    ...Shadows.card
+  },
+  readerTitle: {
+    color: Colors.text,
+    fontWeight: '900',
+    fontSize: 17
+  },
+  readerDesc: {
+    color: Colors.textMuted,
+    fontSize: 13
+  },
+  readerInput: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    color: Colors.text,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  readerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10
+  },
+  readerButton: {
+    flex: 1,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  readerButtonText: {
+    color: Colors.text,
+    fontWeight: '700'
+  },
+  readerButtonPrimary: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    ...Shadows.button
+  },
+  readerButtonTextPrimary: {
+    color: '#ffffff',
+    fontWeight: '800'
+  },
+  cameraFrame: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#000'
+  },
+  cameraView: {
+    width: '100%',
+    height: '100%'
+  },
+  cameraDisabledWrap: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Space.md,
+    gap: 6
+  },
+  cameraDisabledText: {
+    color: Colors.text,
+    textAlign: 'center'
   },
   empty: {
     padding: 24,
@@ -914,12 +1489,16 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 120
   },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginBottom: Space.sm
+  },
   menuColumnWrapper: {
     justifyContent: 'flex-start',
     alignItems: 'stretch'
   },
   menuCell: {
-    marginBottom: Space.sm,
     alignSelf: 'stretch'
   },
   menuCellSpacing: {

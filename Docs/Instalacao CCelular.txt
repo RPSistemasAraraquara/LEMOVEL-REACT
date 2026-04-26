@@ -1,0 +1,11 @@
+subst R: "C:\Users\Rafael\Desktop\Developer\Fast FOOD\LEMOVEL-REACT"
+R:
+cd \APPReact\android
+$env:NODE_ENV="production"
+.\gradlew.bat installRelease
+
+
+R:
+cd \APPReact\android
+$env:NODE_ENV="production"
+.\gradlew.bat installRelease

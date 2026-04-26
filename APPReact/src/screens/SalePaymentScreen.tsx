@@ -1,13 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { api, normalizeSaleStatus, PaymentMethod, SalePayment } from '../services/api';
+import { api, logSyncDiagnostic, normalizeSaleStatus, PaymentMethod, SalePayment } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
-import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
 import { Colors, Radius, Shadows, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { useApp } from '../context/AppContext';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
+import {
+  abortActivePayment,
+  describeMachinePaymentError,
+  executePayment,
+  formatPaymentProviderLabel,
+  preparePaymentProvider,
+  resolveConfiguredPaymentProvider,
+  resolvePaymentProviderForMethod
+} from '../services/payment';
 
 type Route = RouteProp<RootStackParams, 'Pagamento'>;
 
@@ -15,17 +23,25 @@ type PaymentDraft = {
   codigo: number;
   valor: string;
   processed?: boolean;
+  registered?: boolean;
   sfiCodigo?: number;
   provider?: string;
   nsu?: string;
+};
+
+type StatusNotice = {
+  visible: boolean;
+  title: string;
+  message: string;
+  tone: 'warning' | 'success' | 'error' | 'info';
 };
 
 const normalize = (value: string) => Number(value.replace(',', '.'));
 
 export const SalePaymentScreen: React.FC = () => {
   const route = useRoute<Route>();
-  const navigation = useNavigation();
-  const { activeTable, user, refreshDashboard } = useApp();
+  const navigation = useNavigation<any>();
+  const { activeTable, user, refreshDashboard, appSettings } = useApp();
   const idVenda = route.params?.idVenda || activeTable?.idVenda;
 
   const [loading, setLoading] = useState(false);
@@ -35,33 +51,49 @@ export const SalePaymentScreen: React.FC = () => {
   const [saleTotal, setSaleTotal] = useState(0);
   const [saleStatus, setSaleStatus] = useState('');
   const [drafts, setDrafts] = useState<PaymentDraft[]>([{ codigo: 0, valor: '0' }]);
-  const [sweetAlert, setSweetAlert] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: SweetAlertType;
-  }>({
+  const [paymentProcessingVisible, setPaymentProcessingVisible] = useState(false);
+  const [paymentProcessingLineIndex, setPaymentProcessingLineIndex] = useState<number | null>(null);
+  const [paymentProcessingLabel, setPaymentProcessingLabel] = useState('');
+  const [paymentProcessingMessage, setPaymentProcessingMessage] = useState('');
+  const [statusNotice, setStatusNotice] = useState<StatusNotice>({
     visible: false,
     title: '',
     message: '',
-    type: 'warning'
+    tone: 'warning'
   });
 
-  const showSweetAlert = (title: string, message: string, type: SweetAlertType = 'warning') => {
-    setSweetAlert({
-      visible: true,
-      title,
-      message,
-      type
-    });
+  const activePaymentTokenRef = useRef<string | null>(null);
+  const paymentSelectionBusyRef = useRef(false);
+
+  const isMachinePaymentRunning = paymentProcessingVisible || Boolean(activePaymentTokenRef.current);
+
+  const showStatusNotice = (
+    title: string,
+    message: string,
+    tone: StatusNotice['tone'] = 'warning'
+  ) => {
+    setStatusNotice({ visible: true, title, message, tone });
   };
 
   const resetDrafts = (availableMethods: PaymentMethod[]) => {
-    setDrafts([{ codigo: availableMethods[0]?.codigo || 0, valor: '0' }]);
+    setDrafts([{ codigo: availableMethods[0]?.codigo || 0, valor: '0', processed: false, registered: false }]);
+  };
+
+  const removeDraftAndEnsureBlankLine = (lineIndex: number, availableMethods: PaymentMethod[] = methods) => {
+    setDrafts((prev) => {
+      const next = prev.filter((_, idx) => idx !== lineIndex);
+      if (next.length > 0) {
+        return next;
+      }
+
+      return [{ codigo: availableMethods[0]?.codigo || 0, valor: '0', processed: false, registered: false }];
+    });
   };
 
   const load = async () => {
     if (!idVenda) return;
+    const startedAt = Date.now();
+    logSyncDiagnostic(`fluxo pagamento parcial carregar inicio idVenda=${idVenda}`);
     setLoading(true);
     try {
       const [pm, ps, sale] = await Promise.all([
@@ -75,9 +107,13 @@ export const SalePaymentScreen: React.FC = () => {
       setSaleStatus(normalizeSaleStatus(sale?.situacao || ''));
       setDrafts((prev) => {
         if (prev.length > 0) return prev;
-        return [{ codigo: pm[0]?.codigo || 0, valor: '0' }];
+        return [{ codigo: pm[0]?.codigo || 0, valor: '0', processed: false, registered: false }];
       });
+      logSyncDiagnostic(
+        `fluxo pagamento parcial carregar fim idVenda=${idVenda} formas=${pm.length} pagamentos=${ps.length} total=${Number(sale?.valorTotal || sale?.valor || 0).toFixed(2)} em ${Date.now() - startedAt}ms`
+      );
     } catch (error: any) {
+      logSyncDiagnostic(`fluxo pagamento parcial carregar erro idVenda=${idVenda}: ${error?.message || 'erro desconhecido'}`, 2);
       Alert.alert('Erro', error?.message || 'Não foi possível carregar pagamentos.');
     } finally {
       setLoading(false);
@@ -93,10 +129,16 @@ export const SalePaymentScreen: React.FC = () => {
     setDrafts((prev) =>
       prev.map((item) => ({
         ...item,
-        codigo: item.codigo || methods[0]?.codigo || 0
+        codigo: item.codigo || methods[0]?.codigo || 0,
+        registered: item.registered ?? false
       }))
     );
   }, [methods]);
+
+  useEffect(() => {
+    if (resolveConfiguredPaymentProvider(appSettings) !== 'pagbank') return;
+    preparePaymentProvider(appSettings).catch(() => false);
+  }, [appSettings]);
 
   const totalPago = useMemo(() => pagamentos.reduce((acc, item) => acc + (item.valor || 0), 0), [pagamentos]);
   const totalDigitado = useMemo(
@@ -109,6 +151,41 @@ export const SalePaymentScreen: React.FC = () => {
   );
   const valorPendente = Math.max(0, saleTotal - totalPago);
 
+  const clearPaymentProcessingUi = () => {
+    setPaymentProcessingVisible(false);
+    setPaymentProcessingLineIndex(null);
+    setPaymentProcessingLabel('');
+    setPaymentProcessingMessage('');
+  };
+
+  const releaseMachinePaymentFlow = (paymentToken?: string | null) => {
+    if (!paymentToken || activePaymentTokenRef.current === paymentToken) {
+      activePaymentTokenRef.current = null;
+    }
+    paymentSelectionBusyRef.current = false;
+    clearPaymentProcessingUi();
+  };
+
+  const discardDraft = (lineIndex: number) => {
+    setDrafts((prev) => {
+      if (!prev[lineIndex]) return prev;
+      return prev.filter((_, idx) => idx !== lineIndex);
+    });
+  };
+
+  const cancelCurrentMachinePayment = async (lineIndex?: number, message?: string) => {
+    activePaymentTokenRef.current = null;
+    paymentSelectionBusyRef.current = false;
+    clearPaymentProcessingUi();
+    if (typeof lineIndex === 'number') {
+      discardDraft(lineIndex);
+    }
+    await abortActivePayment(appSettings).catch(() => false);
+    if (message) {
+      Alert.alert('Atenção', message);
+    }
+  };
+
   const setDraftValue = (index: number, value: string) => {
     setDrafts((prev) => {
       const next = [...prev];
@@ -116,6 +193,7 @@ export const SalePaymentScreen: React.FC = () => {
         ...next[index],
         valor: value,
         processed: false,
+        registered: false,
         provider: undefined,
         sfiCodigo: undefined,
         nsu: undefined
@@ -131,6 +209,7 @@ export const SalePaymentScreen: React.FC = () => {
         ...next[index],
         codigo: methodId,
         processed: false,
+        registered: false,
         provider: undefined,
         sfiCodigo: undefined,
         nsu: undefined
@@ -140,16 +219,188 @@ export const SalePaymentScreen: React.FC = () => {
   };
 
   const addDraft = () => {
+    if (isMachinePaymentRunning || saving) return;
     const firstMethod = methods[0];
-    setDrafts((prev) => [...prev, { codigo: firstMethod?.codigo || 0, valor: '0', processed: false }]);
+    setDrafts((prev) => [
+      ...prev,
+      { codigo: firstMethod?.codigo || 0, valor: '0', processed: false, registered: false }
+    ]);
   };
 
   const removeDraft = (index: number) => {
-    setDrafts((prev) => prev.filter((_, idx) => idx !== index));
+    setDrafts((prev) => {
+      if (!prev[index] || prev[index].processed) return prev;
+      return prev.filter((_, idx) => idx !== index);
+    });
   };
 
-  const onSelectDraftMethod = (index: number, methodId: number) => {
+  const onSelectDraftMethod = async (index: number, methodId: number) => {
+    Keyboard.dismiss();
+    if (paymentSelectionBusyRef.current || isMachinePaymentRunning) return;
+
     setDraftMethod(index, methodId);
+
+    const selectedMethod = methods.find((m) => m.codigo === methodId);
+    if (!selectedMethod) return;
+
+    const paymentProvider = resolvePaymentProviderForMethod(appSettings, selectedMethod);
+    if (paymentProvider === 'manual') return;
+
+    paymentSelectionBusyRef.current = true;
+    const providerLabel = formatPaymentProviderLabel(paymentProvider);
+
+    if (!idVenda) {
+      paymentSelectionBusyRef.current = false;
+      Alert.alert('Atenção', `Venda não identificada para processar pagamento na ${providerLabel}.`);
+      return;
+    }
+
+    const draft = drafts[index];
+    const valorSelecionado = normalize(draft?.valor || '0');
+
+    if (!Number.isFinite(valorSelecionado) || valorSelecionado <= 0) {
+      paymentSelectionBusyRef.current = false;
+      Alert.alert('Atenção', `Informe o valor antes de processar na ${providerLabel}.`);
+      return;
+    }
+
+    const paymentToken = `${paymentProvider}-${index}-${Date.now()}`;
+    activePaymentTokenRef.current = paymentToken;
+    setPaymentProcessingLineIndex(index);
+    setPaymentProcessingLabel(`${providerLabel} · ${selectedMethod.descricao}`);
+    setPaymentProcessingMessage(`Processando pagamento com ${providerLabel}. Aguarde na maquininha.`);
+    setPaymentProcessingVisible(true);
+    let slowPaymentTimer: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      logSyncDiagnostic(
+        `fluxo pagamento parcial terminal inicio idVenda=${idVenda} linha=${index} forma=${selectedMethod.codigo} valor=${valorSelecionado.toFixed(2)} provider=${paymentProvider}`
+      );
+      const paymentStartedAt = Date.now();
+      slowPaymentTimer = setTimeout(() => {
+        if (activePaymentTokenRef.current !== paymentToken) {
+          return;
+        }
+        const message = `Aguardando retorno da ${providerLabel}. Não feche o app nem tente registrar de novo.`;
+        setPaymentProcessingMessage(message);
+        logSyncDiagnostic(
+          `fluxo pagamento parcial terminal aguardando idVenda=${idVenda} linha=${index} provider=${paymentProvider} em ${Date.now() - paymentStartedAt}ms`
+        );
+      }, 15000);
+      const result = await executePayment({
+        value: valorSelecionado,
+        method: selectedMethod,
+        availableMethods: methods,
+        settings: appSettings,
+        idVenda,
+        onProgress: (msg) => setPaymentProcessingMessage(msg)
+      });
+      logSyncDiagnostic(
+        `fluxo pagamento parcial terminal ok idVenda=${idVenda} linha=${index} forma=${result.method.codigo} provider=${result.provider} em ${Date.now() - paymentStartedAt}ms`
+      );
+
+      if (activePaymentTokenRef.current !== paymentToken) return;
+
+      releaseMachinePaymentFlow(paymentToken);
+
+      const approvedLine: PaymentDraft = {
+        codigo: result.method.codigo,
+        valor: valorSelecionado.toFixed(2),
+        processed: true,
+        registered: false,
+        provider: result.provider,
+        sfiCodigo: result.sfiCodigo ?? result.method.sfiCodigo,
+        nsu: result.nsu
+      };
+
+      setDrafts((prev) => {
+        if (!prev[index]) return prev;
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          ...approvedLine
+        };
+        return next;
+      });
+
+      setSaving(true);
+      let registeredSuccessfully = false;
+      try {
+        const registerStartedAt = Date.now();
+        logSyncDiagnostic(
+          `fluxo pagamento parcial registrar terminal inicio idVenda=${idVenda} forma=${result.method.codigo} valor=${valorSelecionado.toFixed(2)}`
+        );
+        await api.registerPartialPayment({
+          idVenda,
+          idFormaPagamento: result.method.codigo,
+          valor: valorSelecionado,
+          idUsuario: user?.idUsuario
+        });
+        registeredSuccessfully = true;
+        logSyncDiagnostic(
+          `fluxo pagamento parcial registrar terminal ok idVenda=${idVenda} forma=${result.method.codigo} em ${Date.now() - registerStartedAt}ms`
+        );
+
+        await Promise.all([
+          load(),
+          refreshDashboard(undefined, { force: true })
+        ]);
+        removeDraftAndEnsureBlankLine(index);
+        showStatusNotice('Aprovado', result.message || `Pagamento aprovado via ${providerLabel}.`, 'success');
+      } catch (registerError: any) {
+        logSyncDiagnostic(
+          `fluxo pagamento parcial registrar terminal erro idVenda=${idVenda}: ${registerError?.message || 'erro desconhecido'}`,
+          2
+        );
+        if (registeredSuccessfully) {
+          removeDraftAndEnsureBlankLine(index);
+          await load().catch(() => null);
+          await refreshDashboard(undefined, { force: true }).catch(() => null);
+          showStatusNotice(
+            'Pagamento aprovado',
+            'O pagamento foi aprovado e registrado, mas a atualização visual da tela falhou. Confira os totais antes de continuar.',
+            'warning'
+          );
+          return;
+        }
+
+        setDrafts((prev) => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            ...approvedLine,
+            registered: false
+          };
+          return next;
+        });
+        showStatusNotice(
+          'Pagamento aprovado',
+          registerError?.message ||
+            `O pagamento foi aprovado na ${providerLabel}, mas não foi possível atualizar a venda. Toque em "Pagamento Parcial" para tentar registrar novamente.`,
+          'warning'
+        );
+      } finally {
+        setSaving(false);
+      }
+    } catch (error: any) {
+      if (activePaymentTokenRef.current !== paymentToken) return;
+      const details = describeMachinePaymentError(providerLabel, error);
+      logSyncDiagnostic(
+        `fluxo pagamento parcial terminal erro idVenda=${idVenda} linha=${index} provider=${paymentProvider} ${details.diagnostic}`,
+        2
+      );
+      releaseMachinePaymentFlow(paymentToken);
+      discardDraft(index);
+      Alert.alert('Erro', details.message);
+    } finally {
+      if (slowPaymentTimer) {
+        clearTimeout(slowPaymentTimer);
+      }
+      if (activePaymentTokenRef.current === paymentToken || paymentSelectionBusyRef.current) {
+        releaseMachinePaymentFlow(paymentToken);
+      }
+    }
   };
 
   const register = async () => {
@@ -157,7 +408,7 @@ export const SalePaymentScreen: React.FC = () => {
     if (saving || loading) return;
 
     if (!user?.permitePagamentoParcial) {
-      showSweetAlert('Atenção', 'Sem permissão para pagamento parcial.', 'warning');
+      showStatusNotice('Atenção', 'Sem permissão para pagamento parcial.', 'warning');
       return;
     }
     if (!saleStatus.toLowerCase().includes('pendente')) {
@@ -175,13 +426,30 @@ export const SalePaymentScreen: React.FC = () => {
       return;
     }
 
+    const pendingTerminal = drafts.find((item) => {
+      if (!item.processed && Number(item.codigo || 0) > 0) {
+        const method = methods.find((m) => m.codigo === item.codigo);
+        if (method) {
+          return resolvePaymentProviderForMethod(appSettings, method) !== 'manual';
+        }
+      }
+      return false;
+    });
+    if (pendingTerminal) {
+      const method = methods.find((m) => m.codigo === pendingTerminal.codigo);
+      const providerLabel = method ? formatPaymentProviderLabel(resolvePaymentProviderForMethod(appSettings, method)) : 'terminal';
+      Alert.alert('Atenção', `Há um pagamento via ${providerLabel} que ainda não foi processado na maquininha. Selecione a forma de pagamento para processar antes de finalizar.`);
+      return;
+    }
+
     const lines = drafts
       .map((item, index) => ({
         index,
         codigo: Number(item.codigo || 0),
-        valor: normalize(item.valor)
+        valor: normalize(item.valor),
+        registered: Boolean(item.registered)
       }))
-      .filter((item) => item.codigo > 0 && item.valor > 0);
+      .filter((item) => item.codigo > 0 && item.valor > 0 && !item.registered);
 
     if (lines.length === 0) {
       Alert.alert('Atenção', 'Informe ao menos um pagamento com valor maior que zero.');
@@ -194,33 +462,50 @@ export const SalePaymentScreen: React.FC = () => {
     }
 
     setSaving(true);
+    const startedAt = Date.now();
+    logSyncDiagnostic(
+      `fluxo pagamento parcial registrar inicio idVenda=${idVenda} linhas=${lines.length} total=${lines.reduce((acc, item) => acc + item.valor, 0).toFixed(2)}`
+    );
     try {
+      let registeredSomePayment = false;
       for (const line of lines) {
         const method = methods.find((item) => item.codigo === line.codigo);
         if (!method) {
           throw new Error('Forma de pagamento não encontrada.');
         }
 
+        logSyncDiagnostic(
+          `fluxo pagamento parcial registrar linha idVenda=${idVenda} forma=${method.codigo} valor=${line.valor.toFixed(2)}`
+        );
         await api.registerPartialPayment({
           idVenda,
           idFormaPagamento: method.codigo,
           valor: line.valor,
           idUsuario: user?.idUsuario
         });
+        registeredSomePayment = true;
       }
 
-      await Promise.all([
-        load(),
-        refreshDashboard(undefined, { force: true })
-      ]);
+      try {
+        await Promise.all([
+          load(),
+          refreshDashboard(undefined, { force: true })
+        ]);
+      } catch (refreshError: any) {
+        resetDrafts(methods);
+        showStatusNotice(
+          'Concluído',
+          refreshError?.message || 'Pagamento registrado, mas a tela não atualizou por completo. Confira a venda novamente.',
+          registeredSomePayment ? 'warning' : 'success'
+        );
+        return;
+      }
+
       resetDrafts(methods);
-      Alert.alert('Concluído', 'Pagamento parcial registrado com sucesso.', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack()
-        }
-      ]);
+      logSyncDiagnostic(`fluxo pagamento parcial registrar fim ok idVenda=${idVenda} em ${Date.now() - startedAt}ms`);
+      showStatusNotice('Concluído', 'Pagamento parcial registrado com sucesso.', 'success');
     } catch (error: any) {
+      logSyncDiagnostic(`fluxo pagamento parcial registrar erro idVenda=${idVenda}: ${error?.message || 'erro desconhecido'}`, 2);
       Alert.alert('Erro', error?.message || 'Não foi possível registrar pagamento.');
     } finally {
       setSaving(false);
@@ -228,121 +513,218 @@ export const SalePaymentScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-      <ScreenRouteLabel />
-      {!idVenda ? (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Fluxo inválido</Text>
-          <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas antes de registrar pagamento.</Text>
-          <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Tabs', { screen: 'Mesas' })}>
-            <Text style={styles.primaryText}>Ir para Mesas</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          <SectionHeader title={`Pagamento parcial #${idVenda}`} subtitle="Adicione pagamentos e registre na venda." />
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Total da venda</Text>
-            <Text style={styles.value}>R$ {saleTotal.toFixed(2)}</Text>
-            <Text style={styles.label}>Total já recebido</Text>
-            <Text style={styles.value}>R$ {totalPago.toFixed(2)}</Text>
-            <Text style={styles.label}>Pendente</Text>
-            <Text style={[styles.value, styles.pending]}>R$ {valorPendente.toFixed(2)}</Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScreenRouteLabel />
+        {statusNotice.visible ? (
+          <View
+            style={[
+              styles.noticeCard,
+              statusNotice.tone === 'success' ? styles.noticeSuccess : null,
+              statusNotice.tone === 'error' ? styles.noticeError : null,
+              statusNotice.tone === 'warning' ? styles.noticeWarning : null
+            ]}
+          >
+            <View style={styles.noticeHeaderRow}>
+              <Text style={styles.noticeTitle}>{statusNotice.title}</Text>
+              <Pressable onPress={() => setStatusNotice((prev) => ({ ...prev, visible: false }))}>
+                <Text style={styles.noticeDismiss}>Fechar</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.noticeMessage}>{statusNotice.message}</Text>
           </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Adicionar pagamentos</Text>
-            {drafts.map((line, index) => {
-              const selectedMethod = methods.find((method) => method.codigo === line.codigo) || methods[0];
-              return (
-                <View key={`draft-${index}`} style={styles.paymentLine}>
-                  <Text style={styles.payLabel}>Método</Text>
-                  <Text style={styles.selectedMethod}>{selectedMethod?.descricao || 'Selecionar'}</Text>
-                  <View style={styles.methods}>
-                    {methods.map((method) => (
-                      <Pressable
-                        key={`${method.codigo}-${index}`}
-                        style={[styles.methodButton, line.codigo === method.codigo ? styles.methodSelected : null]}
-                        onPress={() => onSelectDraftMethod(index, method.codigo)}
-                      >
-                        <Text style={[styles.methodText, line.codigo === method.codigo ? styles.methodSelectedText : null]}>
-                          {method.descricao}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Text style={styles.payLabel}>Valor (R$)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={line.valor}
-                    onChangeText={(value) => setDraftValue(index, value)}
-                    placeholder="0,00"
-                  />
-                  {drafts.length > 1 ? (
-                    <Pressable style={styles.removeBtn} onPress={() => removeDraft(index)}>
-                      <Text style={styles.removeText}>Remover</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
-
-            <Pressable style={styles.addBtn} onPress={addDraft}>
-              <Text style={styles.addText}>Adicionar pagamento</Text>
-            </Pressable>
-
-            <Text style={styles.label}>Total digitado</Text>
-            <Text style={styles.value}>R$ {totalDigitado.toFixed(2)}</Text>
-
-            <Pressable style={styles.primaryBtn} onPress={register} disabled={saving || loading}>
-              <Text style={styles.primaryText}>{saving ? 'Salvando...' : 'Pagamento Parcial'}</Text>
+        ) : null}
+        {!idVenda ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Fluxo inválido</Text>
+            <Text style={styles.infoText}>Selecione uma mesa e abra a venda em Mesas antes de registrar pagamento.</Text>
+            <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Tabs', { screen: 'Mesas' })}>
+              <Text style={styles.primaryText}>Ir para Mesas</Text>
             </Pressable>
           </View>
+        ) : (
+          <>
+            <SectionHeader title={`Pagamento parcial #${idVenda}`} subtitle="Adicione pagamentos e registre na venda." />
 
-          <Text style={styles.subsectionTitle}>Histórico desta venda</Text>
-          <View style={styles.listWrap}>
-            {loading ? (
-              <Text style={styles.infoText}>Carregando...</Text>
-            ) : (
-              <FlatList
-                data={pagamentos}
-                keyExtractor={(item) => String(item.idVendaPagamentoAntecipado || `${item.idFormaPagamento || Math.random()}`)}
-                scrollEnabled={false}
-                ListEmptyComponent={<Text style={styles.infoText}>Sem pagamentos registrados.</Text>}
-                renderItem={({ item }) => {
-                  const method = item.formaPagamento?.descricao || `Forma ${item.idFormaPagamento || '-'}`;
-                  return (
-                    <View style={styles.item}>
-                      <Text style={styles.itemTitle}>{method}</Text>
-                      <Text style={styles.itemValue}>R$ {(item.valor || 0).toFixed(2)}</Text>
+            <View style={styles.card}>
+              <Text style={styles.label}>Total da venda</Text>
+              <Text style={styles.value}>R$ {saleTotal.toFixed(2)}</Text>
+              <Text style={styles.label}>Total já recebido</Text>
+              <Text style={styles.value}>R$ {totalPago.toFixed(2)}</Text>
+              <Text style={styles.label}>Pendente</Text>
+              <Text style={[styles.value, styles.pending]}>R$ {valorPendente.toFixed(2)}</Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>Adicionar pagamentos</Text>
+              {drafts.map((line, index) => {
+                const selectedMethod = methods.find((method) => method.codigo === line.codigo) || methods[0];
+                const isLocked = Boolean(line.processed);
+                return (
+                  <View key={`draft-${index}`} style={[styles.paymentLine, isLocked ? styles.paymentLineLocked : null]}>
+                    <Text style={styles.payLabel}>Método</Text>
+                    <Text style={styles.selectedMethod}>{selectedMethod?.descricao || 'Selecionar'}</Text>
+                    <View style={styles.methods}>
+                      {methods.map((method) => (
+                        <Pressable
+                          key={`${method.codigo}-${index}`}
+                          disabled={isLocked || isMachinePaymentRunning}
+                          style={[
+                            styles.methodButton,
+                            line.codigo === method.codigo ? styles.methodSelected : null,
+                            isLocked || isMachinePaymentRunning ? styles.methodButtonDisabled : null
+                          ]}
+                          onPress={() => onSelectDraftMethod(index, method.codigo)}
+                        >
+                          <Text style={[styles.methodText, line.codigo === method.codigo ? styles.methodSelectedText : null]}>
+                            {method.descricao}
+                          </Text>
+                        </Pressable>
+                      ))}
                     </View>
-                  );
-                }}
-              />
-            )}
+                    <Text style={styles.payLabel}>Valor (R$)</Text>
+                    <TextInput
+                      style={[styles.input, isLocked ? styles.inputLocked : null]}
+                      keyboardType="numeric"
+                      value={line.valor}
+                      editable={!isLocked}
+                      onChangeText={(value) => setDraftValue(index, value)}
+                      placeholder="0,00"
+                    />
+                    {isLocked ? (
+                      <View style={styles.paymentApprovedBox}>
+                        <Text style={styles.paymentApprovedTitle}>Pagamento aprovado</Text>
+                        {line.provider ? (
+                          <Text style={styles.paymentApprovedText}>
+                            Integração: {String(line.provider).toUpperCase()}
+                          </Text>
+                        ) : null}
+                        {line.nsu ? <Text style={styles.paymentApprovedText}>NSU: {line.nsu}</Text> : null}
+                      </View>
+                    ) : null}
+                    {drafts.length > 1 && !isLocked ? (
+                      <Pressable style={styles.removeBtn} onPress={() => removeDraft(index)}>
+                        <Text style={styles.removeText}>Remover</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })}
+
+              <Pressable
+                style={[styles.addBtn, saving || isMachinePaymentRunning ? styles.addBtnDisabled : null]}
+                disabled={saving || isMachinePaymentRunning}
+                onPress={addDraft}
+              >
+                <Text style={styles.addText}>Adicionar pagamento</Text>
+              </Pressable>
+
+              <Text style={styles.label}>Total digitado</Text>
+              <Text style={styles.value}>R$ {totalDigitado.toFixed(2)}</Text>
+
+              <Pressable
+                style={[styles.primaryBtn, saving || loading || isMachinePaymentRunning ? styles.primaryBtnDisabled : null]}
+                onPress={register}
+                disabled={saving || loading || isMachinePaymentRunning}
+              >
+                <Text style={styles.primaryText}>{saving ? 'Salvando...' : 'Pagamento Parcial'}</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.subsectionTitle}>Histórico desta venda</Text>
+            <View style={styles.listWrap}>
+              {loading ? (
+                <Text style={styles.infoText}>Carregando...</Text>
+              ) : (
+                <FlatList
+                  data={pagamentos}
+                  keyExtractor={(item) => String(item.idVendaPagamentoAntecipado || `${item.idFormaPagamento || Math.random()}`)}
+                  scrollEnabled={false}
+                  ListEmptyComponent={<Text style={styles.infoText}>Sem pagamentos registrados.</Text>}
+                  renderItem={({ item }) => {
+                    const method = item.formaPagamento?.descricao || `Forma ${item.idFormaPagamento || '-'}`;
+                    return (
+                      <View style={styles.item}>
+                        <Text style={styles.itemTitle}>{method}</Text>
+                        <Text style={styles.itemValue}>R$ {(item.valor || 0).toFixed(2)}</Text>
+                      </View>
+                    );
+                  }}
+                />
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      {paymentProcessingVisible ? (
+        <View style={styles.modalOverlay} pointerEvents="auto">
+          <View style={styles.modalCard}>
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginBottom: 16 }} />
+            {paymentProcessingLabel ? (
+              <Text style={styles.modalLabel}>{paymentProcessingLabel}</Text>
+            ) : null}
+            <Text style={styles.modalMessage}>{paymentProcessingMessage || 'Aguarde...'}</Text>
+            <Pressable
+              style={styles.cancelPaymentBtn}
+              onPress={() => cancelCurrentMachinePayment(
+                paymentProcessingLineIndex ?? undefined,
+                'Pagamento cancelado pelo usuário.'
+              )}
+            >
+              <Text style={styles.cancelPaymentText}>Cancelar</Text>
+            </Pressable>
           </View>
-        </>
-      )}
-      <SweetAlert
-        visible={sweetAlert.visible}
-        title={sweetAlert.title}
-        message={sweetAlert.message}
-        type={sweetAlert.type}
-        onConfirm={() =>
-          setSweetAlert((prev) => ({
-            ...prev,
-            visible: false
-          }))
-        }
-      />
-    </ScrollView>
+        </View>
+      ) : null}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: Space.md },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: Space.md, paddingBottom: 120 },
+  noticeCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: Space.md,
+    ...Shadows.soft
+  },
+  noticeWarning: {
+    borderColor: Colors.warning
+  },
+  noticeSuccess: {
+    borderColor: Colors.success
+  },
+  noticeError: {
+    borderColor: Colors.danger
+  },
+  noticeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6
+  },
+  noticeTitle: {
+    color: Colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+    flex: 1
+  },
+  noticeDismiss: {
+    color: Colors.primary,
+    fontWeight: '700',
+    fontSize: 12
+  },
+  noticeMessage: {
+    color: Colors.textMuted,
+    lineHeight: 20
+  },
   card: {
     backgroundColor: Colors.card,
     borderWidth: 1,
@@ -385,6 +767,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     backgroundColor: Colors.primarySoft
   },
+  methodButtonDisabled: {
+    opacity: 0.4
+  },
   methodText: {
     color: Colors.textMuted,
     fontWeight: '700',
@@ -402,6 +787,41 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: Space.sm
   },
+  inputLocked: {
+    opacity: 0.5,
+    backgroundColor: Colors.border
+  },
+  paymentLine: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.cardSoft,
+    borderRadius: 20,
+    padding: 10,
+    marginBottom: 10,
+    ...Shadows.soft
+  },
+  paymentLineLocked: {
+    borderColor: Colors.success ?? '#22c55e',
+    backgroundColor: 'rgba(34,197,94,0.06)'
+  },
+  paymentApprovedBox: {
+    borderWidth: 1,
+    borderColor: Colors.success ?? '#22c55e',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: 'rgba(34,197,94,0.08)'
+  },
+  paymentApprovedTitle: {
+    color: Colors.success ?? '#22c55e',
+    fontWeight: '700',
+    fontSize: 13,
+    marginBottom: 2
+  },
+  paymentApprovedText: {
+    color: Colors.success ?? '#22c55e',
+    fontSize: 12
+  },
   addBtn: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -411,6 +831,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardSoft,
     marginBottom: 12,
     ...Shadows.soft
+  },
+  addBtnDisabled: {
+    opacity: 0.4
   },
   addText: {
     color: Colors.primary,
@@ -424,6 +847,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     ...Shadows.button
+  },
+  primaryBtnDisabled: {
+    opacity: 0.5
   },
   primaryText: {
     color: '#fff',
@@ -478,15 +904,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '700'
   },
-  paymentLine: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.cardSoft,
-    borderRadius: 20,
-    padding: 10,
-    marginBottom: 10,
-    ...Shadows.soft
-  },
   payLabel: {
     color: Colors.textMuted,
     marginTop: 4,
@@ -510,5 +927,43 @@ const styles = StyleSheet.create({
     color: Colors.warning,
     fontWeight: '700',
     fontSize: 12
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 24,
+    padding: 28,
+    width: '82%',
+    alignItems: 'center',
+    ...Shadows.card
+  },
+  modalLabel: {
+    color: Colors.text,
+    fontWeight: '700',
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 8
+  },
+  modalMessage: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  cancelPaymentBtn: {
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    borderRadius: 999,
+    paddingHorizontal: 24,
+    paddingVertical: 10
+  },
+  cancelPaymentText: {
+    color: Colors.warning,
+    fontWeight: '700'
   }
 });

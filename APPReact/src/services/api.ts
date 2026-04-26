@@ -1,7 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { NativeModules, Platform } from 'react-native';
 import { loadStoredMachineSettings, saveStoredMachineSettings } from './machineSettingsDb';
+import {
+  countStoredCatalogProductSummaries,
+  loadStoredCatalogFingerprint,
+  loadStoredCatalogProduct,
+  loadStoredCatalogProducts,
+  loadStoredCatalogProductSummaries,
+  saveStoredCatalogProducts
+} from './productCatalogDb';
+import type { ProductCatalogSummaryItem } from './productCatalogDb';
 
 export type MenuItem = {
   id: number;
@@ -34,6 +43,7 @@ export type MenuItem = {
   happyHourAtivar?: boolean;
   happyHour?: ProductHappyHour;
   opcionais?: ProductOptional[];
+  catalogCompact?: boolean;
 };
 
 export type ProductHappyHour = {
@@ -186,6 +196,7 @@ export type Sale = {
   valorCouvertFeminino?: number;
   valorTaxaServico?: number;
   valorEntrada?: number;
+  valorPagamentoAntecipado?: number;
   valorDesconto?: number;
   tipoDesconto?: number;
   itens?: SaleLine[];
@@ -239,6 +250,7 @@ export type SyncTaskResult = {
   key: string;
   status: 'ok' | 'error' | 'skip';
   message: string;
+  durationMs?: number;
 };
 
 export type SyncResult = {
@@ -248,14 +260,26 @@ export type SyncResult = {
   details?: SyncTaskResult[];
 };
 
+type SyncAllOptions = {
+  onTaskStart?: (task: string) => void;
+  onTaskFinish?: (result: SyncTaskResult) => void;
+};
+
 type CategoryListOptions = {
   requireRemote?: boolean;
   preferCache?: boolean;
+  preferNativeHttp?: boolean;
+  timeoutMs?: number;
 };
 
 type ProductListOptions = {
   requireRemote?: boolean;
   preferCache?: boolean;
+  forceRemote?: boolean;
+  preferNativeHttp?: boolean;
+  timeoutMs?: number;
+  preserveCachedImages?: boolean;
+  compact?: boolean;
 };
 
 type UserListOptions = {
@@ -481,15 +505,20 @@ export const defaultMobileSettings: MobileAppSettings = {
   impressaoLinhasPulo: 1,
   sincronizarAposLogin: true,
   modoExibicao: 'mesa',
-  utilizaMaquininhaStone: false,
-  tipoIntegracao: 'nenhum',
-  modeloMaquininha: 'false',
-  usuario: '',
-  senha: ''
+  utilizaMaquininhaStone: true,
+  tipoIntegracao: 'pagbank',
+  modeloMaquininha: 'PagBank',
+  usuario: '1',
+  senha: '1'
 };
 
 const STORAGE_KEY = '@rpcheff:mobile-settings';
-const CATALOG_STORAGE_VERSION = 3;
+const CATALOG_STORAGE_VERSION = 5;
+const CATALOG_PRODUCT_WRITE_BATCH_SIZE = 80;
+const PRODUCT_CATALOG_TIMEOUT_MS = 60000;
+const SYNC_PRODUCT_CATALOG_TIMEOUT_MS = 30000;
+const PRODUCT_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PRODUCT_IMAGE_DOWNLOAD_CONCURRENCY = 2;
 
 function buildCatalogStoragePrefix(baseUrl: string, empresaId: number): string {
   const normalizedBaseUrl = String(baseUrl || '')
@@ -519,6 +548,21 @@ function buildCatalogImageDirectory(baseUrl: string, empresaId: number): string 
   return `${rootDirectory}rpcheff-catalog/${empresaId}/${baseToken}/`;
 }
 
+function buildCatalogRemoteImagePath(baseUrl: string, empresaId: number, idProduto?: number | null) {
+  const productId = Number(idProduto || 0);
+  const directory = buildCatalogImageDirectory(baseUrl, empresaId);
+  if (!directory || !Number.isFinite(productId) || productId <= 0) {
+    return null;
+  }
+
+  const normalizedProductId = Math.trunc(productId);
+  return {
+    directory,
+    path: `${directory}${normalizedProductId}-remote.jpg`,
+    tempPath: `${directory}${normalizedProductId}-remote.download`
+  };
+}
+
 const fallbackPaymentMethods: PaymentMethod[] = [
   { codigo: 1, descricao: 'Dinheiro', sfiCodigo: 1 },
   { codigo: 2, descricao: 'Cartão de Débito', sfiCodigo: 4 },
@@ -533,7 +577,7 @@ const requestDefaults = {
   timeoutMs: 15000
 };
 
-export const quickConnectionCheckTimeoutMs = 4000;
+export const quickConnectionCheckTimeoutMs = 8000;
 
 type NativeHttpResponse = {
   body?: string | null;
@@ -551,8 +595,40 @@ type NativeHttpModule = {
   ) => Promise<NativeHttpResponse>;
 };
 
+type ApiRequestInit = RequestInit & {
+  timeoutMs?: number;
+  preferNativeHttp?: boolean;
+};
+
 const nativeHttpModule: NativeHttpModule | undefined =
   Platform.OS === 'android' ? (NativeModules.RPCheffHttp as NativeHttpModule | undefined) : undefined;
+
+let activeProductImageDownloads = 0;
+const productImageDownloadQueue: Array<() => void> = [];
+
+function runProductImageDownload<T>(task: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const execute = () => {
+      activeProductImageDownloads += 1;
+      task()
+        .then(resolve, reject)
+        .finally(() => {
+          activeProductImageDownloads = Math.max(0, activeProductImageDownloads - 1);
+          const next = productImageDownloadQueue.shift();
+          if (next) {
+            next();
+          }
+        });
+    };
+
+    if (activeProductImageDownloads < PRODUCT_IMAGE_DOWNLOAD_CONCURRENCY) {
+      execute();
+      return;
+    }
+
+    productImageDownloadQueue.push(execute);
+  });
+}
 
 type GetRequestCacheEntry = {
   payload: unknown;
@@ -570,6 +646,33 @@ const GET_CACHE_TTL = {
   categories: 30000,
   products: 30000
 };
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-cache',
+  Pragma: 'no-cache'
+};
+
+type NativeLoggingGlobal = typeof globalThis & {
+  nativeLoggingHook?: (message: string, level: number) => void;
+};
+
+export function logSyncDiagnostic(message: string, level = 1) {
+  const formatted = `[RP_SYNC] ${message}`;
+  try {
+    const nativeLoggingHook = (globalThis as NativeLoggingGlobal).nativeLoggingHook;
+    if (typeof nativeLoggingHook === 'function') {
+      nativeLoggingHook(formatted, level);
+      return;
+    }
+  } catch {
+    // Diagnostico nunca deve interferir no fluxo principal.
+  }
+
+  try {
+    console.info(formatted);
+  } catch {
+    // Sem fallback de log disponivel.
+  }
+}
 
 function getAuthorizationHeaderValue(): string {
   const raw = `${AUTH_USERNAME}:${AUTH_PASSWORD}`;
@@ -630,6 +733,11 @@ function isTransientAndroidNetworkError(error: unknown): boolean {
     normalized.includes('unexpected end of stream') ||
     normalized.includes('connection abort') ||
     normalized.includes('connection reset') ||
+    normalized.includes('aborted') ||
+    normalized.includes('aborterror') ||
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('tempo limite') ||
     normalized.includes('eofexception') ||
     normalized.includes('socketexception')
   );
@@ -652,6 +760,11 @@ function isTransientFetchNetworkError(error: unknown): boolean {
     normalized.includes('unexpected end of stream') ||
     normalized.includes('connection abort') ||
     normalized.includes('connection reset') ||
+    normalized.includes('aborted') ||
+    normalized.includes('aborterror') ||
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('tempo limite') ||
     normalized.includes('eofexception') ||
     normalized.includes('socketexception')
   );
@@ -703,6 +816,73 @@ export function getProductImageSource(baseUrl: string, empresaId: number, idProd
       Authorization: getAuthorizationHeaderValue()
     }
   };
+}
+
+export async function cacheProductImageOnDemand(
+  baseUrl: string,
+  empresaId: number,
+  idProduto?: number | null
+): Promise<string | undefined> {
+  const imageUrl = buildProductImageUrl(baseUrl, empresaId, idProduto);
+  const imagePath = buildCatalogRemoteImagePath(baseUrl, empresaId, idProduto);
+  if (!imageUrl || !imagePath) {
+    return undefined;
+  }
+
+  const readCachedPath = async () => {
+    try {
+      const info = await FileSystem.getInfoAsync(imagePath.path);
+      if (!info.exists || info.isDirectory || info.size <= 0) {
+        return { path: undefined, fresh: false };
+      }
+
+      const modifiedAtMs =
+        typeof info.modificationTime === 'number' && Number.isFinite(info.modificationTime)
+          ? info.modificationTime * 1000
+          : 0;
+      const fresh = modifiedAtMs <= 0 || Date.now() - modifiedAtMs <= PRODUCT_IMAGE_CACHE_TTL_MS;
+      return { path: imagePath.path, fresh };
+    } catch {
+      return { path: undefined, fresh: false };
+    }
+  };
+
+  const cached = await readCachedPath();
+  if (cached.path && cached.fresh) {
+    return cached.path;
+  }
+
+  return runProductImageDownload(async () => {
+    const queuedCached = await readCachedPath();
+    if (queuedCached.path && queuedCached.fresh) {
+      return queuedCached.path;
+    }
+
+    try {
+      await FileSystem.makeDirectoryAsync(imagePath.directory, { intermediates: true });
+      await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
+      const result = await FileSystem.downloadAsync(imageUrl, imagePath.tempPath, {
+        headers: {
+          Authorization: getAuthorizationHeaderValue()
+        }
+      });
+
+      if (result.status < 200 || result.status >= 300) {
+        await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
+        return queuedCached.path;
+      }
+
+      await FileSystem.deleteAsync(imagePath.path, { idempotent: true }).catch(() => null);
+      await FileSystem.moveAsync({
+        from: imagePath.tempPath,
+        to: imagePath.path
+      });
+      return imagePath.path;
+    } catch {
+      await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
+      return queuedCached.path;
+    }
+  });
 }
 
 function parseNumber(value: any, fallback = 0): number {
@@ -1119,33 +1299,283 @@ function estimateBase64DecodedSize(imagePayload?: string): number {
   return Math.max(0, Math.floor((normalizedPayload.length * 3) / 4) - padding);
 }
 
+function stripInlineProductImage(item: MenuItem, forceHasImage?: boolean): MenuItem {
+  const localPath = extractStoredImageLocalPath(item.imagemLocalPath || item.imagem);
+  const hadInlineImage = Boolean(extractStoredImagePayload(item.imagem_db || item.imagem));
+  const possuiImagem = forceHasImage ?? Boolean(localPath || hadInlineImage || item.possuiImagem);
+  return {
+    ...item,
+    imagem: localPath,
+    imagem_db: undefined,
+    imagemLocalPath: localPath,
+    possuiImagem
+  };
+}
+
+function stripInlineProductImages(products: MenuItem[]): MenuItem[] {
+  let changed = false;
+  const resolved = products.map((item) => {
+    if (!item.imagem && !item.imagem_db && !item.imagemLocalPath) {
+      return item;
+    }
+
+    changed = true;
+    return stripInlineProductImage(item);
+  });
+
+  return changed ? resolved : products;
+}
+
+function buildCatalogProductsFingerprint(nextIds: number[], productJsonList: string[]): string {
+  let hash = 2166136261;
+  let totalLength = 0;
+  const values = [JSON.stringify(nextIds), ...productJsonList];
+
+  values.forEach((value) => {
+    totalLength += value.length;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  });
+
+  return `${values.length}:${totalLength}:${hash >>> 0}`;
+}
+
+function buildCatalogRawPayloadFingerprint(rawText?: string): string | null {
+  if (!rawText) {
+    return null;
+  }
+
+  let hash = 2166136261;
+  for (let index = 0; index < rawText.length; index += 1) {
+    hash ^= rawText.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `raw:${rawText.length}:${hash >>> 0}`;
+}
+
+function buildCatalogProductsSemanticFingerprint(products: MenuItem[]): string {
+  let hash = 2166136261;
+  let totalLength = 0;
+  let valueCount = 0;
+
+  const append = (value: unknown) => {
+    const normalized = value === undefined || value === null ? '' : String(value);
+    valueCount += 1;
+    totalLength += normalized.length;
+
+    const lengthToken = String(normalized.length);
+    for (let index = 0; index < lengthToken.length; index += 1) {
+      hash ^= lengthToken.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    hash ^= 58;
+    hash = Math.imul(hash, 16777619);
+
+    for (let index = 0; index < normalized.length; index += 1) {
+      hash ^= normalized.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    hash ^= 124;
+    hash = Math.imul(hash, 16777619);
+  };
+
+  products.forEach((item) => {
+    append(item.id);
+    append(item.idProduto);
+    append(item.descricao);
+    append(item.descricaoCurta);
+    append(item.codReferencia);
+    append(item.idCategoria);
+    append(item.b_venda_mobile === false ? 0 : 1);
+    append(item.vendaPorTamanho ? 1 : 0);
+    append(item.tamanhoPadrao);
+    append(item.tamanhoP);
+    append(item.tamanhoM);
+    append(item.tamanhoG);
+    append(item.tamanhoGG);
+    append(item.tamanhoExtra);
+    append(item.valorTamanhoP || 0);
+    append(item.valorTamanhoM || 0);
+    append(item.valorTamanhoG || 0);
+    append(item.valorTamanhoGG || 0);
+    append(item.valorTamanhoExtra || 0);
+    append(item.valorVenda || 0);
+    append(item.valorUnitario || 0);
+    append(item.usaQuantidadeDecimal ? 1 : 0);
+    append(item.permiteFracao ? 1 : 0);
+    append(item.possuiImagem ? 1 : 0);
+    append(item.happyHourAtivar ? 1 : 0);
+    append(item.happyHour?.valor || 0);
+    append(item.happyHour?.horaInicial || '');
+    append(item.happyHour?.horaFinal || '');
+    append(item.happyHour?.tipoMesa ? 1 : 0);
+    append(item.happyHour?.tipoComanda ? 1 : 0);
+    append(item.happyHour?.segundaFeira ? 1 : 0);
+    append(item.happyHour?.tercaFeira ? 1 : 0);
+    append(item.happyHour?.quartaFeira ? 1 : 0);
+    append(item.happyHour?.quintaFeira ? 1 : 0);
+    append(item.happyHour?.sextaFeira ? 1 : 0);
+    append(item.happyHour?.sabado ? 1 : 0);
+    append(item.happyHour?.domingo ? 1 : 0);
+
+    const optionals = item.opcionais || [];
+    append(optionals.length);
+    optionals.forEach((optional) => {
+      append(optional.idOpcional);
+      append(optional.descricao);
+      append(optional.valor);
+      append(optional.gratis ? 1 : 0);
+      append(optional.opcionalP);
+      append(optional.opcionalM);
+      append(optional.opcionalG);
+      append(optional.opcionalGG);
+      append(optional.opcionalExtra);
+      append(optional.valorOpcionalP || 0);
+      append(optional.valorOpcionalM || 0);
+      append(optional.valorOpcionalG || 0);
+      append(optional.valorOpcionalGG || 0);
+      append(optional.valorOpcionalExtra || 0);
+    });
+  });
+
+  return `semantic:${valueCount}:${totalLength}:${hash >>> 0}`;
+}
+
 function toStoredMenuItem(item: MenuItem): StoredMenuItem {
-  const { imagem, imagemLocalPath, ...rest } = item;
-  const storedImage = extractStoredImagePayload(item.imagem_db || imagem);
+  const { imagem, imagemLocalPath, imagem_db: discardedImagePayload, ...rest } = item;
+  void discardedImagePayload;
+  const storedLocalPath = extractStoredImageLocalPath(imagemLocalPath || imagem);
   return {
     ...rest,
-    ...(storedImage ? { imagem_db: storedImage } : {}),
-    ...(imagemLocalPath ? { imagem_local_path: imagemLocalPath } : {})
+    ...(storedLocalPath ? { imagem_local_path: storedLocalPath } : {})
+  };
+}
+
+function toCatalogListMenuItem(item: MenuItem): MenuItem {
+  const localPath = extractStoredImageLocalPath(item.imagemLocalPath || item.imagem);
+  return {
+    ...item,
+    imagem: localPath,
+    imagem_db: undefined,
+    imagemLocalPath: localPath,
+    opcionais: [],
+    catalogCompact: true,
+    possuiImagem: Boolean(localPath || item.possuiImagem)
+  };
+}
+
+function buildCatalogPersistItems(products: MenuItem[]) {
+  return products
+    .map((item, index) => {
+      const summary = toCatalogListMenuItem(item);
+      const localPath = extractStoredImageLocalPath(summary.imagemLocalPath || summary.imagem);
+      return {
+        id: Number(summary.idProduto || summary.id || 0),
+        sortOrder: index,
+        compactJson: JSON.stringify(toStoredMenuItem(summary)),
+        fullJson: JSON.stringify(toStoredMenuItem(item)),
+        descricao: summary.descricao,
+        descricaoCurta: summary.descricaoCurta,
+        codReferencia: summary.codReferencia,
+        idCategoria: summary.idCategoria,
+        valorVenda: summary.valorVenda,
+        valorUnitario: summary.valorUnitario,
+        bVendaMobile: summary.b_venda_mobile !== false,
+        vendaPorTamanho: Boolean(summary.vendaPorTamanho),
+        tamanhoPadrao: summary.tamanhoPadrao,
+        tamanhoP: summary.tamanhoP,
+        tamanhoM: summary.tamanhoM,
+        tamanhoG: summary.tamanhoG,
+        tamanhoGG: summary.tamanhoGG,
+        tamanhoExtra: summary.tamanhoExtra,
+        valorTamanhoP: summary.valorTamanhoP,
+        valorTamanhoM: summary.valorTamanhoM,
+        valorTamanhoG: summary.valorTamanhoG,
+        valorTamanhoGG: summary.valorTamanhoGG,
+        valorTamanhoExtra: summary.valorTamanhoExtra,
+        usaQuantidadeDecimal: Boolean(summary.usaQuantidadeDecimal),
+        permiteFracao: Boolean(summary.permiteFracao),
+        possuiImagem: Boolean(localPath || summary.possuiImagem),
+        imagemLocalPath: localPath,
+        happyHourAtivar: summary.happyHourAtivar,
+        happyHourJson: summary.happyHour ? JSON.stringify(summary.happyHour) : undefined
+      };
+    })
+    .filter((item) => item.id > 0);
+}
+
+function numberFromCatalogSummary(value: unknown, fallback = 0): number {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function flagFromCatalogSummary(value: unknown, fallback = false): boolean {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  return Number(value) !== 0;
+}
+
+function textFromCatalogSummary(value: unknown): string | undefined {
+  const text = String(value || '').trim();
+  return text || undefined;
+}
+
+function parseCatalogSummaryItem(row: ProductCatalogSummaryItem): MenuItem {
+  const idProduto = Math.trunc(numberFromCatalogSummary(row.idProduto, 0));
+  const localPath = extractStoredImageLocalPath(row.imagemLocalPath || undefined);
+  const hasHappyHourMetadata = row.happyHourAtivar !== null && row.happyHourAtivar !== undefined || Boolean(row.happyHourJson);
+  let happyHour: ProductHappyHour | undefined;
+
+  if (row.happyHourJson) {
+    try {
+      happyHour = parseHappyHour(JSON.parse(row.happyHourJson));
+    } catch {
+      happyHour = undefined;
+    }
+  }
+
+  return {
+    id: idProduto,
+    idProduto,
+    descricao: String(row.descricao || ''),
+    descricaoCurta: textFromCatalogSummary(row.descricaoCurta),
+    codReferencia: textFromCatalogSummary(row.codReferencia),
+    imagem: localPath,
+    imagem_db: undefined,
+    imagemLocalPath: localPath,
+    possuiImagem: flagFromCatalogSummary(row.possuiImagem, Boolean(localPath)),
+    idCategoria: numberFromCatalogSummary(row.idCategoria, 0) > 0 ? numberFromCatalogSummary(row.idCategoria, 0) : undefined,
+    b_venda_mobile: flagFromCatalogSummary(row.bVendaMobile, true),
+    vendaPorTamanho: flagFromCatalogSummary(row.vendaPorTamanho, false),
+    tamanhoPadrao: String(row.tamanhoPadrao || ''),
+    tamanhoP: String(row.tamanhoP || ''),
+    tamanhoM: String(row.tamanhoM || ''),
+    tamanhoG: String(row.tamanhoG || ''),
+    tamanhoGG: String(row.tamanhoGG || ''),
+    tamanhoExtra: String(row.tamanhoExtra || ''),
+    valorTamanhoP: numberFromCatalogSummary(row.valorTamanhoP, 0),
+    valorTamanhoM: numberFromCatalogSummary(row.valorTamanhoM, 0),
+    valorTamanhoG: numberFromCatalogSummary(row.valorTamanhoG, 0),
+    valorTamanhoGG: numberFromCatalogSummary(row.valorTamanhoGG, 0),
+    valorTamanhoExtra: numberFromCatalogSummary(row.valorTamanhoExtra, 0),
+    valorVenda: numberFromCatalogSummary(row.valorVenda, numberFromCatalogSummary(row.valorUnitario, 0)),
+    valorUnitario: numberFromCatalogSummary(row.valorUnitario, numberFromCatalogSummary(row.valorVenda, 0)),
+    usaQuantidadeDecimal: flagFromCatalogSummary(row.usaQuantidadeDecimal, false),
+    permiteFracao: flagFromCatalogSummary(row.permiteFracao, false),
+    happyHourAtivar: hasHappyHourMetadata ? flagFromCatalogSummary(row.happyHourAtivar, false) : undefined,
+    happyHour,
+    opcionais: [],
+    catalogCompact: true
   };
 }
 
 function mergeProductWithCachedImage(product: MenuItem, cached?: MenuItem): MenuItem {
   const cachedLocalImagePath = extractStoredImageLocalPath(cached?.imagemLocalPath || cached?.imagem);
-  const cachedInlineImage = resolveImageUri(cached?.imagem);
-  const cachedImagePayload = cached?.imagem_db;
-  const hasCachedImage = Boolean(cachedLocalImagePath || cachedInlineImage || cachedImagePayload);
-
   if (product.possuiImagem === false) {
-    if (!product.imagem && !product.imagem_db && !product.imagemLocalPath && hasCachedImage) {
-      return {
-        ...product,
-        imagem: cachedLocalImagePath || cachedInlineImage,
-        imagem_db: cachedImagePayload,
-        imagemLocalPath: cachedLocalImagePath,
-        possuiImagem: true
-      };
-    }
-
     return {
       ...product,
       imagem: undefined,
@@ -1157,8 +1587,8 @@ function mergeProductWithCachedImage(product: MenuItem, cached?: MenuItem): Menu
 
   const currentLocalImagePath = extractStoredImageLocalPath(product.imagemLocalPath || product.imagem);
   const mergedLocalImagePath = currentLocalImagePath || cachedLocalImagePath;
-  const mergedImagePayload = extractStoredImagePayload(product.imagem_db || product.imagem) || cachedImagePayload;
-  const mergedInlineImage = resolveImageUri(product.imagem) || cachedInlineImage;
+  const mergedImagePayload = extractStoredImagePayload(product.imagem_db || product.imagem);
+  const mergedInlineImage = resolveImageUri(product.imagem);
 
   if (product.imagem || product.imagem_db || product.imagemLocalPath) {
     return {
@@ -1176,10 +1606,10 @@ function mergeProductWithCachedImage(product: MenuItem, cached?: MenuItem): Menu
 
   return {
     ...product,
-    imagem: mergedLocalImagePath || mergedInlineImage,
-    imagem_db: mergedImagePayload,
+    imagem: mergedLocalImagePath,
+    imagem_db: undefined,
     imagemLocalPath: mergedLocalImagePath,
-    possuiImagem: true
+    possuiImagem: Boolean(mergedLocalImagePath || product.possuiImagem)
   };
 }
 
@@ -1477,6 +1907,7 @@ function parseMenuItem(value: any): MenuItem {
     imagem: normalizedLocalImage || normalizedImage,
     imagem_db: storedImagePayload,
     imagemLocalPath: normalizedLocalImage,
+    catalogCompact: parseBoolean(resolveField(value, ['catalogCompact', 'catalog_compact']), false) || undefined,
     possuiImagem: parseBoolean(
       resolveField(value, ['possuiImagem', 'possui_imagem', 'temImagem', 'tem_imagem']),
       Boolean(normalizedLocalImage || normalizedImage)
@@ -1486,7 +1917,15 @@ function parseMenuItem(value: any): MenuItem {
       return rawCategory ? parseNumber(rawCategory, 0) : undefined;
     })(),
     b_venda_mobile: parseBoolean(
-      resolveField(value, ['b_venda_mobile', 'bVendamobile', 'bVendaMobile', 'permiteVendaMobile']),
+      resolveField(value, [
+        'b_venda_mobile',
+        'bVendamobile',
+        'bVendaMobile',
+        'permiteVendaMobile',
+        'PermiteVendaAPP',
+        'permiteVendaAPP',
+        'permite_venda_app'
+      ]),
       true
     ),
     vendaPorTamanho: parseBoolean(
@@ -1676,14 +2115,14 @@ function parsePaymentMethod(value: any): PaymentMethod {
       : parseNumber(sfiRaw, 0);
 
   return {
-    codigo: parseNumber(resolveField(value, ['codigo', 'id', 'idFormaPagamento', 'idFormaPgto']), 0),
+    codigo: parseNumber(resolveField(value, ['codigo', 'id', 'idFormaPagamento', 'idFormaPgto', 'id_formapgto', 'for_001']), 0),
     descricao: sanitizeText(
-      resolveField(value, ['descricao', 'nome', 'descricaoFormaPagamento', 'descricao_forma_pagamento']),
+      resolveField(value, ['descricao', 'nome', 'descricaoFormaPagamento', 'descricao_forma_pagamento', 'for_002']),
       ''
     ),
     sfiCodigo: typeof parsedSfi === 'number' && parsedSfi > 0 ? parsedSfi : undefined,
     sfiDescricao: sanitizeText(resolveField(value, ['sfiDescricao', 'sfi_descricao', 'descricaoSfi']), ''),
-    cortesia: parseBoolean(resolveField(value, ['cortesia']), false),
+    cortesia: parseBoolean(resolveField(value, ['cortesia', 'b_cortesia']), false),
     utilizaControleCartao: parseBoolean(resolveField(value, ['utilizaControleCartao', 'utiliza_controle_cartao']), false),
     utilizaPagamentoOnline: parseBoolean(
       resolveField(value, [
@@ -1702,7 +2141,7 @@ function parsePaymentMethod(value: any): PaymentMethod {
     ),
     prazoCartao: parseNumber(resolveField(value, ['prazoCartao', 'prazo_cartao']), 0),
     taxaCartao: parseNumber(resolveField(value, ['taxaCartao', 'taxa_cartao']), 0),
-    idContaCorrente: parseNumber(resolveField(value, ['idContaCorrente', 'id_conta_corrente']), 0)
+    idContaCorrente: parseNumber(resolveField(value, ['idContaCorrente', 'id_conta_corrente', 'id_contacorrente']), 0)
   };
 }
 
@@ -1819,15 +2258,28 @@ function parseSaleLine(value: any): SaleLine {
 }
 
 function parseSalePayment(value: any): SalePayment {
-  const forma = value?.formaPagamento;
+  const forma = resolveField(value, ['formaPagamento', 'forma_pagamento', 'forma', 'pagamento']);
   return {
-    idVendaPagamentoAntecipado: parseNumber(value?.idVendaPagamentoAntecipado, 0),
-    idFormaPagamento: parseNumber(value?.idFormaPagamento ?? value?.idFormapagamento, 0),
-    valor: parseNumber(value?.valor, 0),
+    idVendaPagamentoAntecipado: parseNumber(
+      resolveField(value, ['idVendaPagamentoAntecipado', 'id_venda_pag_antecipado', 'idVendaPagAntecipado']),
+      0
+    ),
+    idFormaPagamento: parseNumber(
+      resolveField(value, ['idFormaPagamento', 'idFormapagamento', 'idFormaPgto', 'id_formapgto', 'formaPagamentoId', 'for_001']),
+      0
+    ),
+    valor: parseNumber(
+      resolveField(value, ['valor', 'valorPagamento', 'valor_pagamento', 'valorPago', 'valor_pago', 'valor_antecipado']),
+      0
+    ),
     formaPagamento: forma ? parsePaymentMethod(forma) : undefined,
-    dataHora: value?.dataHora ? String(value.dataHora) : undefined,
-    observacao: value?.observacao ? String(value.observacao) : undefined,
-    taxaServico: parseBoolean(value?.TaxaServico ?? value?.taxaServico, false)
+    dataHora: resolveField(value, ['dataHora', 'data_hora'])
+      ? String(resolveField(value, ['dataHora', 'data_hora']))
+      : undefined,
+    observacao: resolveField(value, ['observacao', 'Observacao'])
+      ? String(resolveField(value, ['observacao', 'Observacao']))
+      : undefined,
+    taxaServico: parseBoolean(resolveField(value, ['TaxaServico', 'taxaServico', 'b_taxa']), false)
   };
 }
 
@@ -1868,15 +2320,21 @@ function parseSale(value: any): Sale {
       ]),
       0
     ),
-    valorTaxaServico: parseNumber(value?.valorTaxaServico, 0),
-    valorEntrada: parseNumber(value?.valorEntrada, 0),
-    valorDesconto: parseNumber(value?.valorDesconto, 0),
+    valorTaxaServico: parseNumber(resolveField(value, ['valorTaxaServico', 'valor_taxa_servico', 'ven_008']), 0),
+    valorEntrada: parseNumber(resolveField(value, ['valorEntrada', 'valor_entrada']), 0),
+    valorPagamentoAntecipado: parseNumber(
+      resolveField(value, ['valorPagamentoAntecipado', 'valor_pagamento_antecipado', 'valorPagoAntecipado']),
+      0
+    ),
+    valorDesconto: parseNumber(resolveField(value, ['valorDesconto', 'valor_desconto']), 0),
     tipoDesconto:
       value?.tipoDesconto !== undefined && value?.tipoDesconto !== null
         ? parseNumber(value.tipoDesconto, 0)
         : undefined,
     itens: Array.isArray(value?.itens) ? value.itens.map(parseSaleLine) : [],
-    pagamentos: Array.isArray(value?.pagamentos) ? value.pagamentos.map(parseSalePayment) : []
+    pagamentos: Array.isArray(resolveField(value, ['pagamentos', 'pagamentosAntecipados', 'pagamentoAntecipado']))
+      ? (resolveField(value, ['pagamentos', 'pagamentosAntecipados', 'pagamentoAntecipado']) as any[]).map(parseSalePayment)
+      : []
   };
 }
 
@@ -2080,13 +2538,23 @@ function toBase64(input: string): string {
   return out;
 }
 
-async function safeJson(response: Response) {
+async function readJsonResponse(response: Response): Promise<{ payload: unknown; rawText: string }> {
   const text = await response.text();
   try {
-    return text ? JSON.parse(text) : null;
+    return {
+      payload: text ? JSON.parse(text) : null,
+      rawText: text
+    };
   } catch {
-    return text;
+    return {
+      payload: text,
+      rawText: text
+    };
   }
+}
+
+async function safeJson(response: Response) {
+  return (await readJsonResponse(response)).payload;
 }
 
 const extractApiErrorMessage = (payload: unknown, fallback: string): string => {
@@ -2131,10 +2599,21 @@ export class ApiClient {
   private readonly inFlightGet: Map<string, Promise<unknown>> = new Map();
   private cachedCatalogCategories: Category[] | null = null;
   private cachedCatalogProducts: MenuItem[] | null = null;
+  private cachedCatalogProductSummaries: MenuItem[] | null = null;
+  private cachedCatalogProductsFingerprint: string | null = null;
+  private cachedCatalogSqliteKey: string | null = null;
+  private cachedCatalogSqliteFingerprint: string | null = null;
+  private cachedCatalogSqliteSummaryCount: number | null = null;
   private cachedUsers: UserProfile[] | null = null;
   private catalogSchemaReadyKey: string | null = null;
+  private productCatalogLoadSeq = 0;
+  private syncAllInFlight: Promise<SyncResult> | null = null;
 
   constructor(private baseUrl: string, private idEmpresa = 1) {}
+
+  isSyncAllRunning(): boolean {
+    return this.syncAllInFlight !== null;
+  }
 
   setBaseUrl(value: string) {
     this.baseUrl = value;
@@ -2218,6 +2697,11 @@ export class ApiClient {
       }
       delete this.getCache[key];
     });
+    this.inFlightGet.forEach((_, key) => {
+      if (key.includes(prefix)) {
+        this.inFlightGet.delete(key);
+      }
+    });
   }
 
   private clearTablesGetCache() {
@@ -2241,8 +2725,31 @@ export class ApiClient {
   private clearCatalogMemoryCache() {
     this.cachedCatalogCategories = null;
     this.cachedCatalogProducts = null;
+    this.cachedCatalogProductSummaries = null;
+    this.cachedCatalogProductsFingerprint = null;
+    this.cachedCatalogSqliteKey = null;
+    this.cachedCatalogSqliteFingerprint = null;
+    this.cachedCatalogSqliteSummaryCount = null;
     this.cachedUsers = null;
     this.catalogSchemaReadyKey = null;
+  }
+
+  private rememberCatalogSqliteSummaryState(fingerprint: string | null, count: number) {
+    if (!fingerprint || count <= 0) {
+      return;
+    }
+
+    this.cachedCatalogSqliteKey = this.getCatalogStoragePrefix();
+    this.cachedCatalogSqliteFingerprint = fingerprint;
+    this.cachedCatalogSqliteSummaryCount = count;
+  }
+
+  private hasCatalogSqliteSummaryState(fingerprint: string, count: number) {
+    return (
+      this.cachedCatalogSqliteKey === this.getCatalogStoragePrefix() &&
+      this.cachedCatalogSqliteFingerprint === fingerprint &&
+      Number(this.cachedCatalogSqliteSummaryCount || 0) >= count
+    );
   }
 
   private async materializeProductImages(products: MenuItem[], previousProducts: MenuItem[]): Promise<MenuItem[]> {
@@ -2252,7 +2759,7 @@ export class ApiClient {
 
     const imageDirectory = buildCatalogImageDirectory(this.baseUrl, this.idEmpresa);
     if (!imageDirectory) {
-      return products;
+      return products.map((item) => stripInlineProductImage(item));
     }
 
     const previousProductsById = new Map<number, MenuItem>();
@@ -2268,7 +2775,7 @@ export class ApiClient {
       try {
         await FileSystem.makeDirectoryAsync(imageDirectory, { intermediates: true });
       } catch {
-        return products;
+        return products.map((item) => stripInlineProductImage(item));
       }
     }
 
@@ -2283,45 +2790,33 @@ export class ApiClient {
 
       if (!imagePayload) {
         if (knownLocalPath) {
-          try {
-            const info = await FileSystem.getInfoAsync(knownLocalPath);
-            if (info.exists) {
-              resolvedProducts.push({
-                ...product,
-                imagem: knownLocalPath,
-                imagemLocalPath: knownLocalPath
-              });
-              continue;
-            }
-          } catch {}
+          resolvedProducts.push({
+            ...product,
+            imagem: knownLocalPath,
+            imagem_db: undefined,
+            imagemLocalPath: knownLocalPath,
+            possuiImagem: product.possuiImagem !== false
+          });
+          continue;
         }
 
         resolvedProducts.push({
           ...product,
+          imagem_db: undefined,
           imagemLocalPath: undefined
         });
         continue;
       }
 
       if (knownLocalPath && previousProduct?.imagem_db === imagePayload) {
-        try {
-          const info = await FileSystem.getInfoAsync(knownLocalPath);
-          const expectedImageSize = estimateBase64DecodedSize(imagePayload);
-          const currentImageSize = typeof info.size === 'number' ? info.size : 0;
-          if (
-            info.exists &&
-            (!expectedImageSize || !currentImageSize || Math.abs(currentImageSize - expectedImageSize) <= 2)
-          ) {
-            resolvedProducts.push({
-              ...product,
-              imagem: knownLocalPath,
-              imagem_db: imagePayload,
-              imagemLocalPath: knownLocalPath,
-              possuiImagem: true
-            });
-            continue;
-          }
-        } catch {}
+        resolvedProducts.push({
+          ...product,
+          imagem: knownLocalPath,
+          imagem_db: undefined,
+          imagemLocalPath: knownLocalPath,
+          possuiImagem: true
+        });
+        continue;
       }
 
       const imageExtension = getImageFileExtensionFromPayload(imagePayload);
@@ -2334,15 +2829,12 @@ export class ApiClient {
         resolvedProducts.push({
           ...product,
           imagem: imagePath,
-          imagem_db: imagePayload,
+          imagem_db: undefined,
           imagemLocalPath: imagePath,
           possuiImagem: true
         });
       } catch {
-        resolvedProducts.push({
-          ...product,
-          imagem_db: imagePayload
-        });
+        resolvedProducts.push(stripInlineProductImage(product, true));
       }
     }
 
@@ -2351,6 +2843,36 @@ export class ApiClient {
 
   private getCatalogStoragePrefix() {
     return buildCatalogStoragePrefix(this.baseUrl, this.idEmpresa);
+  }
+
+  private getCatalogStorageSuffix() {
+    const currentPrefix = this.getCatalogStoragePrefix();
+    const marker = `@rpcheff:catalog:v${CATALOG_STORAGE_VERSION}:`;
+    return currentPrefix.startsWith(marker) ? currentPrefix.slice(marker.length) : '';
+  }
+
+  private async pruneLegacyCatalogStorage() {
+    try {
+      const suffix = this.getCatalogStorageSuffix();
+      if (!suffix) {
+        return;
+      }
+
+      const currentPrefix = this.getCatalogStoragePrefix();
+      const keys = await AsyncStorage.getAllKeys();
+      const staleKeys = keys.filter(
+        (key) =>
+          key.startsWith('@rpcheff:catalog:v') &&
+          key.includes(`:${suffix}`) &&
+          !key.startsWith(currentPrefix)
+      );
+
+      if (staleKeys.length > 0) {
+        await AsyncStorage.multiRemove(staleKeys);
+      }
+    } catch {
+      // Cache antigo nao pode bloquear sincronizacao.
+    }
   }
 
   private getCatalogSchemaKey() {
@@ -2363,6 +2885,10 @@ export class ApiClient {
 
   private getCatalogProductIdsKey() {
     return `${this.getCatalogStoragePrefix()}:product_ids`;
+  }
+
+  private getCatalogProductFingerprintKey() {
+    return `${this.getCatalogStoragePrefix()}:product_fingerprint`;
   }
 
   private getCatalogProductKey(idProduto: number) {
@@ -2395,18 +2921,24 @@ export class ApiClient {
       return;
     }
 
-    const storedVersion = Number((await AsyncStorage.getItem(schemaKey)) || 0);
-    if (storedVersion !== CATALOG_STORAGE_VERSION) {
-      const existingIds = await this.readCachedProductIds();
-      const keysToRemove = [
-        this.getCatalogCategoriesKey(),
-        this.getCatalogProductIdsKey(),
-        ...existingIds.map((id) => this.getCatalogProductKey(id))
-      ];
-      if (keysToRemove.length > 0) {
-        await AsyncStorage.multiRemove(keysToRemove);
+    try {
+      const storedVersion = Number((await AsyncStorage.getItem(schemaKey)) || 0);
+      if (storedVersion !== CATALOG_STORAGE_VERSION) {
+        await this.pruneLegacyCatalogStorage();
+        const existingIds = await this.readCachedProductIds();
+        const keysToRemove = [
+          this.getCatalogCategoriesKey(),
+          this.getCatalogProductIdsKey(),
+          this.getCatalogProductFingerprintKey(),
+          ...existingIds.map((id) => this.getCatalogProductKey(id))
+        ];
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+        }
+        await AsyncStorage.setItem(schemaKey, String(CATALOG_STORAGE_VERSION));
       }
-      await AsyncStorage.setItem(schemaKey, String(CATALOG_STORAGE_VERSION));
+    } catch {
+      // Falha de storage nao pode invalidar dados carregados da API.
     }
 
     this.catalogSchemaReadyKey = schemaKey;
@@ -2457,26 +2989,31 @@ export class ApiClient {
       }));
 
     this.cachedCatalogCategories = normalized;
-    await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
+    try {
+      await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
+    } catch {
+      await this.pruneLegacyCatalogStorage();
+      try {
+        await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
+      } catch {
+        // Mantem cache em memoria quando o storage local esta indisponivel.
+      }
+    }
   }
 
-  private async loadCachedProducts(): Promise<MenuItem[]> {
-    if (this.cachedCatalogProducts) {
+  private async loadCachedProducts(options: { compact?: boolean } = {}): Promise<MenuItem[]> {
+    if (options.compact && this.cachedCatalogProductSummaries) {
+      return this.cachedCatalogProductSummaries;
+    }
+    if (!options.compact && this.cachedCatalogProducts) {
       return this.cachedCatalogProducts;
     }
 
     await this.ensureCatalogStorageSchema();
 
-    try {
-      const ids = await this.readCachedProductIds();
-      if (!ids.length) {
-        this.cachedCatalogProducts = [];
-        return this.cachedCatalogProducts;
-      }
-
-      const entries = await AsyncStorage.multiGet(ids.map((id) => this.getCatalogProductKey(id)));
-      this.cachedCatalogProducts = entries
-        .map(([, raw]) => {
+    const parseRows = (rows: string[]) =>
+      rows
+        .map((raw) => {
           if (!raw) {
             return null;
           }
@@ -2489,46 +3026,287 @@ export class ApiClient {
         })
         .filter((item): item is MenuItem => Boolean(item));
 
-      return this.cachedCatalogProducts;
+    try {
+      if (options.compact) {
+        const summaryStartedAt = Date.now();
+        const summaryRows = await loadStoredCatalogProductSummaries(this.getCatalogStoragePrefix());
+        if (summaryRows.length > 0) {
+          this.cachedCatalogProductSummaries = summaryRows.map(parseCatalogSummaryItem);
+          logSyncDiagnostic(
+            `cache produtos sqlite compacto count=${this.cachedCatalogProductSummaries.length} em ${Date.now() - summaryStartedAt}ms`
+          );
+          return this.cachedCatalogProductSummaries;
+        }
+      }
+
+      const sqliteRows = await loadStoredCatalogProducts(this.getCatalogStoragePrefix(), {
+        compact: options.compact
+      });
+      if (sqliteRows.length > 0) {
+        const products = parseRows(sqliteRows);
+        if (options.compact) {
+          this.cachedCatalogProductSummaries = products;
+          return this.cachedCatalogProductSummaries;
+        }
+
+        this.cachedCatalogProducts = products;
+        this.cachedCatalogProductSummaries = products.map(toCatalogListMenuItem);
+        this.cachedCatalogProductsFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix());
+        this.rememberCatalogSqliteSummaryState(this.cachedCatalogProductsFingerprint, products.length);
+        return this.cachedCatalogProducts;
+      }
+    } catch {
+      // AsyncStorage antigo segue como fallback.
+    }
+
+    try {
+      const ids = await this.readCachedProductIds();
+      if (!ids.length) {
+        this.cachedCatalogProducts = [];
+        this.cachedCatalogProductSummaries = [];
+        return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
+      }
+
+      const entries = await AsyncStorage.multiGet(ids.map((id) => this.getCatalogProductKey(id)));
+      const products = parseRows(entries.map(([, raw]) => raw || ''));
+      const fingerprint = await AsyncStorage.getItem(this.getCatalogProductFingerprintKey()).catch(() => null);
+      this.cachedCatalogProducts = products;
+      this.cachedCatalogProductSummaries = products.map(toCatalogListMenuItem);
+      this.cachedCatalogProductsFingerprint = fingerprint;
+
+      if (products.length > 0 && fingerprint) {
+        await saveStoredCatalogProducts(
+          this.getCatalogStoragePrefix(),
+          buildCatalogPersistItems(products),
+          fingerprint
+        );
+        this.rememberCatalogSqliteSummaryState(fingerprint, products.length);
+      }
+
+      return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
     } catch {
       this.cachedCatalogProducts = [];
-      return this.cachedCatalogProducts;
+      this.cachedCatalogProductSummaries = [];
+      return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
     }
   }
 
-  private async saveCachedProducts(products: MenuItem[]) {
+  private async loadCachedProduct(idProduto: number): Promise<MenuItem | null> {
+    const targetId = Math.trunc(Number(idProduto || 0));
+    if (targetId <= 0) {
+      return null;
+    }
+
+    const findInMemory = () =>
+      this.cachedCatalogProducts?.find((item) => Number(item.idProduto || item.id || 0) === targetId) || null;
+
+    const memoryProduct = findInMemory();
+    if (memoryProduct) {
+      return memoryProduct;
+    }
+
+    try {
+      const raw = await loadStoredCatalogProduct(this.getCatalogStoragePrefix(), targetId);
+      if (raw) {
+        return parseMenuItem(JSON.parse(raw));
+      }
+    } catch {
+      // AsyncStorage antigo segue como fallback.
+    }
+
+    try {
+      const raw = await AsyncStorage.getItem(this.getCatalogProductKey(targetId));
+      if (raw) {
+        return parseMenuItem(JSON.parse(raw));
+      }
+    } catch {
+      // Quando o item individual falhar, tentamos a carga completa abaixo.
+    }
+
+    const products = await this.loadCachedProducts();
+    return products.find((item) => Number(item.idProduto || item.id || 0) === targetId) || null;
+  }
+
+  private async syncCatalogProductCount(): Promise<number> {
+    const startedAt = Date.now();
+    const productPath = `rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=false`;
+    const { response, payload, rawText } = await this.request(productPath, {
+      preferNativeHttp: Platform.OS === 'android',
+      timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
+    });
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar ${productPath}: ${response.status}`);
+    }
+    if (!Array.isArray(payload)) {
+      throw new Error('Erro na API');
+    }
+
+    logSyncDiagnostic(
+      `produtos remoto count=${payload.length} exibirImagem=false preserveCachedImages=false em ${Date.now() - startedAt}ms`
+    );
+
+    const remoteFingerprint = buildCatalogRawPayloadFingerprint(rawText);
+    let knownFingerprint = this.cachedCatalogProductsFingerprint;
+    if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
+      knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+    }
+
+    if (remoteFingerprint && knownFingerprint === remoteFingerprint) {
+      this.cachedCatalogProductsFingerprint = remoteFingerprint;
+      logSyncDiagnostic(`produtos prontos inalterado count=${payload.length} em ${Date.now() - startedAt}ms`);
+      return payload.length;
+    }
+
+    const products = stripInlineProductImages(payload.map(parseMenuItem));
+    await this.saveCachedProducts(products, {
+      fingerprint: remoteFingerprint
+    });
+    logSyncDiagnostic(`produtos prontos count=${products.length} compact=false em ${Date.now() - startedAt}ms`);
+    return products.length;
+  }
+
+  private async persistCachedProducts(
+    pairs: [string, string][],
+    nextIds: number[],
+    staleKeys: string[],
+    fingerprint: string
+  ) {
+    for (let index = 0; index < pairs.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+      const batch = pairs.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE);
+      if (batch.length > 0) {
+        await AsyncStorage.multiSet(batch);
+      }
+    }
+
+    for (let index = 0; index < staleKeys.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+      await AsyncStorage.multiRemove(staleKeys.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE));
+    }
+
+    await AsyncStorage.multiSet([
+      [this.getCatalogProductIdsKey(), JSON.stringify(nextIds)],
+      [this.getCatalogProductFingerprintKey(), fingerprint]
+    ]);
+  }
+
+  private async readCachedProductStorageFingerprint(previousIds: number[]) {
+    if (!previousIds.length) {
+      return null;
+    }
+
+    try {
+      const entries = await AsyncStorage.multiGet(previousIds.map((id) => this.getCatalogProductKey(id)));
+      if (entries.some(([, value]) => !value)) {
+        return null;
+      }
+
+      return buildCatalogProductsFingerprint(
+        previousIds,
+        entries.map(([, value]) => value || '')
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  private async saveCachedProducts(products: MenuItem[], options: { fingerprint?: string | null } = {}) {
+    const startedAt = Date.now();
     await this.ensureCatalogStorageSchema();
 
     const uniqueById = new Map<number, MenuItem>();
     products.forEach((item) => {
       const id = Number(item.idProduto || item.id || 0);
       if (id > 0) {
+        const storedLocalPath = extractStoredImageLocalPath(item.imagemLocalPath || item.imagem);
         uniqueById.set(id, {
           ...item,
-          imagem_db: extractStoredImagePayload(item.imagem_db || item.imagem)
+          imagem: storedLocalPath,
+          imagemLocalPath: storedLocalPath,
+          imagem_db: undefined,
+          possuiImagem: Boolean(storedLocalPath || item.possuiImagem)
         });
       }
     });
 
     const normalized = [...uniqueById.values()].sort((a, b) => (a.idProduto || a.id) - (b.idProduto || b.id));
     const nextIds = normalized.map((item) => Number(item.idProduto || item.id || 0)).filter((item) => item > 0);
-    const previousIds = await this.readCachedProductIds();
-    const nextIdSet = new Set(nextIds);
-    const staleKeys = previousIds.filter((id) => !nextIdSet.has(id)).map((id) => this.getCatalogProductKey(id));
-    const pairs: [string, string][] = [
-      [this.getCatalogProductIdsKey(), JSON.stringify(nextIds)],
-      ...normalized.map((item) => [
-        this.getCatalogProductKey(Number(item.idProduto || item.id || 0)),
-        JSON.stringify(toStoredMenuItem(item))
-      ])
-    ];
-
-    await AsyncStorage.multiSet(pairs);
-    if (staleKeys.length > 0) {
-      await AsyncStorage.multiRemove(staleKeys);
+    const fingerprint = options.fingerprint || buildCatalogProductsSemanticFingerprint(normalized);
+    const verifiedSqliteSummary = this.hasCatalogSqliteSummaryState(fingerprint, normalized.length);
+    const sqliteFingerprint = verifiedSqliteSummary
+      ? fingerprint
+      : await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+    let previousFingerprint =
+      this.cachedCatalogProductsFingerprint ||
+      sqliteFingerprint ||
+      (await AsyncStorage.getItem(this.getCatalogProductFingerprintKey()).catch(() => null));
+    if (!previousFingerprint) {
+      const previousIds = await this.readCachedProductIds();
+      previousFingerprint = await this.readCachedProductStorageFingerprint(previousIds);
     }
 
     this.cachedCatalogProducts = normalized;
+    this.cachedCatalogProductSummaries = normalized.map(toCatalogListMenuItem);
+    if (previousFingerprint === fingerprint) {
+      const sqliteSummaryCount = verifiedSqliteSummary
+        ? normalized.length
+        : sqliteFingerprint
+          ? await countStoredCatalogProductSummaries(this.getCatalogStoragePrefix()).catch(() => 0)
+          : 0;
+      if (sqliteFingerprint && sqliteSummaryCount >= normalized.length) {
+        this.cachedCatalogProductsFingerprint = fingerprint;
+        this.rememberCatalogSqliteSummaryState(fingerprint, sqliteSummaryCount);
+        logSyncDiagnostic(`cache produtos sem alteracao count=${normalized.length} em ${Date.now() - startedAt}ms`);
+        return;
+      }
+
+      const persistItems = buildCatalogPersistItems(normalized);
+      if (persistItems.length > 0) {
+        await saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint);
+        this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
+      }
+      this.cachedCatalogProductsFingerprint = fingerprint;
+      logSyncDiagnostic(`cache produtos sem alteracao count=${normalized.length} em ${Date.now() - startedAt}ms`);
+      return;
+    }
+
+    const previousIds = await this.readCachedProductIds();
+    const nextIdSet = new Set(nextIds);
+    const staleKeys = previousIds.filter((id) => !nextIdSet.has(id)).map((id) => this.getCatalogProductKey(id));
+    const productJsonList = normalized.map((item) => JSON.stringify(toStoredMenuItem(item)));
+    const pairs = normalized.map(
+      (item, index): [string, string] => [
+        this.getCatalogProductKey(Number(item.idProduto || item.id || 0)),
+        productJsonList[index]
+      ]
+    );
+    const persistItems = buildCatalogPersistItems(normalized);
+
+    try {
+      await Promise.all([
+        this.persistCachedProducts(pairs, nextIds, staleKeys, fingerprint),
+        saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
+      ]);
+      this.cachedCatalogProductsFingerprint = fingerprint;
+      this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
+      logSyncDiagnostic(
+        `cache produtos salvo count=${normalized.length} stale=${staleKeys.length} em ${Date.now() - startedAt}ms`
+      );
+    } catch {
+      await this.pruneLegacyCatalogStorage();
+      try {
+        await Promise.all([
+          this.persistCachedProducts(pairs, nextIds, staleKeys, fingerprint),
+          saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
+        ]);
+        this.cachedCatalogProductsFingerprint = fingerprint;
+        this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
+        logSyncDiagnostic(
+          `cache produtos salvo apos limpeza count=${normalized.length} stale=${staleKeys.length} em ${Date.now() - startedAt}ms`
+        );
+      } catch {
+        // A sincronizacao deve continuar usando dados em memoria mesmo sem cache em disco.
+        logSyncDiagnostic(`cache produtos indisponivel count=${normalized.length}`, 2);
+      }
+    }
   }
 
   private shouldCacheGet(path: string, init: RequestInit = {}): boolean {
@@ -2578,8 +3356,8 @@ export class ApiClient {
       statusText: nativeResponse.statusText || '',
       text: async () => nativeResponse.body || ''
     } as Response;
-    const payload = await safeJson(response);
-    return { response, payload };
+    const { payload, rawText } = await readJsonResponse(response);
+    return { response, payload, rawText };
   }
 
   private async requestWithFetch(
@@ -2635,8 +3413,8 @@ export class ApiClient {
         response = await executeWithoutAbortSignal();
       }
 
-      const payload = await safeJson(response);
-      return { response, payload };
+      const { payload, rawText } = await readJsonResponse(response);
+      return { response, payload, rawText };
     } finally {
       if (timeout) {
         clearTimeout(timeout);
@@ -2644,8 +3422,8 @@ export class ApiClient {
     }
   }
 
-  private async request(path: string, init: (RequestInit & { timeoutMs?: number }) = {}) {
-    const { timeoutMs: customTimeoutMs, ...fetchInit } = init;
+  private async request(path: string, init: ApiRequestInit = {}) {
+    const { timeoutMs: customTimeoutMs, preferNativeHttp = false, ...fetchInit } = init;
     const timeoutMs =
       typeof customTimeoutMs === 'number' && Number.isFinite(customTimeoutMs) && customTimeoutMs > 0
         ? customTimeoutMs
@@ -2656,9 +3434,21 @@ export class ApiClient {
       ...normalizeRequestHeaders(fetchInit.headers)
     };
     const url = this.buildUrl(path);
-    const fallbackTimeoutMs = Math.max(1500, Math.floor(timeoutMs / 2));
+    const fallbackTimeoutMs = Math.max(timeoutMs, Platform.OS === 'android' ? quickConnectionCheckTimeoutMs : 1500);
 
     if (Platform.OS === 'android' && nativeHttpModule?.request) {
+      if (preferNativeHttp) {
+        try {
+          return await this.requestWithNativeHttp(url, fetchInit, headers, fallbackTimeoutMs);
+        } catch (nativeError) {
+          if (!isTransientAndroidNetworkError(nativeError)) {
+            throw nativeError;
+          }
+
+          return this.requestWithFetch(path, url, fetchInit, headers, timeoutMs);
+        }
+      }
+
       try {
         return await this.requestWithFetch(path, url, fetchInit, headers, timeoutMs);
       } catch (fetchError) {
@@ -2681,10 +3471,7 @@ export class ApiClient {
     return this.requestWithFetch(path, url, fetchInit, headers, timeoutMs);
   }
 
-  private async requestJson(
-    path: string,
-    init: (RequestInit & { timeoutMs?: number }) = {}
-  ): Promise<unknown> {
+  private async requestJson(path: string, init: ApiRequestInit = {}): Promise<unknown> {
     if (!this.shouldCacheGet(path, init)) {
       const { response, payload } = await this.request(path, init);
       if (!response.ok) {
@@ -2743,7 +3530,8 @@ export class ApiClient {
   ): Promise<{ ok: boolean; status: number; message: string; payloadType: 'json' | 'text' | 'empty' }> {
     try {
       const { response, payload } = await this.request(`rpCheff/v1/ping`, {
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
+        preferNativeHttp: Platform.OS === 'android'
       });
 
       if (response.ok || response.status !== 404) {
@@ -2765,7 +3553,8 @@ export class ApiClient {
     options: { timeoutMs?: number } = {}
   ): Promise<{ ok: boolean; status: number; message: string; payloadType: 'json' | 'text' | 'empty' }> {
     const { response, payload } = await this.request(`rpCheff/v1/empresa/${this.idEmpresa}`, {
-      timeoutMs: options.timeoutMs
+      timeoutMs: options.timeoutMs,
+      preferNativeHttp: Platform.OS === 'android'
     });
     return {
       ok: response.ok,
@@ -2895,33 +3684,41 @@ export class ApiClient {
 
     try {
       if (taskCode === 'catalogo') {
-        const shouldLoadImages = await this.resolveCatalogImagePreference();
+        const shouldShowImages = await this.resolveCatalogImagePreference();
         this.clearMenuGetCache();
-        const [categories, products] = await Promise.all([
-          this.listCategories({ requireRemote: true }),
-          this.listProducts(shouldLoadImages, { requireRemote: true })
+        const [categories, productCount] = await Promise.all([
+          this.listCategories({
+            requireRemote: true,
+            preferNativeHttp: Platform.OS === 'android',
+            timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
+          }),
+          this.syncCatalogProductCount()
         ]);
         return {
           key: task,
-          status: categories.length > 0 || products.length > 0 ? 'ok' : 'skip',
-          message: `Catálogo: ${categories.length} categorias | ${products.length} produtos${shouldLoadImages ? ' | imagens ativas' : ' | imagens desativadas'}`
+          status: categories.length > 0 || productCount > 0 ? 'ok' : 'skip',
+          message: `Catálogo: ${categories.length} categorias | ${productCount} produtos${shouldShowImages ? ' | imagens por demanda' : ' | imagens desativadas'}`
         };
       }
 
       if (taskCode === 'produtos' || taskCode === 'produto') {
-        const shouldLoadImages = await this.resolveCatalogImagePreference();
+        const shouldShowImages = await this.resolveCatalogImagePreference();
         this.clearProductGetCache();
-        const products = await this.listProducts(shouldLoadImages, { requireRemote: true });
+        const productCount = await this.syncCatalogProductCount();
         return {
           key: task,
-          status: products.length > 0 ? 'ok' : 'skip',
-          message: `${products.length} produtos atualizados com opcionais${shouldLoadImages ? ' | imagens ativas' : ' | imagens desativadas'}`
+          status: productCount > 0 ? 'ok' : 'skip',
+          message: `${productCount} produtos atualizados com opcionais${shouldShowImages ? ' | imagens por demanda' : ' | imagens desativadas'}`
         };
       }
 
       if (taskCode === 'categorias' || taskCode === 'categoria') {
         this.clearCategoryGetCache();
-        const categories = await this.listCategories({ requireRemote: true });
+        const categories = await this.listCategories({
+          requireRemote: true,
+          preferNativeHttp: Platform.OS === 'android',
+          timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
+        });
         return {
           key: task,
           status: categories.length > 0 ? 'ok' : 'skip',
@@ -2987,35 +3784,98 @@ export class ApiClient {
     }
   }
 
-  async syncAll(): Promise<SyncResult> {
+  async syncAll(options: SyncAllOptions = {}): Promise<SyncResult> {
+    if (this.syncAllInFlight) {
+      logSyncDiagnostic('syncAll reutilizando execucao em andamento');
+      return this.syncAllInFlight;
+    }
+
+    const syncTask = this.runSyncAll(options);
+    this.syncAllInFlight = syncTask;
+    try {
+      return await syncTask;
+    } finally {
+      if (this.syncAllInFlight === syncTask) {
+        this.syncAllInFlight = null;
+      }
+    }
+  }
+
+  private async runSyncAll(options: SyncAllOptions = {}): Promise<SyncResult> {
     const timestamp = new Date().toISOString();
     const tasks = ['catalogo', 'mesas', 'formas', 'configuracoes', 'usuarios'];
-    const details = await Promise.all(tasks.map((task) => this.syncPartial(task)));
+    const details = new Array<SyncTaskResult>(tasks.length);
+    const maxParallelTasks = 4;
+    const syncStartedAt = Date.now();
+    logSyncDiagnostic(`syncAll inicio tasks=${tasks.join(',')}`);
+
+    const runTask = async (task: string): Promise<SyncTaskResult> => {
+      const startedAt = Date.now();
+      logSyncDiagnostic(`etapa ${task} inicio`);
+      try {
+        options.onTaskStart?.(task);
+      } catch {
+        // Callback de UI nao pode interferir na sincronizacao.
+      }
+
+      const result = {
+        ...(await this.syncPartial(task)),
+        durationMs: Date.now() - startedAt
+      };
+
+      try {
+        options.onTaskFinish?.(result);
+      } catch {
+        // Callback de UI nao pode interferir na sincronizacao.
+      }
+
+      logSyncDiagnostic(`etapa ${task} ${result.status} em ${result.durationMs}ms | ${result.message}`);
+      return result;
+    };
+
+    let nextTaskIndex = 0;
+    const workers = Array.from({ length: Math.min(maxParallelTasks, tasks.length) }, async () => {
+      while (nextTaskIndex < tasks.length) {
+        const taskIndex = nextTaskIndex;
+        nextTaskIndex += 1;
+        details[taskIndex] = await runTask(tasks[taskIndex]);
+      }
+    });
+
+    await Promise.all(workers);
+    const orderedDetails = details.filter((item): item is SyncTaskResult => Boolean(item));
+
     const status: SyncResult['status'] =
-      details.every((item) => item.status === 'ok') ? 'ok' : 'partial';
+      orderedDetails.every((item) => item.status === 'ok') ? 'ok' : 'partial';
 
     const summary = [
       `Sincronização concluída em ${timestamp}.`,
-      ...details.map((item) => item.message)
+      ...orderedDetails.map((item) => item.message)
     ];
+    logSyncDiagnostic(`syncAll fim status=${status} em ${Date.now() - syncStartedAt}ms`);
 
     return {
       status,
       timestamp,
       summary,
-      details
+      details: orderedDetails
     };
   }
 
   async listCategories(options: CategoryListOptions = {}): Promise<Category[]> {
     const cachedCategories = await this.loadCachedCategories();
-    if (options.preferCache) {
+    if (options.preferCache && cachedCategories.length > 0) {
       return cachedCategories;
     }
 
     try {
-      const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/categoria`);
+      const startedAt = Date.now();
+      const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/categoria`, {
+        preferNativeHttp: options.preferNativeHttp,
+        timeoutMs: options.timeoutMs
+      });
       if (!Array.isArray(payload)) throw new Error('Erro na API');
+      logSyncDiagnostic(`categorias remoto count=${payload.length} em ${Date.now() - startedAt}ms`);
       const categories = payload.map((value: any) => ({
         id: parseNumber((value as any)?.idCategoria, parseNumber((value as any)?.id, 0)),
         descricao: sanitizeText((value as any)?.descricao, `Categoria ${parseNumber((value as any)?.idCategoria, 0)}`),
@@ -3032,32 +3892,99 @@ export class ApiClient {
   }
 
   async listProducts(exibirImagem = true, options: ProductListOptions = {}): Promise<MenuItem[]> {
-    const cachedProducts = await this.loadCachedProducts();
-    if (options.preferCache) {
+    if (options.forceRemote) {
+      this.clearProductGetCache();
+    }
+
+    const preserveCachedImages = options.preserveCachedImages !== false;
+    const shouldLoadCachedProducts = options.preferCache || preserveCachedImages || !options.requireRemote;
+    const cachedProducts = shouldLoadCachedProducts ? await this.loadCachedProducts({ compact: options.compact }) : [];
+    if (options.preferCache && !options.forceRemote && cachedProducts.length > 0) {
       return cachedProducts;
     }
 
+    const loadSeq = ++this.productCatalogLoadSeq;
+    const startedAt = Date.now();
+
     try {
-      const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=${exibirImagem ? 'true' : 'false'}`, {
-        timeoutMs: 60000
+      const productPath = `rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=${exibirImagem ? 'true' : 'false'}`;
+      const { response, payload, rawText } = await this.request(productPath, {
+        preferNativeHttp: options.preferNativeHttp,
+        timeoutMs:
+          typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+            ? options.timeoutMs
+            : PRODUCT_CATALOG_TIMEOUT_MS
       });
+      if (!response.ok) {
+        throw new Error(`Falha ao consultar ${productPath}: ${response.status}`);
+      }
       if (!Array.isArray(payload)) throw new Error('Erro na API');
+      logSyncDiagnostic(
+        `produtos remoto count=${payload.length} exibirImagem=${exibirImagem} preserveCachedImages=${preserveCachedImages} em ${Date.now() - startedAt}ms`
+      );
+      const remoteFingerprint = buildCatalogRawPayloadFingerprint(rawText);
+      let knownCatalogFingerprint = this.cachedCatalogProductsFingerprint;
+      if (
+        remoteFingerprint &&
+        (!knownCatalogFingerprint || knownCatalogFingerprint !== remoteFingerprint)
+      ) {
+        const storedFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+        if (storedFingerprint) {
+          this.cachedCatalogProductsFingerprint = storedFingerprint;
+          knownCatalogFingerprint = storedFingerprint;
+        }
+      }
+      let cachedReusableProducts = options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
+      if (options.compact && !cachedReusableProducts && this.cachedCatalogProducts) {
+        cachedReusableProducts = this.cachedCatalogProducts.map(toCatalogListMenuItem);
+        this.cachedCatalogProductSummaries = cachedReusableProducts;
+      }
+      const canReuseUnchangedCatalog =
+        !exibirImagem &&
+        !preserveCachedImages &&
+        remoteFingerprint &&
+        remoteFingerprint === knownCatalogFingerprint &&
+        cachedReusableProducts?.length === payload.length;
+
+      if (canReuseUnchangedCatalog) {
+        if (cachedReusableProducts) {
+          logSyncDiagnostic(
+            `produtos prontos cache_memoria count=${cachedReusableProducts.length} compact=${Boolean(options.compact)} em ${Date.now() - startedAt}ms`
+          );
+          return cachedReusableProducts;
+        }
+      }
+
       const remoteProducts = payload.map(parseMenuItem);
-      const mergedProducts = exibirImagem ? remoteProducts : mergeProductsWithCachedImages(remoteProducts, cachedProducts);
-      const products = await this.materializeProductImages(mergedProducts, cachedProducts);
-      await this.saveCachedProducts(products);
-      return products;
+      const mergedProducts =
+        exibirImagem || preserveCachedImages
+          ? exibirImagem
+            ? remoteProducts
+            : mergeProductsWithCachedImages(remoteProducts, cachedProducts)
+          : remoteProducts;
+      const products =
+        exibirImagem || preserveCachedImages
+          ? await this.materializeProductImages(mergedProducts, cachedProducts)
+          : stripInlineProductImages(mergedProducts);
+      if (loadSeq === this.productCatalogLoadSeq) {
+        await this.saveCachedProducts(products, {
+          fingerprint: remoteFingerprint
+        });
+      }
+      const resultProducts = options.compact ? products.map(toCatalogListMenuItem) : products;
+      logSyncDiagnostic(`produtos prontos count=${resultProducts.length} compact=${Boolean(options.compact)} em ${Date.now() - startedAt}ms`);
+      return resultProducts;
     } catch (error) {
       if (options.requireRemote) {
         throw error;
       }
-      return cachedProducts.length ? cachedProducts : fallbackProducts;
+      const fallback = cachedProducts.length ? cachedProducts : fallbackProducts;
+      return options.compact ? fallback.map(toCatalogListMenuItem) : fallback;
     }
   }
 
   async getProduct(idProduto: number, exibirImagem = true): Promise<MenuItem | null> {
-    const cachedProducts = await this.loadCachedProducts();
-    const cachedProduct = cachedProducts.find((item) => Number(item.idProduto || item.id || 0) === Number(idProduto || 0)) || null;
+    const cachedProduct = await this.loadCachedProduct(idProduto);
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/produto/${idProduto}?exibirImagem=${exibirImagem ? 'true' : 'false'}`,
       {
@@ -3072,28 +3999,34 @@ export class ApiClient {
   }
 
   async listTables(): Promise<TableOrder[]> {
-    const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/mesa`);
+    const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/mesa?_=${Date.now()}`, {
+      headers: NO_CACHE_HEADERS
+    });
     if (!Array.isArray(payload)) throw new Error('Erro na API ao carregar mesas');
     return payload.map((value) => parseTable(value, 'mesa'));
   }
 
   async listTablesBySaleStatus(situacaoVenda: string): Promise<TableOrder[]> {
     const payload = await this.requestJson(
-      `rpCheff/v1/empresa/${this.idEmpresa}/mesa?situacaoVenda=${encodeURIComponent(situacaoVenda)}`
+      `rpCheff/v1/empresa/${this.idEmpresa}/mesa?situacaoVenda=${encodeURIComponent(situacaoVenda)}&_=${Date.now()}`,
+      { headers: NO_CACHE_HEADERS }
     );
     if (!Array.isArray(payload)) throw new Error('Erro na API ao carregar mesas');
     return payload.map((value) => parseTable(value, 'mesa'));
   }
 
   async listComandas(): Promise<TableOrder[]> {
-    const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/comanda`);
+    const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/comanda?_=${Date.now()}`, {
+      headers: NO_CACHE_HEADERS
+    });
     if (!Array.isArray(payload)) throw new Error('Erro na API ao carregar comandas');
     return payload.map((value) => parseTable(value, 'comanda'));
   }
 
   async listComandasBySaleStatus(situacaoVenda: string): Promise<TableOrder[]> {
     const payload = await this.requestJson(
-      `rpCheff/v1/empresa/${this.idEmpresa}/comanda?situacaoVenda=${encodeURIComponent(situacaoVenda)}`
+      `rpCheff/v1/empresa/${this.idEmpresa}/comanda?situacaoVenda=${encodeURIComponent(situacaoVenda)}&_=${Date.now()}`,
+      { headers: NO_CACHE_HEADERS }
     );
     if (!Array.isArray(payload)) throw new Error('Erro na API ao carregar comandas');
     return payload.map((value) => parseTable(value, 'comanda'));
@@ -3261,9 +4194,10 @@ export class ApiClient {
 
   async getSale(idVenda: number, listarItens = true): Promise<Sale | null> {
     const { response, payload } = await this.request(
-      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}`,
+      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}?_=${Date.now()}`,
       {
         headers: {
+          ...NO_CACHE_HEADERS,
           listarItens: listarItens ? 'true' : 'false'
         }
       }

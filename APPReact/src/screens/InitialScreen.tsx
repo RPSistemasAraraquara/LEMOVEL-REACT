@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   Alert,
   FlatList,
+  InteractionManager,
   Modal,
   PermissionsAndroid,
   Pressable,
@@ -19,7 +20,15 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { Colors, Radius, Shadows, Space, Typography } from '../theme';
-import { formatTableStatusLabel, isTableStatusQuickLaunch, isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
+import {
+  api,
+  formatTableStatusLabel,
+  isTableStatusQuickLaunch,
+  isTableStatusReserved,
+  logSyncDiagnostic,
+  normalizeSaleStatus,
+  TableOrder
+} from '../services/api';
 import { TableCard } from '../components/TableCard';
 import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
 import { OpenTableNameModal } from '../components/OpenTableNameModal';
@@ -50,6 +59,8 @@ const getCameraViewComponent = (): React.ComponentType<any> | null => {
 };
 
 const VISIBLE_DASHBOARD_REFRESH_MS = 3000;
+const MENU_PREWARM_RETRY_MS = 1200;
+const MENU_PREWARM_MAX_RETRIES = 8;
 
 const statusText = (value: unknown): string => normalizeSaleStatus(value).toLowerCase();
 
@@ -138,9 +149,12 @@ export const InitialScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const {
     tables,
+    categories,
+    products,
     appSettings,
     settingsReady,
     refreshDashboard,
+    refreshMenu,
     flushPendingItems,
     cart,
     user,
@@ -178,10 +192,14 @@ export const InitialScreen: React.FC = () => {
   const autoSendTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartCountRef = React.useRef(0);
   const tableOpenLockRef = React.useRef(false);
+  const menuCatalogCountsRef = React.useRef({ categories: 0, products: 0 });
+  const menuWarmupInFlightRef = React.useRef(false);
+  const menuWarmupRetryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuWarmupRetryCountRef = React.useRef(0);
+  const lastMenuWarmupAtRef = React.useRef(0);
   const linkedMesaOpenAutoPromptRef = React.useRef(false);
   const lastWarningRef = React.useRef<{ message: string; at: number }>({ message: '', at: 0 });
   const filterInputRef = React.useRef<TextInput>(null);
-  const canUseCamera = Platform.OS !== 'web' && Boolean(CameraViewComponent);
   const cameraBusyRef = React.useRef(false);
   const dashboardRefreshInFlightRef = React.useRef(false);
   const configuredDisplayMode = appSettings.modoExibicao || 'mesa';
@@ -206,6 +224,60 @@ export const InitialScreen: React.FC = () => {
     saleTable: pendingLinkedMesaOpen?.table || null
   });
 
+  menuCatalogCountsRef.current = {
+    categories: categories.length,
+    products: products.length
+  };
+
+  const warmupMenuCache = React.useCallback(
+    async (reason: string) => {
+      if (!settingsReady || !user || menuWarmupInFlightRef.current) {
+        return;
+      }
+
+      if (api.isSyncAllRunning()) {
+        logSyncDiagnostic(`menu prewarm adiado origem=${reason}: syncAll em andamento`);
+        if (!menuWarmupRetryTimerRef.current && menuWarmupRetryCountRef.current < MENU_PREWARM_MAX_RETRIES) {
+          menuWarmupRetryCountRef.current += 1;
+          menuWarmupRetryTimerRef.current = setTimeout(() => {
+            menuWarmupRetryTimerRef.current = null;
+            void warmupMenuCache(`${reason}-retry`);
+          }, MENU_PREWARM_RETRY_MS);
+        }
+        return;
+      }
+
+      if (menuWarmupRetryTimerRef.current) {
+        clearTimeout(menuWarmupRetryTimerRef.current);
+        menuWarmupRetryTimerRef.current = null;
+      }
+      menuWarmupRetryCountRef.current = 0;
+
+      const now = Date.now();
+      const catalogCounts = menuCatalogCountsRef.current;
+      if (catalogCounts.categories > 0 && catalogCounts.products > 0 && now - lastMenuWarmupAtRef.current < 60000) {
+        return;
+      }
+
+      const startedAt = Date.now();
+      menuWarmupInFlightRef.current = true;
+      logSyncDiagnostic(
+        `menu prewarm inicio origem=${reason} cats=${catalogCounts.categories} produtos=${catalogCounts.products}`
+      );
+      try {
+        await refreshMenu({ preferCache: true });
+        lastMenuWarmupAtRef.current = Date.now();
+        logSyncDiagnostic(`menu prewarm fim origem=${reason} em ${Date.now() - startedAt}ms`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error || 'falha');
+        logSyncDiagnostic(`menu prewarm falhou origem=${reason}: ${message}`, 2);
+      } finally {
+        menuWarmupInFlightRef.current = false;
+      }
+    },
+    [refreshMenu, settingsReady, user]
+  );
+
   React.useEffect(() => {
     if (configuredDisplayMode === 'comanda') {
       if (visibleMode !== 'comanda') {
@@ -229,6 +301,30 @@ export const InitialScreen: React.FC = () => {
       setVisibleMode(initialScreenMode);
     }
   }, [configuredDisplayMode, initialScreenMode, setInitialScreenMode, visibleMode]);
+
+  React.useEffect(() => {
+    if (!isFocused || !settingsReady || !user) {
+      return undefined;
+    }
+
+    let warmupTimer: ReturnType<typeof setTimeout> | null = null;
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      warmupTimer = setTimeout(() => {
+        void warmupMenuCache('inicial-focus');
+      }, 250);
+    });
+
+    return () => {
+      if (warmupTimer) {
+        clearTimeout(warmupTimer);
+      }
+      if (menuWarmupRetryTimerRef.current) {
+        clearTimeout(menuWarmupRetryTimerRef.current);
+        menuWarmupRetryTimerRef.current = null;
+      }
+      interaction.cancel?.();
+    };
+  }, [isFocused, settingsReady, user, warmupMenuCache]);
 
   const menuItems: FilterItem[] = React.useMemo(() => {
     const base: FilterItem[] = [
@@ -396,10 +492,16 @@ export const InitialScreen: React.FC = () => {
         const opened = await openTableByCard(item.idMesa, effectiveName, item.tipo);
         setActiveTable(opened || item);
         setLinkedMesaSelection(normalizedLinkedMesa);
+        if (route === 'Cardapio') {
+          void warmupMenuCache('abrir-cardapio');
+        }
         navigation.navigate('Tabs', { screen: route } as never);
       } catch {
         setActiveTable(item);
         setLinkedMesaSelection(normalizedLinkedMesa);
+        if (route === 'Cardapio') {
+          void warmupMenuCache('abrir-cardapio-fallback');
+        }
         navigation.navigate('Tabs', { screen: route } as never);
         showDedupWarning('Atenção', 'Não foi possível abrir a venda agora. Você ainda pode selecionar itens no cardápio.');
       } finally {
@@ -408,7 +510,7 @@ export const InitialScreen: React.FC = () => {
         }, 350);
       }
     },
-    [navigation, openTableByCard, setActiveTable, setLinkedMesaSelection, showDedupWarning]
+    [navigation, openTableByCard, setActiveTable, setLinkedMesaSelection, showDedupWarning, warmupMenuCache]
   );
 
   const closeLinkedMesaOpenFlow = React.useCallback(() => {
@@ -506,6 +608,9 @@ export const InitialScreen: React.FC = () => {
 
     if (tableHasOpenSale) {
       setActiveTable(item);
+      if (route === 'Cardapio') {
+        void warmupMenuCache('abrir-cardapio');
+      }
       navigation.navigate('Tabs', { screen: route } as never);
       return;
     }
@@ -516,7 +621,7 @@ export const InitialScreen: React.FC = () => {
     }
 
     await beginOpenFlow(item, route);
-  }, [appSettings.exigeNomeAbertura, beginOpenFlow, navigation, requestOpenName, setActiveTable, settingsReady]);
+  }, [appSettings.exigeNomeAbertura, beginOpenFlow, navigation, requestOpenName, setActiveTable, settingsReady, warmupMenuCache]);
 
   const renderTableItem = React.useCallback(
     ({ item, index }: { item: TableOrder; index: number }) => (
@@ -577,6 +682,9 @@ export const InitialScreen: React.FC = () => {
       setReaderOpen(false);
       setReaderCameraOpen(false);
       setReaderText('');
+      if (nextRoute === 'Cardapio') {
+        void warmupMenuCache('abrir-cardapio-codigo');
+      }
       navigation.navigate('Tabs', { screen: nextRoute } as never);
     } catch {
       const fallback = tables.find((item) => item.idMesa === id);
@@ -595,6 +703,9 @@ export const InitialScreen: React.FC = () => {
       setReaderOpen(false);
       setReaderCameraOpen(false);
       setReaderText('');
+      if (route === 'Cardapio') {
+        void warmupMenuCache('abrir-cardapio-codigo-fallback');
+      }
       navigation.navigate('Tabs', { screen: route } as never);
       Alert.alert('Atenção', 'Não foi possível abrir a venda agora. Você ainda pode selecionar itens no cardápio.');
     } finally {
@@ -1516,5 +1627,3 @@ const styles = StyleSheet.create({
     marginBottom: Space.md
   }
 });
-
-

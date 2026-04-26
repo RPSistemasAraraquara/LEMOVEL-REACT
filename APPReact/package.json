@@ -9,6 +9,7 @@
     "android:native": "expo run:android",
     "android:release": "cd android && set NODE_ENV=production&& gradlew.bat installRelease",
     "android:dx8000": "cd android && set NODE_ENV=production&& gradlew.bat installRelease -PtargetArchitectures=armeabi-v7a",
+    "postinstall": "patch-package",
     "prebuild:android": "expo prebuild --platform android",
     "ios": "expo run:ios",
     "web": "expo start --web"
@@ -26,6 +27,7 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
+    "metro-runtime": "^0.84.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -37,6 +39,7 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   }
 }

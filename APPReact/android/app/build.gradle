@@ -132,8 +132,8 @@ android {
         applicationId resolveApplicationId()
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 105808
-        versionName "52.0.1"
+        versionCode 105810
+        versionName "52.0.3"
         manifestPlaceholders = [
             appScheme: resolveAppDeepLinkScheme()
         ]
@@ -227,4 +227,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+}
+
+def positivoSigningConfig = rootProject.file("positivo/positivo-signing-config.gradle")
+if (positivoSigningConfig.exists()) {
+    apply from: positivoSigningConfig
 }

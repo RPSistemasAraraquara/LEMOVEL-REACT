@@ -16,6 +16,7 @@ type
   TAPIRPCheffDAOVendaItem = class(TAPIRPCheffDAOBase<TAPIRPCheffEntityVendaItem>)
   private
     procedure Select;
+    procedure CarregarOpcionaisEmLote(AItens: TObjectList<TAPIRPCheffEntityVendaItem>);
 
 
   protected
@@ -240,7 +241,6 @@ begin
         if Result.tamanho = 'EXTRA' then
           Result.descricaoTamanho := ADataSet.FieldByName('tamanho_extra').AsString;
       end;
-      Result.opcionais := TAPIRPCheffDAOFactory(FactoryDAO).IdEmpresa(Result.idEmpresa).VendaItemOpcionalDAO.Listar(Result.idVenda, Result.numeroItem);
     except
       Result.Free;
       raise;
@@ -248,9 +248,77 @@ begin
   end;
 end;
 
+procedure TAPIRPCheffDAOVendaItem.CarregarOpcionaisEmLote(AItens: TObjectList<TAPIRPCheffEntityVendaItem>);
+var
+  I: Integer;
+  LIdVenda: Integer;
+  LIdEmpresa: Integer;
+  LMesmoContexto: Boolean;
+  LItem: TAPIRPCheffEntityVendaItem;
+  LItensPorNumero: TDictionary<Integer, TAPIRPCheffEntityVendaItem>;
+  LOpcional: TAPIRPCheffEntityVendaItemOpcional;
+  LOpcionais: TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
+  LCopia: TAPIRPCheffEntityVendaItemOpcional;
+begin
+  if (not Assigned(AItens)) or (AItens.Count = 0) then
+    Exit;
+
+  LIdVenda := AItens[0].idVenda;
+  LIdEmpresa := AItens[0].idEmpresa;
+  LMesmoContexto := True;
+  for I := 0 to Pred(AItens.Count) do
+  begin
+    if (AItens[I].idVenda <> LIdVenda) or (AItens[I].idEmpresa <> LIdEmpresa) then
+    begin
+      LMesmoContexto := False;
+      Break;
+    end;
+  end;
+
+  if not LMesmoContexto then
+  begin
+    for I := 0 to Pred(AItens.Count) do
+      AItens[I].opcionais := TAPIRPCheffDAOFactory(FactoryDAO)
+        .IdEmpresa(AItens[I].idEmpresa)
+        .VendaItemOpcionalDAO
+        .Listar(AItens[I].idVenda, AItens[I].numeroItem);
+    Exit;
+  end;
+
+  LOpcionais := nil;
+  LItensPorNumero := nil;
+  try
+    LOpcionais := TAPIRPCheffDAOFactory(FactoryDAO)
+      .IdEmpresa(LIdEmpresa)
+      .VendaItemOpcionalDAO
+      .ListarTodosPorVenda(LIdVenda);
+    LItensPorNumero := TDictionary<Integer, TAPIRPCheffEntityVendaItem>.Create;
+
+    for I := 0 to Pred(AItens.Count) do
+      LItensPorNumero.AddOrSetValue(AItens[I].numeroItem, AItens[I]);
+
+    for LOpcional in LOpcionais do
+      if LItensPorNumero.TryGetValue(LOpcional.idVendaItem, LItem) then
+      begin
+        LCopia := TAPIRPCheffEntityVendaItemOpcional.Create;
+        try
+          LCopia.Assign(LOpcional);
+          LItem.opcionais.Add(LCopia);
+        except
+          LCopia.Free;
+          raise;
+        end;
+      end;
+  finally
+    LItensPorNumero.Free;
+    LOpcionais.Free;
+  end;
+end;
+
 function TAPIRPCheffDAOVendaItem.DataSetToList(ADataSet: TDataSet): TObjectList<TAPIRPCheffEntityVendaItem>;
 begin
   Result := inherited;
+  CarregarOpcionaisEmLote(Result);
   TAPIRPCheffEntityVendaItem.SepararFracionados(Result);
 end;
 

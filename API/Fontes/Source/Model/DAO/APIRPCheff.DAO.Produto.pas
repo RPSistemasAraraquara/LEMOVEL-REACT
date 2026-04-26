@@ -14,6 +14,7 @@ type
   TAPIRPCheffDAOProduto = class(TAPIRPCheffDAOBase<TAPIRPCheffEntityProduto>)
   private
     FExibirImagem: Boolean;
+    procedure CarregarRelacionamentos(AProdutos: TObjectList<TAPIRPCheffEntityProduto>);
     procedure SelectProdutos;
     function CompactarImagemJpeg(const ABytes: TBytes): TMemoryStream;
     function CompactarImagemBase64(const ABytes: TBytes): string;
@@ -193,9 +194,65 @@ begin
     .Open;
   Result := DataSetToEntity(FQuery.DataSet);
   if Assigned(Result) then
+  begin
+    Result.promocao := TAPIRPCheffDAOFactory(FactoryDAO)
+      .IdEmpresa(FIdEmpresa)
+      .PromocaoDAO.Buscar(Result.idProduto);
     Result.opcionais := TAPIRPCheffDAOFactory(FactoryDAO)
       .IdEmpresa(FIdEmpresa)
       .OpcionalDAO.Lista(Result.idProduto);
+  end;
+end;
+
+procedure TAPIRPCheffDAOProduto.CarregarRelacionamentos(AProdutos: TObjectList<TAPIRPCheffEntityProduto>);
+var
+  LOpcionaisPorProduto: TDictionary<Integer, TObjectList<TAPIRPCheffEntityOpcional>>;
+  LPromocoesPorProduto: TDictionary<Integer, TAPIRPCheffEntityPromocao>;
+  LProduto: TAPIRPCheffEntityProduto;
+  LIdsProduto: TArray<Integer>;
+  LListaOpcional: TObjectList<TAPIRPCheffEntityOpcional>;
+  LPromocao: TAPIRPCheffEntityPromocao;
+  LPairOpcional: TPair<Integer, TObjectList<TAPIRPCheffEntityOpcional>>;
+  LPairPromocao: TPair<Integer, TAPIRPCheffEntityPromocao>;
+  I: Integer;
+begin
+  if (not Assigned(AProdutos)) or (AProdutos.Count = 0) then
+    Exit;
+
+  SetLength(LIdsProduto, AProdutos.Count);
+  for I := 0 to Pred(AProdutos.Count) do
+    LIdsProduto[I] := AProdutos[I].idProduto;
+
+  LOpcionaisPorProduto := TAPIRPCheffDAOFactory(FactoryDAO)
+    .IdEmpresa(FIdEmpresa)
+    .OpcionalDAO.ListaPorProdutos(LIdsProduto);
+  LPromocoesPorProduto := TAPIRPCheffDAOFactory(FactoryDAO)
+    .IdEmpresa(FIdEmpresa)
+    .PromocaoDAO.ListaPorProdutos(LIdsProduto);
+  try
+    for LProduto in AProdutos do
+    begin
+      if LOpcionaisPorProduto.TryGetValue(LProduto.idProduto, LListaOpcional) then
+      begin
+        LProduto.opcionais := LListaOpcional;
+        LOpcionaisPorProduto.Remove(LProduto.idProduto);
+      end;
+
+      if LPromocoesPorProduto.TryGetValue(LProduto.idProduto, LPromocao) then
+      begin
+        LProduto.promocao := LPromocao;
+        LPromocoesPorProduto.Remove(LProduto.idProduto);
+      end;
+    end;
+
+    for LPairOpcional in LOpcionaisPorProduto do
+      LPairOpcional.Value.Free;
+    for LPairPromocao in LPromocoesPorProduto do
+      LPairPromocao.Value.Free;
+  finally
+    LOpcionaisPorProduto.Free;
+    LPromocoesPorProduto.Free;
+  end;
 end;
 
 function TAPIRPCheffDAOProduto.DataSetToEntity(ADataSet: TDataSet): TAPIRPCheffEntityProduto;
@@ -266,8 +323,6 @@ begin
       Result.possuiImagem                      := ADataSet.FieldByName('possui_imagem').AsBoolean;
       if FExibirImagem and (not ADataSet.FieldByName('imagem_db').IsNull) then
         Result.imagem                          := CompactarImagemBase64(ADataSet.FieldByName('imagem_db').AsBytes);
-      // Avaliar a perda de performance com isso
-      Result.promocao := TAPIRPCheffDAOFactory(FactoryDAO).IdEmpresa(FIdEmpresa).PromocaoDAO.Buscar(Result.idProduto);
     except
       Result.Free;
       raise;
@@ -276,25 +331,16 @@ begin
 end;
 
 function TAPIRPCheffDAOProduto.Lista: TObjectList<TAPIRPCheffEntityProduto>;
-var
-  LProduto: TAPIRPCheffEntityProduto;
 begin
   SelectProdutos;
   FQuery.SQL('where emp_001 = :idEmpresa')
     .SQL('and sit_001 = 4')
+    .SQL('and b_venda_mobile = true')
     .SQL('order by mat_003')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .Open;
   Result := DataSetToList(FQuery.DataSet);
-  try
-    for LProduto in Result do
-    begin
-      LProduto.opcionais := TAPIRPCheffDAOFactory(FactoryDAO)
-        .IdEmpresa(FIdEmpresa)
-        .OpcionalDAO.Lista(LProduto.idProduto);
-    end;
-  except
-  end;
+  CarregarRelacionamentos(Result);
 end;
 
 function TAPIRPCheffDAOProduto.Lista(AIdCategoria: Integer): TObjectList<TAPIRPCheffEntityProduto>;
@@ -303,11 +349,13 @@ begin
   FQuery.SQL('where emp_001 = :idEmpresa')
     .SQL('and cat_001 = :idCategoria')
     .SQL('and sit_001 = 4')
+    .SQL('and b_venda_mobile = true')
     .SQL('order by mat_003')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .ParamAsInteger('idCategoria', AIdCategoria)
     .Open;
   Result := DataSetToList(FQuery.DataSet);
+  CarregarRelacionamentos(Result);
 end;
 
 procedure TAPIRPCheffDAOProduto.SelectProdutos;
@@ -323,7 +371,7 @@ begin
     .SQL('nao_dia_sab, nao_dia_dom,                                                                      ')
     .SQL('b_permite_frac, b_proximogratis, qtdeproximogratis, usaQuantidadeDecimal,                      ')
     .SQL('valor_tabela2, valor_atacado, preco4, preco5, preco6, preco7,b_ficha_individual,b_venda_mobile, ')
-    .SQL('mat_012, mat_006, mat_022, case when imagem_db is not null then true else false end as possui_imagem');
+    .SQL('mat_012, mat_006, case when imagem_db is not null then true else false end as possui_imagem');
   if FExibirImagem then
     FQuery.SQL(', imagem_db');
   FQuery.SQL('from materiais');

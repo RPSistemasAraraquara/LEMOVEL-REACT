@@ -195,7 +195,7 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.configButtonLabel}>Abrir configuração</Text>
           </Pressable>
 
-          <Text style={styles.versionLabel}>Versão 52.0.1</Text>
+          <Text style={styles.versionLabel}>Versão 12.0.0</Text>
         </View>
       </ScrollView>
       <Text style={styles.footer}>www.sistemalechef.com.br</Text>

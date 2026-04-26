@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command \"msbuild\" -ErrorAction SilentlyContinue)",
+      "PowerShell($env:NODE_ENV = \"production\"; Set-Location \"C:\\\\RN\\\\android\"; & \".\\\\gradlew.bat\" assembleRelease 2>&1)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Rafael\\Desktop\\Developer\\Fast FOOD\\LEMOVEL-REACT\\APPReact\\android\\app\\.cxx"
+    ]
+  }
+}

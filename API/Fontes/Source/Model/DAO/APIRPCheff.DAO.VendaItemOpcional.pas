@@ -20,6 +20,7 @@ type
     procedure Inserir(AVendaItemOpcional: TAPIRPCheffEntityVendaItemOpcional);
     function ListarAgrupadoPorProduto(AIdVenda,ANumeroItem: Integer): TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
     function ListarPorVenda(AidVenda:Integer): TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
+    function ListarTodosPorVenda(AidVenda:Integer): TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
   end;
 
 implementation
@@ -108,6 +109,23 @@ begin
     FreeAndNil(LDataSet);
    end;
 
+end;
+
+function TAPIRPCheffDAOVendaItemOpcional.ListarTodosPorVenda(AidVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
+var
+  LDataSet: TDataSet;
+begin
+  Select;
+  LDataSet := Query.SQL(' where vendaitemopcional.id_venda = :idVenda and vendaitemopcional.id_empresa = :idEmpresa ')
+                   .SQL(' order by vendaitemopcional.id_vendaitem')
+                   .ParamAsInteger('idEmpresa', FIdEmpresa)
+                   .ParamAsInteger('idVenda', AIdVenda)
+                   .OpenDataSet;
+  try
+    Result := DataSetToList(LDataSet);
+  finally
+    FreeAndNil(LDataSet);
+  end;
 end;
 
 

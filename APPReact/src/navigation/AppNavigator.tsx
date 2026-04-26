@@ -1,5 +1,6 @@
 import React from 'react';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, Pressable, StyleSheet } from 'react-native';
@@ -32,7 +33,7 @@ import { GlobalSweetAlertHost } from '../components/GlobalSweetAlertHost';
 
 export type RootStackParams = {
   Login: undefined;
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParams> | undefined;
   Inicial: { autoSendPending?: boolean } | undefined;
   Produtos: undefined;
   Categorias: undefined;
@@ -74,8 +75,8 @@ export type RootStackParams = {
   };
   Pagamento: { idVenda: number };
   PagamentoProgresso: { idVenda: number };
-  Transferencia: { idMesaOrigem: number; idVenda?: number };
-  JuntarMesa: { idVendaDestino?: number };
+  Transferencia: { idMesaOrigem: number; idVenda?: number; tableType?: 'mesa' | 'comanda' };
+  JuntarMesa: { idVendaDestino?: number; tableType?: 'mesa' | 'comanda' };
   Carrinho: undefined;
 };
 
@@ -105,6 +106,8 @@ function BottomButtonBar({ state, descriptors, navigation }: BottomTabBarProps) 
   const insets = useSafeAreaInsets();
   const stackNavigation = navigation.getParent<NativeStackNavigationProp<RootStackParams>>();
   const activeTab = ((state.routes[state.index]?.name || 'Cardapio') as 'Mesas' | 'Cardapio' | 'Gestao');
+  const canShowPreClosureButton = Boolean(user?.permitePreFechamentoMesaComanda);
+  const canShowFinalClosureButton = Boolean(user?.permiteFechamentoMesaComanda);
   const [sweetAlert, setSweetAlert] = React.useState<{
     visible: boolean;
     title: string;
@@ -185,6 +188,17 @@ function BottomButtonBar({ state, descriptors, navigation }: BottomTabBarProps) 
       <View style={[styles.tabBarSafeArea, { paddingBottom: Math.max(insets.bottom, Space.xs) + 6 }]}>
         <View style={styles.tabBarContainer}>
           {state.routes.map((route, index) => {
+            const shouldShowButton =
+              route.name === 'Mesas'
+                ? canShowPreClosureButton
+                : route.name === 'Cardapio'
+                  ? canShowFinalClosureButton
+                  : true;
+
+            if (!shouldShowButton) {
+              return null;
+            }
+
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
             const label = (typeof options.tabBarLabel === 'string'
@@ -371,12 +385,12 @@ export function AppNavigator() {
               <Stack.Screen
                 name="Pagamento"
                 component={SalePaymentScreen}
-                options={{ headerShown: true, headerTitle: 'Pagamento' }}
+                options={{ headerShown: true, headerTitle: 'Pagamento', animation: 'none' }}
               />
               <Stack.Screen
                 name="PagamentoProgresso"
                 component={PaymentProgressScreen}
-                options={{ headerShown: true, headerTitle: 'Progresso de pagamento' }}
+                options={{ headerShown: true, headerTitle: 'Progresso de pagamento', animation: 'none' }}
               />
               <Stack.Screen
                 name="Transferencia"

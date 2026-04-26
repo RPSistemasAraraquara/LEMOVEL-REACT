@@ -13,9 +13,12 @@ type Route = RouteProp<RootStackParams, 'Transferencia' | 'JuntarMesa'>;
 export const TransferMergeScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation();
-  const routeMesaOrigem = route.name === 'Transferencia' ? route.params.idMesaOrigem : 0;
-  const routeVendaDestino = route.name === 'JuntarMesa' ? route.params.idVendaDestino : undefined;
-  const { tables, refreshDashboard, activeTable, user } = useApp();
+  const transferParams = route.name === 'Transferencia' ? (route.params as RootStackParams['Transferencia']) : undefined;
+  const mergeParams = route.name === 'JuntarMesa' ? (route.params as RootStackParams['JuntarMesa']) : undefined;
+  const routeMesaOrigem = transferParams?.idMesaOrigem || 0;
+  const routeVendaDestino = mergeParams?.idVendaDestino;
+  const routeTableType = mergeParams?.tableType || transferParams?.tableType;
+  const { tables, refreshDashboard, activeTable, user, setActiveTable } = useApp();
   const [filterText, setFilterText] = useState('');
   const [selectedTargetIds, setSelectedTargetIds] = useState<number[]>([]);
   const [selectedOriginSaleIds, setSelectedOriginSaleIds] = useState<number[]>([]);
@@ -36,7 +39,7 @@ export const TransferMergeScreen: React.FC = () => {
     tables.find((table) => Number(table.idVenda || 0) === destinationSaleId) ||
     tables.find((table) => Number(table.idMesa || 0) === sourceTableId) ||
     null;
-  const currentType = currentTable?.tipo;
+  const currentType = currentTable?.tipo || routeTableType;
   const getTransferId = (table: (typeof tables)[number]) =>
     Number(table.tipo === 'comanda' ? table.idComanda || table.idMesa || 0 : table.idMesa || 0);
 
@@ -229,9 +232,56 @@ export const TransferMergeScreen: React.FC = () => {
                   Number(user?.idUsuario || 0)
                 );
               }
-              await refreshDashboard(undefined, { force: true });
+              const destinationId = selectedTargetIds[0];
+              const dashboardMode = currentType === 'comanda' ? 'comanda' : 'mesa';
+              await refreshDashboard(dashboardMode, { force: true });
+
+              const transferredSale = currentTable?.idVenda
+                ? await api.getSale(Number(currentTable.idVenda), true)
+                : null;
+              const freshTargets = dashboardMode === 'comanda'
+                ? await api.listComandas()
+                : await api.listTables();
+              const destinationTable =
+                freshTargets.find((table) => getTransferId(table) === destinationId) ||
+                availableTransferTargets.find((table) => getTransferId(table) === destinationId) || null;
+              let transferredActiveTable: NonNullable<typeof currentTable> | null = null;
+
+              if (currentTable?.idVenda && destinationTable) {
+                const saleTotal = Number(transferredSale?.valorTotal ?? transferredSale?.valor ?? currentTable.valorTotal ?? 0);
+                transferredActiveTable = {
+                  ...destinationTable,
+                  idVenda: Number(currentTable.idVenda),
+                  tipo: dashboardMode,
+                  idComanda: dashboardMode === 'comanda' ? Number(destinationTable.idComanda || destinationTable.idMesa || destinationId) : destinationTable.idComanda,
+                  nomeMesaComanda:
+                    destinationTable.nomeMesaComanda ||
+                    transferredSale?.nomeMesaComanda ||
+                    `${dashboardMode === 'comanda' ? 'Comanda' : 'Mesa'} ${destinationId}`,
+                  situacao: transferredSale?.situacao || destinationTable.situacao,
+                  valorTotal: saleTotal,
+                  venda: {
+                    ...destinationTable.venda,
+                    idVenda: Number(currentTable.idVenda),
+                    situacao: transferredSale?.situacao || destinationTable.venda?.situacao,
+                    nomeMesaComanda: destinationTable.nomeMesaComanda || transferredSale?.nomeMesaComanda || destinationTable.venda?.nomeMesaComanda,
+                    valorTotal: saleTotal,
+                    valorPagamentoAntecipado: destinationTable.venda?.valorPagamentoAntecipado
+                  }
+                };
+                setActiveTable(transferredActiveTable);
+              }
+
               Alert.alert('Concluído', 'Transferido com sucesso.', [
-                { text: 'OK', onPress: () => navigation.navigate('Inicial' as never) }
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    if (transferredActiveTable) {
+                      setActiveTable(transferredActiveTable);
+                    }
+                    navigation.goBack();
+                  }
+                }
               ]);
             } catch (error: any) {
               Alert.alert('Erro', error?.message || 'Não foi possível transferir.');
@@ -272,8 +322,9 @@ export const TransferMergeScreen: React.FC = () => {
           onPress: async () => {
             setLoading(true);
             try {
+              const dashboardMode = currentType === 'comanda' ? 'comanda' : currentType === 'mesa' ? 'mesa' : undefined;
               await api.joinSales(destinationSaleId, selectedOriginSaleIds);
-              await refreshDashboard(undefined, { force: true });
+              await refreshDashboard(dashboardMode, { force: true });
               Alert.alert('Concluído', 'Mesas juntadas com sucesso.', [
                 { text: 'OK', onPress: () => navigation.goBack() }
               ]);

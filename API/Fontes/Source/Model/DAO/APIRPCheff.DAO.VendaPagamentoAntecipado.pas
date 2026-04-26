@@ -85,6 +85,7 @@ begin
     Result := TAPIRPCheffEntityVendaPagamentoAntecipado.Create;
     try
       Result.idVenda                                := ADataSet.FieldByName('id_venda').AsInteger;
+      Result.idVendaPagamentoAntecipado             := ADataSet.FieldByName('id_venda_pag_antecipado').AsInteger;
       Result.idEmpresa                              := ADataSet.FieldByName('id_empresa').AsInteger;
       Result.dataHora                               := ADataSet.FieldByName('data_hora').AsDateTime;
       Result.valor                                  := ADataSet.FieldByName('valor').AsCurrency;
@@ -96,7 +97,25 @@ begin
       Result.TaxaServico                            := ADataSet.FieldByName('b_taxa').AsBoolean;
       Result.ValorTaxaServico                       := ADataSet.FieldByName('valor_taxa').AsCurrency;
       Result.ValorProduto                           := ADataSet.FieldByName('valor_prod').AsCurrency;
-      Result.formaPagamento                         := TAPIRPCheffDAOFactory(FactoryDAO).FormaPagamentoDAO.GetFormaPagamento(Result.idFormaPagamento);
+      if ADataSet.FieldByName('exibir_forma_app').AsBoolean then
+      begin
+        Result.formaPagamento.codigo                         := Result.idFormaPagamento;
+        Result.formaPagamento.idEmpresa                      := Result.idEmpresa;
+        Result.formaPagamento.descricao                      := ADataSet.FieldByName('for_002').AsString;
+        Result.formaPagamento.sfiCodigo                      := ADataSet.FieldByName('sfi_codigo').AsInteger;
+        Result.formaPagamento.cortesia                       := ADataSet.FieldByName('b_cortesia').AsBoolean;
+        Result.formaPagamento.utilizaControleCartao          := ADataSet.FieldByName('utiliza_controle_cartao').AsBoolean;
+        Result.formaPagamento.idContaCorrente                := ADataSet.FieldByName('id_contacorrente').AsInteger;
+        Result.formaPagamento.taxaCartao                     := ADataSet.FieldByName('taxa_cartao').AsCurrency;
+        Result.formaPagamento.prazoCartao                    := ADataSet.FieldByName('prazo_cartao').AsInteger;
+        Result.formaPagamento.utilizaPagamentoOnline         := ADataSet.FieldByName('utilizaPagamentoOnline').AsBoolean;
+        Result.formaPagamento.PermitePagamentoParceladoOnline := ADataSet.FieldByName('permite_pag_parcelado').AsBoolean;
+        Result.formaPagamento.Juros                          := ADataSet.FieldByName('juros').AsFloat;
+        Result.formaPagamento.emiteFiscal                    := ADataSet.FieldByName('emite_fiscal').AsBoolean;
+        Result.formaPagamento.ExibirFormaPgtoAPP             := ADataSet.FieldByName('exibir_forma_app').AsBoolean;
+      end
+      else
+        Result.formaPagamento := nil;
       Result.situacao.FromDBValue(ADataSet.FieldByName('id_situacao').AsInteger);
     except
       Result.Free;
@@ -129,8 +148,9 @@ begin
     .SQL('  venda_pag_antecipado.id_formapgto, venda_pag_antecipado.valor,                                              ')
     .SQL('  venda_pag_antecipado.data_hora, venda_pag_antecipado.id_situacao,                                           ')
     .SQL('  formapgto.for_002, formapgto.sit_001, formapgto.sfi_codigo, formapgto.b_cortesia,                           ')
-    .SQL('  formapgto.utiliza_controle_cartao, formapgto.id_contacorrente,                                              ')
-    .SQL('  formapgto.taxa_cartao, formapgto.prazo_cartao,                                                              ')
+    .SQL('  formapgto.permite_pag_parcelado, formapgto.utiliza_controle_cartao, formapgto.id_contacorrente,              ')
+    .SQL('  formapgto.taxa_cartao, formapgto.prazo_cartao, formapgto.utilizaPagamentoOnline,                             ')
+    .SQL('  formapgto.juros, formapgto.emite_fiscal, formapgto.exibir_forma_app,                                         ')
     .SQL('  venda_pag_antecipado.id_caixa, venda_pag_antecipado.id_caixaitem, venda_pag_antecipado.observacao,          ')
     .SQL('  venda_pag_antecipado.id_usuario,  venda_pag_antecipado.b_taxa, venda_pag_antecipado.valor_taxa,             ')
     .SQL('  venda_pag_antecipado.valor_prod                                                                             ')

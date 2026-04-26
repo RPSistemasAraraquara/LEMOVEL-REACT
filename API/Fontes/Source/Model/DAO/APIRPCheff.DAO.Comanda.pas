@@ -96,6 +96,29 @@ function TAPIRPCheffDAOComanda.ListarPorSituacaoVenda(ASituacao: TRPCheffSituaca
 var
   LDataSet: TDataSet;
 begin
+  if ASituacao = svPendente then
+  begin
+    FQuery.SQL('select')
+      .SQL('  coalesce(venda.ven_026, 0) as com_001,')
+      .SQL('  coalesce(venda.nome_mesa_comanda, ''Comanda '' || cast(coalesce(venda.ven_026, 0) as varchar(20))) as com_002,')
+      .SQL('  cast(coalesce(venda.ven_026, 0) as varchar(20)) as com_003,')
+      .SQL('  venda.emp_001, venda.sit_001, venda.ven_001')
+      .SQL('from venda')
+      .SQL('where venda.emp_001 = :idEmpresa')
+      .SQL('and venda.sit_001 = :situacao')
+      .SQL('and venda.ven_024 = ''C''')
+      .SQL('order by venda.ven_026, venda.ven_001')
+      .ParamAsInteger('idEmpresa', FIdEmpresa)
+      .ParamAsInteger('situacao', ASituacao.DBValue);
+    LDataSet := FQuery.OpenDataSet;
+    try
+      Result := DataSetToList(LDataSet);
+    finally
+      FreeAndNil(LDataSet);
+    end;
+    Exit;
+  end;
+
   Select;
   FQuery.SQL('and comanda.emp_001 = :idEmpresa')
     .SQL('and comanda.sit_001 in (4)')

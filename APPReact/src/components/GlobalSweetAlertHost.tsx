@@ -76,7 +76,7 @@ export const installGlobalSweetAlert = () => {
 
   Alert.alert = ((title?: string, message?: string, buttons?: AlertButton[], options?: AlertOptions) => {
     if (!showGlobalAlert) {
-      return originalAlert?.(title, message, buttons, options);
+      return originalAlert?.(title || '', message, buttons, options);
     }
 
     const resolvedButtons = resolveButtons(buttons);

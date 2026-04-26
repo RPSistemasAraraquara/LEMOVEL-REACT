@@ -88,6 +88,9 @@ var
 begin
   for LIdVendaOrigem in FIdVendasOrigem do
   begin
+    if LIdVendaOrigem = FIdVendaDestino then
+      raise Exception.Create('Nao e possivel juntar a venda com ela mesma.');
+
     LVenda := FDAO.VendaDAO.Buscar(LIdVendaOrigem);
     try
       if not Assigned(LVenda) then

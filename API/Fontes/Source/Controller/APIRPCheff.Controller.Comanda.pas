@@ -98,8 +98,8 @@ begin
   begin
     LSituacao := TRPCheffSituacaoVenda(TEnumUtils<TRPCheffSituacaoVenda>
       .EnumValue(FRequest.Query.Field('situacaoVenda').AsString));
-    LComandas := Controller.DAO.IdEmpresa(IdEmpresa).ComandaDAO
-      .ListarPorSituacaoVenda(LSituacao);
+    LComandas := Controller.Service
+      .ComandaConsultaService.ListarPorSituacao(LSituacao);
   end
   else
   begin

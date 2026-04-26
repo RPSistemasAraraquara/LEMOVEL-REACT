@@ -38,22 +38,25 @@ var
   LVendaItemOpcional : TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
   I,J :Integer;
 begin
-   FFechamento := AFechamento;
+  FFechamento := AFechamento;
 
-  for I :=0 to Pred(FParent.VendaItens.Count) do
-  begin
-    FVendaItem        := FParent.VendaItens[I];
-    LVendaItemOpcional:=FParent.DAO.VendaItemOpcionalDAO.ListarPorVenda(FVendaItem.idVenda);
-    try
+  if FParent.VendaItens.Count = 0 then
+    Exit;
+
+  LVendaItemOpcional := FParent.DAO.VendaItemOpcionalDAO.ListarPorVenda(FParent.VendaItens[0].idVenda);
+  try
+    for I :=0 to Pred(FParent.VendaItens.Count) do
+    begin
+      FVendaItem := FParent.VendaItens[I];
       for J :=0 to Pred(LVendaItemOpcional.Count) do
       begin
-        FVendaItemOpcional:=LVendaItemOpcional[J];
+        FVendaItemOpcional := LVendaItemOpcional[J];
         InserirMovimentoSetorEstoqueOpcional;
-       InserirMovimentoEstoqueOpcional;
+        InserirMovimentoEstoqueOpcional;
       end;
-    finally
-      FreeAndNil(LVendaItemOpcional);
     end;
+  finally
+    FreeAndNil(LVendaItemOpcional);
   end;
 end;
 

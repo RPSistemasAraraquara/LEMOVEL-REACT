@@ -13,29 +13,38 @@ type Route = RouteProp<RootStackParams, 'PagamentoProgresso'>;
 
 export const PaymentProgressScreen: React.FC = () => {
   const route = useRoute<Route>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { activeTable } = useApp();
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<SalePayment[]>([]);
   const idVenda = route.params?.idVenda || activeTable?.idVenda;
   const [valorTotal, setValorTotal] = useState(0);
+  const loadSeqRef = React.useRef(0);
 
-  const load = async () => {
+  const load = React.useCallback(async () => {
     if (!idVenda) return;
+    const loadSeq = ++loadSeqRef.current;
     setLoading(true);
     try {
-      const sale = await api.getSale(idVenda, false);
+      const [sale, list] = await Promise.all([
+        api.getSale(idVenda, false),
+        api.listPaymentsBySale(idVenda)
+      ]);
+      if (loadSeq !== loadSeqRef.current) {
+        return;
+      }
       setValorTotal(sale?.valorTotal || sale?.valor || 0);
-      const list = await api.listPaymentsBySale(idVenda);
       setPayments(list);
     } finally {
-      setLoading(false);
+      if (loadSeq === loadSeqRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [idVenda]);
 
   useEffect(() => {
     load();
-  }, [idVenda]);
+  }, [load]);
 
   const recebido = useMemo(() => payments.reduce((acc, item) => acc + (item.valor || 0), 0), [payments]);
   const percentual = valorTotal > 0 ? Math.min(100, (recebido / valorTotal) * 100) : 0;

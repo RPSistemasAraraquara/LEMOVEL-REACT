@@ -424,12 +424,12 @@ begin
       .SQL(' ven_001,  emp_001, dat_001_1, ven_025, cli_001,')
       .SQL(' sit_001, usu_001_1, ven_024, ven_029, ven_004, ')
       .SQL(' id_caixa_abertura, ven_026, terminal_abertura, nome_mesa_comanda,')
-      .SQL(' nro_pessoas)')
+      .SQL(' nro_pessoas, id_garcom_abertura)')
       .SQL('values (')
       .SQL(' :ven_001, :emp_001, :dat_001_1, :ven_025, :cli_001,')
       .SQL(' :sit_001, :usu_001_1, :VEN_024, :ven_029, :ven_004,')
       .SQL(' :id_caixa_abertura, :ven_026, :terminal_abertura, :nome_mesa_comanda,')
-      .SQL(' :nro_pessoas)')
+      .SQL(' :nro_pessoas, :id_garcom_abertura)')
       .ParamAsInteger('ven_001', AVenda.idVenda)
       .ParamAsInteger('emp_001', FIdEmpresa)
       .ParamAsDateTime('dat_001_1', AVenda.dataAbertura)
@@ -445,6 +445,7 @@ begin
       .ParamAsString('terminal_abertura', AVenda.terminalAbertura, True)
       .ParamAsString('nome_mesa_comanda', AVenda.nomeMesaComanda, True)
       .ParamAsInteger('nro_pessoas', AVenda.numeroPessoas, True)
+      .ParamAsInteger('id_garcom_abertura', AVenda.idUsuario, True)
       .ExecSQL;
 
     Commit;

@@ -86,6 +86,7 @@ const IMPRESSAO_PAGINAS = ['CP437', 'Windows-1252', 'ISO-8859-1', 'UTF-8'];
 const BLUETOOTH_LIST = ['Nenhuma', 'BT: Impressora Sala', 'BT: Impressora Cozinha', 'BT: Impressora Entrada'];
 type IntegrationValue = 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo' | 'getnet';
 type GetNetModelValue = 'DX8000' | 'P2' | 'P3' | 'P4' | 'N910' | 'APOSA8';
+type StoneModelValue = 'P2' | 'L400';
 
 const INTEGRACAO_OPTIONS: Array<{ label: string; value: IntegrationValue }> = [
   { label: 'Vero', value: 'vero' },
@@ -96,6 +97,23 @@ const INTEGRACAO_OPTIONS: Array<{ label: string; value: IntegrationValue }> = [
 ];
 
 const GETNET_MODEL_OPTIONS: GetNetModelValue[] = ['DX8000', 'P2', 'P3', 'P4', 'N910', 'APOSA8'];
+const STONE_MODEL_OPTIONS: StoneModelValue[] = ['P2', 'L400'];
+
+const normalizeStoneModel = (value: unknown, fallback: StoneModelValue = 'P2'): StoneModelValue => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+
+  if (normalized === 'L400' || normalized === 'POSITIVO' || normalized === 'POSITIVO L400') {
+    return 'L400';
+  }
+
+  if (normalized === 'P2' || normalized === 'P2-B' || normalized === 'SUNMI' || normalized === 'STONE') {
+    return 'P2';
+  }
+
+  return fallback;
+};
 
 const normalizeGetNetModel = (value: unknown, fallback: GetNetModelValue = 'P2'): GetNetModelValue => {
   const normalized = String(value || '')
@@ -125,7 +143,7 @@ const normalizeGetNetModel = (value: unknown, fallback: GetNetModelValue = 'P2')
 };
 
 const getMachineModelLabel = (value: IntegrationValue): string => {
-  if (value === 'stone') return 'Stone';
+  if (value === 'stone') return 'P2';
   if (value === 'pagbank') return 'PagBank';
   if (value === 'cielo') return 'Cielo';
   if (value === 'getnet') return 'P2';
@@ -165,7 +183,9 @@ const toSettingsState = (settings: MobileAppSettings): SettingsState => ({
   utilizaMaquininhaStone: settings.utilizaMaquininhaStone,
   tipoIntegracao: settings.tipoIntegracao,
   modeloMaquininha:
-    settings.tipoIntegracao === 'getnet'
+    settings.tipoIntegracao === 'stone'
+      ? normalizeStoneModel(settings.modeloMaquininha)
+      : settings.tipoIntegracao === 'getnet'
       ? normalizeGetNetModel(settings.modeloMaquininha)
       : settings.modeloMaquininha
 });
@@ -206,7 +226,9 @@ const toMobileAppSettings = (
   utilizaMaquininhaStone: values.utilizaMaquininhaStone || values.tipoIntegracao !== 'nenhum',
   tipoIntegracao: values.tipoIntegracao,
   modeloMaquininha:
-    values.tipoIntegracao === 'getnet'
+    values.tipoIntegracao === 'stone'
+      ? normalizeStoneModel(values.modeloMaquininha)
+      : values.tipoIntegracao === 'getnet'
       ? normalizeGetNetModel(values.modeloMaquininha)
       : values.modeloMaquininha
 });
@@ -366,7 +388,9 @@ export const SettingsScreen: React.FC = () => {
       ...prev,
       tipoIntegracao: value,
       modeloMaquininha:
-        value === 'getnet'
+        value === 'stone'
+          ? normalizeStoneModel(prev.modeloMaquininha)
+          : value === 'getnet'
           ? normalizeGetNetModel(prev.modeloMaquininha)
           : getMachineModelLabel(value)
     }));
@@ -708,14 +732,14 @@ export const SettingsScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <ScreenRouteLabel />
-      <SectionHeader title="Configurações" subtitle="Todos os campos do formulário RPCheff.View.Configuracoes." />
+      <SectionHeader title="Configurações" />
 
       <Section title="Servidor e Login">
         <FieldInput
           label="Servidor (API)"
           value={settingMemo.servidor}
           onChangeText={(text) => setValue('servidor', text)}
-          placeholder="http://192.168.x.x:9000/"
+          placeholder="http://104.234.189.194:9000/"
         />
         <FieldInput
           label="Terminal de impressão"
@@ -935,6 +959,14 @@ export const SettingsScreen: React.FC = () => {
                 </Pressable>
               ))}
             </View>
+            {settingMemo.tipoIntegracao === 'stone' ? (
+              <FieldSelect
+                label="Modelo Stone"
+                value={normalizeStoneModel(settingMemo.modeloMaquininha)}
+                options={STONE_MODEL_OPTIONS}
+                onChange={(value) => setComboValue('modeloMaquininha', normalizeStoneModel(value))}
+              />
+            ) : null}
             {settingMemo.tipoIntegracao === 'getnet' ? (
               <>
                 <FieldSelect

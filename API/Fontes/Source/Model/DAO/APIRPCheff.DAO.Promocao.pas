@@ -7,7 +7,8 @@ uses
   APIRPCheff.Entity.Classes,
   APIRPCheff.Entity.Types,
   Data.DB,
-  System.SysUtils;
+  System.SysUtils,
+  System.Generics.Collections;
 
 type
   TAPIRPCheffDAOPromocao = class(TAPIRPCheffDAOBase<TAPIRPCheffEntityPromocao>)
@@ -17,6 +18,7 @@ type
     function DataSetToEntity(ADataSet: TDataSet): TAPIRPCheffEntityPromocao; override;
   public
     function Buscar(AIdProduto: Integer): TAPIRPCheffEntityPromocao;
+    function ListaPorProdutos(const AIdsProduto: TArray<Integer>): TDictionary<Integer, TAPIRPCheffEntityPromocao>;
   end;
 
 implementation
@@ -106,6 +108,60 @@ begin
       Result.Free;
       raise;
     end;
+  end;
+end;
+
+function TAPIRPCheffDAOPromocao.ListaPorProdutos(
+  const AIdsProduto: TArray<Integer>): TDictionary<Integer, TAPIRPCheffEntityPromocao>;
+var
+  LDataSet: TDataSet;
+  LPromocao: TAPIRPCheffEntityPromocao;
+  LPair: TPair<Integer, TAPIRPCheffEntityPromocao>;
+  LInClause: string;
+  LIdProduto: Integer;
+  I: Integer;
+begin
+  Result := TDictionary<Integer, TAPIRPCheffEntityPromocao>.Create;
+  if Length(AIdsProduto) = 0 then
+    Exit;
+
+  LInClause := '';
+  for I := Low(AIdsProduto) to High(AIdsProduto) do
+  begin
+    if LInClause <> '' then
+      LInClause := LInClause + ', ';
+    LInClause := LInClause + ':idProduto' + IntToStr(I);
+  end;
+
+  try
+    Select;
+    Query.SQL('where id_empresa = :idEmpresa')
+      .SQL('and id_material in (' + LInClause + ')')
+      .ParamAsInteger('idEmpresa', FIdEmpresa);
+    for I := Low(AIdsProduto) to High(AIdsProduto) do
+      Query.ParamAsInteger('idProduto' + IntToStr(I), AIdsProduto[I]);
+
+    LDataSet := Query.OpenDataSet;
+    try
+      LDataSet.First;
+      while not LDataSet.Eof do
+      begin
+        LPromocao := DataSetToEntity(LDataSet);
+        LIdProduto := LDataSet.FieldByName('id_material').AsInteger;
+        if Assigned(LPromocao) and (not Result.ContainsKey(LIdProduto)) then
+          Result.Add(LIdProduto, LPromocao)
+        else
+          LPromocao.Free;
+        LDataSet.Next;
+      end;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+  except
+    for LPair in Result do
+      LPair.Value.Free;
+    Result.Free;
+    raise;
   end;
 end;
 

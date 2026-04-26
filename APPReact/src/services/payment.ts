@@ -1,6 +1,6 @@
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Linking, NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import { MobileAppSettings, PaymentMethod } from './api';
+import { logSyncDiagnostic, MobileAppSettings, PaymentMethod } from './api';
 import { getGetNetPaymentEnvironment, getGetNetPosDigitalInfo } from './getnetPosDigital';
 import {
   loadStoredGetNetSubsellers,
@@ -85,6 +85,7 @@ const GETNET_RESULT_PENDING = 5;
 type PaymentTerminalTransactionType = 'credit' | 'debit' | 'pix' | 'voucher';
 
 type GetNetModelValue = 'DX8000' | 'P2' | 'P3' | 'P4' | 'N910' | 'APOSA8';
+type StoneModelValue = 'P2' | 'L400';
 
 type RPCheffGetNetIntentTarget = {
   packageName?: string;
@@ -107,6 +108,7 @@ type RPCheffNativePlugPagPayload = {
 type RPCheffNativePlugPagPrintPayload = {
   content: string;
   columns?: number;
+  model?: string;
   title?: string;
 };
 
@@ -275,6 +277,132 @@ const normalizeText = (value?: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
+type PaymentErrorWithCode = Error & { code?: string };
+
+export type RPCheffMachinePaymentErrorDetails = {
+  code?: string;
+  rawMessage: string;
+  message: string;
+  diagnostic: string;
+};
+
+const normalizeDiagnosticText = (value?: string): string =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractErrorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const value = error as Record<string, unknown>;
+  const candidates = [
+    value.code,
+    value.errorCode,
+    value.nativeCode,
+    (value.userInfo as Record<string, unknown> | undefined)?.code
+  ];
+  const found = candidates.find((item) => item !== undefined && item !== null && String(item).trim().length > 0);
+  return found !== undefined && found !== null ? String(found).trim() : undefined;
+};
+
+const extractErrorMessage = (error: unknown): string => {
+  if (!error) return '';
+  if (typeof error === 'string') return error.trim();
+  if (error instanceof Error && error.message) return error.message.trim();
+  if (typeof error === 'object') {
+    const value = error as Record<string, unknown>;
+    const candidates = [value.message, value.mensagem, value.description, value.localizedMessage];
+    const found = candidates.find((item) => typeof item === 'string' && String(item).trim().length > 0);
+    if (typeof found === 'string') return found.trim();
+  }
+  return '';
+};
+
+const createMachinePaymentError = (message: string, code?: string): PaymentErrorWithCode => {
+  const error = new Error(message) as PaymentErrorWithCode;
+  if (code) {
+    error.code = code;
+  }
+  return error;
+};
+
+export const describeMachinePaymentError = (
+  providerLabel: string,
+  error: unknown
+): RPCheffMachinePaymentErrorDetails => {
+  const code = extractErrorCode(error);
+  const rawMessage = normalizeDiagnosticText(extractErrorMessage(error));
+  const normalizedMessage = normalizeText(rawMessage);
+  const normalizedCode = normalizeText(code);
+  let message = rawMessage;
+
+  if (!message) {
+    message = `Falha ao processar pagamento na ${providerLabel}.`;
+  }
+
+  if (normalizedMessage.includes('nenhum pagamento foi registrado')) {
+    return {
+      code,
+      rawMessage,
+      message,
+      diagnostic: `code=${code || 'sem-codigo'} message=${rawMessage || 'sem-mensagem'}`
+    };
+  }
+
+  if (normalizedMessage.includes('tempo') || normalizedMessage.includes('timeout') || normalizedCode.includes('timeout')) {
+    message = `A ${providerLabel} demorou para responder. Nenhum pagamento foi registrado no app. Confira se a transação apareceu na maquininha antes de tentar novamente.`;
+  } else if (normalizedMessage.includes('cancel') || normalizedCode.includes('cancel')) {
+    message = `Operação cancelada na ${providerLabel}. Nenhum pagamento foi registrado no app.`;
+  } else if (normalizedCode.includes('busy') || normalizedMessage.includes('em andamento')) {
+    message = `Já existe um pagamento ${providerLabel} em andamento. Aguarde a maquininha finalizar antes de tentar novamente.`;
+  } else if (normalizedMessage === 'erro de processamento' || normalizedMessage.includes('erro de processamento')) {
+    message = `A ${providerLabel} retornou "Erro de Processamento". Nenhum pagamento foi registrado no app. Confira a mensagem na maquininha e tente novamente.`;
+  } else if (!normalizedMessage.includes('nenhum pagamento foi registrado')) {
+    message = `${message} Nenhum pagamento foi registrado no app.`;
+  }
+
+  return {
+    code,
+    rawMessage,
+    message,
+    diagnostic: `code=${code || 'sem-codigo'} message=${rawMessage || 'sem-mensagem'} friendly=${message}`
+  };
+};
+
+const summarizeNativePaymentResult = (raw: unknown): string => {
+  if (!raw || typeof raw !== 'object') {
+    return `rawType=${typeof raw}`;
+  }
+
+  const value = raw as Record<string, unknown>;
+  const keys = [
+    'approved',
+    'success',
+    'sucesso',
+    'status',
+    'code',
+    'codigo',
+    'statusCode',
+    'responseCode',
+    'message',
+    'mensagem',
+    'responseMessage',
+    'description',
+    'descricao',
+    'sfiCodigo',
+    'typeTransaction',
+    'transactionType'
+  ];
+  const pairs = keys
+    .filter((key) => value[key] !== undefined && value[key] !== null)
+    .map((key) => `${key}=${normalizeDiagnosticText(String(value[key]))}`);
+
+  if (pairs.length > 0) {
+    return pairs.join(' ');
+  }
+
+  return `keys=${Object.keys(value).slice(0, 8).join(',') || 'sem-chaves'}`;
+};
+
 const createNsu = () => `MOB-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
 const detectSfiByText = (text?: string): number | undefined => {
@@ -422,6 +550,22 @@ export const formatPaymentProviderLabel = (provider: RPCheffPaymentProvider): st
 const formatGetNetAmount = (value: number): string => {
   const cents = Math.max(1, Math.round(Number(value || 0) * 100));
   return String(cents).padStart(12, '0');
+};
+
+const normalizeStoneTerminalModel = (value: unknown, fallback: StoneModelValue = 'P2'): StoneModelValue => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+
+  if (normalized === 'L400' || normalized === 'POSITIVO' || normalized === 'POSITIVO L400') {
+    return 'L400';
+  }
+
+  if (normalized === 'P2' || normalized === 'P2-B' || normalized === 'SUNMI' || normalized === 'STONE') {
+    return 'P2';
+  }
+
+  return fallback;
 };
 
 const createGetNetCallerId = (): string => {
@@ -1583,6 +1727,7 @@ const executeNativeTerminalReceiptPrint = async ({
   providerLabel,
   content,
   columns,
+  model,
   title,
   timeoutMessage
 }: {
@@ -1594,6 +1739,7 @@ const executeNativeTerminalReceiptPrint = async ({
   providerLabel: string;
   content: string;
   columns?: number;
+  model?: string;
   title?: string;
   timeoutMessage: string;
 }): Promise<boolean> => {
@@ -1612,6 +1758,7 @@ const executeNativeTerminalReceiptPrint = async ({
       printFn({
         content: printableContent,
         ...(typeof columns === 'number' && Number.isFinite(columns) ? { columns } : {}),
+        ...(typeof model === 'string' && model.trim() ? { model: model.trim() } : {}),
         ...(typeof title === 'string' && title.trim() ? { title: title.trim() } : {})
       }),
       60000,
@@ -1640,6 +1787,7 @@ export const executeStoneReceiptPrint = async ({
     providerLabel: 'Stone',
     content,
     columns: Number(settings.impressaoColunas || 32),
+    model: normalizeStoneTerminalModel(settings.modeloMaquininha),
     title,
     timeoutMessage: 'Tempo limite ao imprimir na Stone.'
   });
@@ -1697,16 +1845,38 @@ const executeStoneNative = async (
   };
 
   let rawResult: unknown;
+  const startedAt = Date.now();
+  logSyncDiagnostic(
+    `pagamento stone nativo inicio idVenda=${input.idVenda || 0} forma=${input.method.codigo} valor=${input.value.toFixed(2)} amount=${payload.amount} sfi=${sfiCodigo} tipo=${transactionType}`
+  );
   try {
-    rawResult = await methodFn(payload);
+    notifyPaymentProgress(input, 'Abrindo Stone. Aguarde a confirmação na maquininha.');
+    rawResult = await withTimeout(
+      methodFn(payload),
+      NATIVE_PAYMENT_TIMEOUT_MS,
+      'Tempo limite ao aguardar retorno da Stone.'
+    );
+    logSyncDiagnostic(
+      `pagamento stone nativo retorno idVenda=${input.idVenda || 0} ${summarizeNativePaymentResult(rawResult)} em ${Date.now() - startedAt}ms`
+    );
   } catch (error: any) {
-    throw new Error(error?.message || 'Falha ao processar pagamento na maquininha Stone.');
+    const details = describeMachinePaymentError('Stone', error);
+    logSyncDiagnostic(
+      `pagamento stone nativo erro idVenda=${input.idVenda || 0} ${details.diagnostic} em ${Date.now() - startedAt}ms`,
+      2
+    );
+    throw createMachinePaymentError(details.message, details.code);
   }
 
   const approved = parseNativeApproved(rawResult);
   const message = parseNativeMessage(rawResult);
   if (!approved) {
-    throw new Error(message || 'Pagamento negado pela maquininha Stone.');
+    const details = describeMachinePaymentError('Stone', { message: message || 'Pagamento negado pela maquininha Stone.' });
+    logSyncDiagnostic(
+      `pagamento stone nativo negado idVenda=${input.idVenda || 0} ${details.diagnostic} em ${Date.now() - startedAt}ms`,
+      2
+    );
+    throw createMachinePaymentError(details.message, details.code);
   }
 
   return {

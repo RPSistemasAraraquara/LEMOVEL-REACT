@@ -32,7 +32,7 @@ const getSizeOptions = (
   getPriceBySize: (item: MenuItem, sizeCode: string) => number
 ): SizeOption[] => {
   const defaultPrice = getPriceBySize(product, String(product.tamanhoPadrao || ''));
-  const hasSizeByFlow = product.vendaPorTamanho || product.permiteFracao;
+  const hasSizeByFlow = product.vendaPorTamanho;
   if (!hasSizeByFlow) {
     return [{
       code: product.tamanhoPadrao || 'U',
@@ -128,8 +128,8 @@ const goToReturnScreen = (navigation: Nav, returnTo: ReturnTarget, returnCategor
 const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
   const tabParams =
     typeof returnCategoryId === 'number'
-      ? { screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } }
-      : { screen: 'Cardapio' };
+      ? ({ screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } } as const)
+      : ({ screen: 'Cardapio' } as const);
   const targetReset = {
     index: 1,
     routes: [
@@ -156,10 +156,10 @@ const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
   }
 
   try {
-    navigation.navigate('Tabs' as never, tabParams as never);
+    navigation.navigate('Tabs', tabParams);
   } catch (error: unknown) {
     void error;
-    navigation.navigate('Inicial' as never);
+    navigation.navigate('Inicial');
   }
 };
 
@@ -176,7 +176,7 @@ const goToReturnWithPending = async (
 };
 
 const getPriceBySize = (product: MenuItem, sizeCode: string): number => {
-  if (!product.vendaPorTamanho && !product.permiteFracao) {
+  if (!product.vendaPorTamanho) {
     return Number(product.valorUnitario || product.valorVenda || 0);
   }
 
@@ -1127,4 +1127,3 @@ const styles = StyleSheet.create({
     lineHeight: 20
   }
 });
-

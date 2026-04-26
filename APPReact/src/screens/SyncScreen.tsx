@@ -3,7 +3,7 @@ import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
-import { api, quickConnectionCheckTimeoutMs } from '../services/api';
+import { api, logSyncDiagnostic, quickConnectionCheckTimeoutMs } from '../services/api';
 import type { SyncResult, SyncTaskResult } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -56,6 +56,20 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const formatDuration = (durationMs?: number) => {
+  if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0) {
+    return '';
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs}ms`;
+  }
+
+  return `${(durationMs / 1000).toFixed(1)}s`;
+};
+
 export const SyncScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams, 'Sincronizar'>>();
   const {
@@ -72,7 +86,10 @@ export const SyncScreen: React.FC = () => {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const isBusy = busyOperation !== null;
 
-  const append = (text: string) => setLog((prev) => [text, ...prev.slice(0, 12)]);
+  const append = (text: string) => {
+    logSyncDiagnostic(`ui ${text}`);
+    setLog((prev) => [text, ...prev.slice(0, 31)]);
+  };
   const progressTranslate = useMemo(
     () =>
       progressAnim.interpolate({
@@ -117,7 +134,12 @@ export const SyncScreen: React.FC = () => {
 
   const runPostSyncRefresh = async (
     includePermissions = false,
-    options: { preferCachedMenu?: boolean; preferCachedPermissions?: boolean } = {}
+    options: {
+      preferCachedMenu?: boolean;
+      preferCachedPermissions?: boolean;
+      includeDashboard?: boolean;
+      includeMenu?: boolean;
+    } = {}
   ) => {
     const refreshTasks: Array<{ label: string; execute: () => Promise<unknown> }> = [
       ...(includePermissions
@@ -128,11 +150,33 @@ export const SyncScreen: React.FC = () => {
             }
           ]
         : []),
-      { label: 'Cardápio', execute: () => refreshMenu({ preferCache: options.preferCachedMenu }) },
-      { label: 'Painel', execute: () => refreshDashboard(undefined, { force: true }) }
+      ...(options.includeMenu === false
+        ? []
+        : [{ label: 'Cardápio', execute: () => refreshMenu({ preferCache: options.preferCachedMenu }) }]),
+      ...(options.includeDashboard === false
+        ? []
+        : [{ label: 'Painel', execute: () => refreshDashboard(undefined, { force: true }) }])
     ];
 
-    const settled = await Promise.allSettled(refreshTasks.map((item) => item.execute()));
+    const executeRefreshTask = async (item: { label: string; execute: () => Promise<unknown> }) => {
+      const startedAt = Date.now();
+      try {
+        const result = await item.execute();
+        append(`Atualização ${item.label} em ${formatDuration(Date.now() - startedAt)}`);
+        return result;
+      } catch (error) {
+        const message = extractErrorMessage(error, '');
+        if (message.toLowerCase().includes('sincronização interrompida')) {
+          await wait(250);
+          const result = await item.execute();
+          append(`Atualização ${item.label} em ${formatDuration(Date.now() - startedAt)}`);
+          return result;
+        }
+        throw error;
+      }
+    };
+
+    const settled = await Promise.allSettled(refreshTasks.map((item) => executeRefreshTask(item)));
     return settled.flatMap((result, index) => {
       if (result.status === 'fulfilled') {
         return [];
@@ -140,19 +184,47 @@ export const SyncScreen: React.FC = () => {
 
       const reason = extractErrorMessage(result.reason, 'Falha ao atualizar a tela.');
       return [`${refreshTasks[index].label}: ${reason}`];
-    });
+      });
   };
+
+  const refreshMenuInBackground = (preferCache = true) => {
+    const startedAt = Date.now();
+    void refreshMenu({ preferCache })
+      .then(() => {
+        logSyncDiagnostic(`ui Atualização Cardápio em segundo plano em ${formatDuration(Date.now() - startedAt)}`);
+      })
+      .catch((error) => {
+        logSyncDiagnostic(`ui Atualização Cardápio em segundo plano falhou: ${extractErrorMessage(error, 'falha')}`, 2);
+      });
+  };
+
+  const refreshDashboardInBackground = () => {
+    const startedAt = Date.now();
+    void refreshDashboard(undefined, { force: true })
+      .then(() => {
+        logSyncDiagnostic(`ui Atualização Painel em segundo plano em ${formatDuration(Date.now() - startedAt)}`);
+      })
+      .catch((error) => {
+        logSyncDiagnostic(`ui Atualização Painel em segundo plano falhou: ${extractErrorMessage(error, 'falha')}`, 2);
+      });
+  };
+
+  const formatTaskLogLine = (item: SyncTaskResult) => {
+    const marker = item.status === 'ok' ? '✓' : item.status === 'skip' ? '•' : '✗';
+    const duration = formatDuration(item.durationMs);
+    return `${marker} ${item.key}${duration ? ` (${duration})` : ''}: ${item.message}`;
+  };
+
+  const getSyncTaskIssues = (items?: SyncTaskResult[]) =>
+    (items || []).filter((item) => item.status !== 'ok').map((item) => `${item.key}: ${item.message}`);
 
   const appendSyncSummary = (result: SyncResult) => {
     append(`Sincronização concluída em ${result.timestamp || 'agora'} | status: ${result.status}`);
-    if (result.summary?.length) {
+
+    if (!result.details?.length && result.summary?.length) {
       result.summary.forEach((item) => append(item));
     }
   };
-
-  const hasSyncTaskErrors = (items?: SyncTaskResult[]) => items?.some((item) => item.status === 'error') ?? false;
-  const didSyncTaskSucceed = (items: SyncTaskResult[] | undefined, key: string) =>
-    items?.some((item) => String(item.key).toLowerCase() === key && item.status !== 'error') ?? false;
 
   const executeFull = async () => {
     if (isBusy) {
@@ -171,17 +243,27 @@ export const SyncScreen: React.FC = () => {
       }
 
       append('Iniciando sincronização completa...');
-      const result = await api.syncAll();
-      const canUseCachedMenu = didSyncTaskSucceed(result.details, 'catalogo');
-      const canUseCachedPermissions = didSyncTaskSucceed(result.details, 'usuarios');
-      const refreshIssues = await runPostSyncRefresh(true, {
-        preferCachedMenu: canUseCachedMenu,
-        preferCachedPermissions: canUseCachedPermissions
+      if (api.isSyncAllRunning()) {
+        append('Já existe uma sincronização completa em andamento. Aguardando a execução atual terminar...');
+      }
+      const result = await api.syncAll({
+        onTaskStart: (task) => append(`Sincronizando etapa: ${task}`),
+        onTaskFinish: (taskResult) => append(formatTaskLogLine(taskResult))
       });
+      const refreshIssues = await runPostSyncRefresh(true, {
+        preferCachedMenu: true,
+        preferCachedPermissions: true,
+        includeDashboard: false,
+        includeMenu: false
+      });
+      refreshMenuInBackground(true);
+      refreshDashboardInBackground();
       appendSyncSummary(result);
+      const syncIssues = getSyncTaskIssues(result.details);
+      syncIssues.forEach((item) => append(`Pendência de sincronização: ${item}`));
       refreshIssues.forEach((item) => append(`Atualização pendente: ${item}`));
 
-      if (!hasSyncTaskErrors(result.details) && refreshIssues.length === 0) {
+      if (syncIssues.length === 0 && refreshIssues.length === 0) {
         Alert.alert('Concluído', 'Sincronização completa concluída.');
         navigation.reset({
           index: 0,
@@ -190,7 +272,15 @@ export const SyncScreen: React.FC = () => {
         return;
       }
 
-      Alert.alert('Atenção', 'Sincronização concluída com pendências. Consulte o log.');
+      const issuePreview = [...syncIssues, ...refreshIssues.map((item) => `Atualização: ${item}`)]
+        .slice(0, 3)
+        .join('\n');
+      Alert.alert(
+        'Atenção',
+        issuePreview
+          ? `Sincronização concluída com pendências:\n${issuePreview}`
+          : 'Sincronização concluída com pendências. Consulte o log.'
+      );
     } catch (error: any) {
       const message = extractErrorMessage(error, 'Não foi possível sincronizar.');
       append(`Falha: ${message}`);

@@ -5,15 +5,19 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Parcel;
 import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
@@ -26,6 +30,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.PermissionAwareActivity;
+import com.facebook.react.modules.core.PermissionListener;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,16 +40,31 @@ import org.json.JSONTokener;
 
 import com.sunmi.trans.TransBean;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import woyou.aidlservice.jiuiv5.ICallback;
 import woyou.aidlservice.jiuiv5.IWoyouService;
 
-public class RPCheffStoneModule extends ReactContextBaseJavaModule implements ActivityEventListener {
+public class RPCheffStoneModule extends ReactContextBaseJavaModule implements ActivityEventListener, PermissionListener {
   private static final String RETURN_SCHEME = "stone-rpmobile";
   private static final String RETURN_SCHEME_CANCEL = "stone-rpmobile-cancel";
   private static final String SUNMI_PRINTER_PACKAGE = "woyou.aidlservice.jiuiv5";
   private static final String SUNMI_PRINTER_ACTION = "woyou.aidlservice.jiuiv5.IWoyouService";
+  private static final String POSITIVO_PRINTER_PACKAGE = "com.xcheng.printerservice";
+  private static final String POSITIVO_PRINTER_ACTION = "com.xcheng.printerservice.IPrinterService";
+  private static final String POSITIVO_PRINTER_PERMISSION = "com.pos.permission.PRINTER";
+  private static final String XCHENG_PRINTER_DESCRIPTOR = "com.xcheng.printerservice.IPrinterService";
+  private static final String XCHENG_PRINTER_CALLBACK_DESCRIPTOR = "com.xcheng.printerservice.IPrinterCallback";
+  private static final int POSITIVO_PRINTER_PERMISSION_REQUEST = 52040;
+  private static final int XCHENG_PRINTER_INIT = 4;
+  private static final int XCHENG_PRINTER_PRINT_TEXT = 7;
+  private static final int XCHENG_PRINTER_PRINT_BITMAP = 10;
+  private static final int XCHENG_CALLBACK_ON_EXCEPTION = 1;
+  private static final int XCHENG_CALLBACK_ON_LENGTH = 2;
+  private static final int XCHENG_CALLBACK_ON_REAL_LENGTH = 3;
+  private static final int XCHENG_CALLBACK_ON_COMPLETE = 4;
   private static final long DEFAULT_TIMEOUT_MS = 180000L;
   private static final String OPERATION_PAYMENT = "payment";
   private static final String OPERATION_PRINT = "print";
@@ -52,6 +73,8 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
   private static final int SUNMI_BITMAP_TYPE_BLACK_AND_WHITE = 1;
   private static final int SUNMI_SEPARATOR_HEIGHT = 1;
   private static final int SUNMI_BLANK_LINE_HEIGHT = 1;
+  private static final int POSITIVO_BITMAP_CHUNK_MAX_HEIGHT = 600;
+  private static final int POSITIVO_BOTTOM_FEED_HEIGHT = 160;
   private static final float FONT_SIZE_SMALL = 20f;
   private static final float FONT_SIZE_MEDIUM = 24f;
   private static final float FONT_SIZE_BIG = 30f;
@@ -64,10 +87,96 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
   private String pendingOperation;
   private IWoyouService sunmiPrinterService;
   private ServiceConnection sunmiPrinterConnection;
+  private IBinder positivoPrinterService;
+  private ServiceConnection positivoPrinterConnection;
+  private String pendingPositivoPrintContent;
   private boolean lastPrintedSeparator;
   private boolean suppressNextSeparator;
   private boolean pendingWaitersHeader;
   private String pendingSummaryMetricLine;
+
+  private static final class ReceiptPrintLine {
+    final String text;
+    final String align;
+    final String size;
+    final String style;
+
+    ReceiptPrintLine(String text, String align, String size, String style) {
+      this.text = text;
+      this.align = align;
+      this.size = size;
+      this.style = style;
+    }
+  }
+
+  private interface XchengPrinterCallbackEvents {
+    void onComplete();
+    void onException(int code, String message);
+  }
+
+  private static final class XchengPrinterCallbackBinder extends Binder {
+    private final XchengPrinterCallbackEvents events;
+
+    XchengPrinterCallbackBinder(XchengPrinterCallbackEvents events) {
+      this.events = events;
+      attachInterface(null, XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+    }
+
+    @Override
+    public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
+      if (code == INTERFACE_TRANSACTION) {
+        if (reply != null) {
+          reply.writeString(XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+        }
+        return true;
+      }
+
+      switch (code) {
+        case XCHENG_CALLBACK_ON_EXCEPTION: {
+          data.enforceInterface(XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+          int errorCode = data.readInt();
+          String message = data.readString();
+          if (reply != null) {
+            reply.writeNoException();
+          }
+          if (events != null) {
+            events.onException(errorCode, message);
+          }
+          return true;
+        }
+        case XCHENG_CALLBACK_ON_LENGTH: {
+          data.enforceInterface(XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+          data.readLong();
+          data.readLong();
+          if (reply != null) {
+            reply.writeNoException();
+          }
+          return true;
+        }
+        case XCHENG_CALLBACK_ON_REAL_LENGTH: {
+          data.enforceInterface(XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+          data.readDouble();
+          data.readDouble();
+          if (reply != null) {
+            reply.writeNoException();
+          }
+          return true;
+        }
+        case XCHENG_CALLBACK_ON_COMPLETE: {
+          data.enforceInterface(XCHENG_PRINTER_CALLBACK_DESCRIPTOR);
+          if (reply != null) {
+            reply.writeNoException();
+          }
+          if (events != null) {
+            events.onComplete();
+          }
+          return true;
+        }
+        default:
+          return super.onTransact(code, data, reply, flags);
+      }
+    }
+  }
 
   public RPCheffStoneModule(ReactApplicationContext reactContext) {
     super(reactContext);
@@ -149,6 +258,7 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     }
 
     String content = payload.hasKey("content") ? safe(payload.getString("content")) : "";
+    String model = payload.hasKey("model") ? safe(payload.getString("model")) : "";
     if (content.isEmpty()) {
       promise.reject("STONE_PRINT_EMPTY", "Conteúdo de impressão vazio.");
       return;
@@ -158,7 +268,11 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
       pendingPromise = promise;
       pendingOperation = OPERATION_PRINT;
       scheduleTimeout();
-      if (!startSunmiPrint(content)) {
+      if (isStoneL400Model(model)) {
+        if (!startPositivoPrintWithPermission(content)) {
+          startStonePrinterAppFallback(content);
+        }
+      } else if (!startSunmiPrint(content)) {
         startStonePrinterAppFallback(content);
       }
     } catch (Throwable error) {
@@ -168,6 +282,656 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
         error
       );
     }
+  }
+
+  private boolean isStoneL400Model(String model) {
+    String normalized = safeLower(model).replace("-", "").replace(" ", "");
+    return normalized.contains("l400") || normalized.contains("positivo");
+  }
+
+  private boolean startPositivoPrintWithPermission(final String content) {
+    if (hasPositivoPrinterPermission()) {
+      return startPositivoPrint(content);
+    }
+
+    Activity activity = getCurrentActivity();
+    if (!(activity instanceof PermissionAwareActivity)) {
+      return false;
+    }
+
+    pendingPositivoPrintContent = content;
+    ((PermissionAwareActivity) activity).requestPermissions(
+      new String[] { POSITIVO_PRINTER_PERMISSION },
+      POSITIVO_PRINTER_PERMISSION_REQUEST,
+      this
+    );
+    return true;
+  }
+
+  private boolean hasPositivoPrinterPermission() {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+      || getReactApplicationContext().checkSelfPermission(POSITIVO_PRINTER_PERMISSION) == PackageManager.PERMISSION_GRANTED;
+  }
+
+  @Override
+  public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    if (requestCode != POSITIVO_PRINTER_PERMISSION_REQUEST) {
+      return false;
+    }
+
+    String content = pendingPositivoPrintContent;
+    pendingPositivoPrintContent = null;
+
+    if (pendingPromise == null || !OPERATION_PRINT.equals(pendingOperation)) {
+      return true;
+    }
+
+    boolean granted = grantResults != null
+      && grantResults.length > 0
+      && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+    if (!granted) {
+      rejectAndClear(
+        "STONE_L400_PERMISSION_DENIED",
+        "Permissão da impressora Stone L400 negada.",
+        null
+      );
+      return true;
+    }
+
+    try {
+      if (!startPositivoPrint(content)) {
+        startStonePrinterAppFallback(content);
+      }
+    } catch (Throwable error) {
+      rejectAndClear(
+        "STONE_L400_PRINT_ERROR",
+        error.getMessage() == null ? "Falha ao iniciar impressão na Stone L400." : error.getMessage(),
+        error
+      );
+    }
+    return true;
+  }
+
+  private boolean startPositivoPrint(final String content) {
+    final ReactApplicationContext context = getReactApplicationContext();
+    final Intent intent = new Intent();
+    intent.setPackage(POSITIVO_PRINTER_PACKAGE);
+    intent.setAction(POSITIVO_PRINTER_ACTION);
+
+    unbindPositivoPrinter();
+    positivoPrinterConnection = new ServiceConnection() {
+      @Override
+      public void onServiceConnected(ComponentName name, IBinder service) {
+        positivoPrinterService = service;
+        try {
+          executePositivoPrint(content);
+        } catch (Throwable error) {
+          rejectPositivoPrint(
+            "STONE_L400_PRINT_ERROR",
+            error.getMessage() == null ? "Falha ao imprimir pela Stone L400." : error.getMessage(),
+            error
+          );
+        }
+      }
+
+      @Override
+      public void onServiceDisconnected(ComponentName name) {
+        positivoPrinterService = null;
+        if (pendingPromise != null && OPERATION_PRINT.equals(pendingOperation)) {
+          rejectPositivoPrint(
+            "STONE_L400_PRINTER_DISCONNECTED",
+            "Serviço da impressora Stone L400 foi desconectado.",
+            null
+          );
+        }
+      }
+    };
+
+    try {
+      final boolean bound = context.bindService(intent, positivoPrinterConnection, Context.BIND_AUTO_CREATE);
+      if (!bound) {
+        unbindPositivoPrinter();
+      }
+      return bound;
+    } catch (Throwable error) {
+      unbindPositivoPrinter();
+      return false;
+    }
+  }
+
+  private void executePositivoPrint(String content) throws RemoteException, JSONException {
+    if (positivoPrinterService == null) {
+      throw new RemoteException("Serviço Positivo indisponível.");
+    }
+
+    try {
+      printPositivoBitmapReceipt(content);
+    } catch (Throwable bitmapError) {
+      printPositivoTextReceipt(content);
+    }
+  }
+
+  private void printPositivoBitmapReceipt(String content) throws RemoteException, JSONException {
+    List<ReceiptPrintLine> lines = collectReceiptPrintLines(content);
+    if (lines.isEmpty()) {
+      throw new RemoteException("Conteúdo de impressão vazio para Stone L400.");
+    }
+
+    List<Bitmap> bitmaps = renderPositivoReceiptBitmapChunks(lines);
+    if (bitmaps.isEmpty()) {
+      throw new RemoteException("Falha ao renderizar impressão Stone L400.");
+    }
+
+    try {
+      callXchengPrinterInit(positivoPrinterService, new XchengPrinterCallbackBinder(null));
+      printNextPositivoBitmapChunk(bitmaps, 0);
+    } catch (Throwable error) {
+      recycleBitmaps(bitmaps);
+      if (error instanceof RemoteException) {
+        throw (RemoteException) error;
+      }
+      throw new RemoteException(error.getMessage() == null ? "Falha ao imprimir imagem na Stone L400." : error.getMessage());
+    }
+  }
+
+  private void printNextPositivoBitmapChunk(final List<Bitmap> bitmaps, final int index) {
+    if (index >= bitmaps.size()) {
+      recycleBitmaps(bitmaps);
+      resolvePositivoPrint("Impressão concluída na Stone L400.");
+      return;
+    }
+
+    final Bitmap bitmap = bitmaps.get(index);
+    try {
+      callXchengPrinterPrintBitmap(positivoPrinterService, bitmap, new XchengPrinterCallbackBinder(new XchengPrinterCallbackEvents() {
+        @Override
+        public void onComplete() {
+          timeoutHandler.post(new Runnable() {
+            @Override
+            public void run() {
+              recycleBitmap(bitmap);
+              printNextPositivoBitmapChunk(bitmaps, index + 1);
+            }
+          });
+        }
+
+        @Override
+        public void onException(final int code, final String message) {
+          timeoutHandler.post(new Runnable() {
+            @Override
+            public void run() {
+              recycleBitmaps(bitmaps);
+              rejectPositivoPrint(
+                "STONE_L400_PRINT_ERROR",
+                resolveXchengPrinterErrorMessage(code, message),
+                null
+              );
+            }
+          });
+        }
+      }));
+    } catch (Throwable error) {
+      recycleBitmaps(bitmaps);
+      rejectPositivoPrint(
+        "STONE_L400_PRINT_ERROR",
+        error.getMessage() == null ? "Falha ao enviar imagem para Stone L400." : error.getMessage(),
+        error
+      );
+    }
+  }
+
+  private void printPositivoTextReceipt(String content) throws RemoteException, JSONException {
+    String printableText = buildPositivoPrintableText(content);
+    if (printableText.trim().isEmpty()) {
+      throw new RemoteException("Conteúdo de impressão vazio para Stone L400.");
+    }
+
+    callXchengPrinterInit(positivoPrinterService, new XchengPrinterCallbackBinder(null));
+    callXchengPrinterPrintText(positivoPrinterService, ensurePositivoFeed(printableText), new XchengPrinterCallbackBinder(new XchengPrinterCallbackEvents() {
+      @Override
+      public void onComplete() {
+        resolvePositivoPrint("Impressão concluída na Stone L400.");
+      }
+
+      @Override
+      public void onException(final int code, final String message) {
+        rejectPositivoPrint(
+          "STONE_L400_PRINT_ERROR",
+          resolveXchengPrinterErrorMessage(code, message),
+          null
+        );
+      }
+    }));
+  }
+
+  private void callXchengPrinterInit(IBinder service, IBinder callback) throws RemoteException {
+    Parcel data = Parcel.obtain();
+    Parcel reply = Parcel.obtain();
+    try {
+      data.writeInterfaceToken(XCHENG_PRINTER_DESCRIPTOR);
+      data.writeStrongBinder(callback);
+      if (!service.transact(XCHENG_PRINTER_INIT, data, reply, 0)) {
+        throw new RemoteException("Serviço Stone L400 não aceitou inicialização da impressora.");
+      }
+      reply.readException();
+    } finally {
+      reply.recycle();
+      data.recycle();
+    }
+  }
+
+  private void callXchengPrinterPrintText(IBinder service, String text, IBinder callback) throws RemoteException {
+    Parcel data = Parcel.obtain();
+    Parcel reply = Parcel.obtain();
+    try {
+      data.writeInterfaceToken(XCHENG_PRINTER_DESCRIPTOR);
+      data.writeString(text);
+      data.writeStrongBinder(callback);
+      if (!service.transact(XCHENG_PRINTER_PRINT_TEXT, data, reply, 0)) {
+        throw new RemoteException("Serviço Stone L400 não aceitou texto da impressão.");
+      }
+      reply.readException();
+    } finally {
+      reply.recycle();
+      data.recycle();
+    }
+  }
+
+  private void callXchengPrinterPrintBitmap(IBinder service, Bitmap bitmap, IBinder callback) throws RemoteException {
+    if (service == null) {
+      throw new RemoteException("Serviço Positivo indisponível.");
+    }
+    if (bitmap == null || bitmap.isRecycled()) {
+      throw new RemoteException("Bitmap inválido para impressão Stone L400.");
+    }
+
+    Parcel data = Parcel.obtain();
+    Parcel reply = Parcel.obtain();
+    try {
+      data.writeInterfaceToken(XCHENG_PRINTER_DESCRIPTOR);
+      data.writeInt(1);
+      bitmap.writeToParcel(data, 0);
+      data.writeStrongBinder(callback);
+      if (!service.transact(XCHENG_PRINTER_PRINT_BITMAP, data, reply, 0)) {
+        throw new RemoteException("Serviço Stone L400 não aceitou imagem da impressão.");
+      }
+      reply.readException();
+    } finally {
+      reply.recycle();
+      data.recycle();
+    }
+  }
+
+  private List<ReceiptPrintLine> collectReceiptPrintLines(String content) throws JSONException {
+    List<ReceiptPrintLine> lines = new ArrayList<>();
+    String raw = safePreserve(content);
+    if (raw.trim().isEmpty()) {
+      return lines;
+    }
+
+    lastPrintedSeparator = false;
+    suppressNextSeparator = false;
+    pendingWaitersHeader = false;
+    pendingSummaryMetricLine = null;
+
+    String trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        Object parsed = new JSONTokener(trimmed).nextValue();
+        collectReceiptJsonPayload(lines, parsed);
+        flushPendingSummaryMetricLine(lines, "left", "medium", "");
+        return lines;
+      } catch (JSONException ignored) {
+      }
+    }
+
+    collectReceiptPlainText(lines, raw);
+    flushPendingSummaryMetricLine(lines, "left", "medium", "");
+    return lines;
+  }
+
+  private void collectReceiptJsonPayload(List<ReceiptPrintLine> lines, Object payload) throws JSONException {
+    if (payload == null) {
+      return;
+    }
+
+    if (payload instanceof JSONArray) {
+      JSONArray array = (JSONArray) payload;
+      for (int index = 0; index < array.length(); index++) {
+        collectReceiptJsonPayload(lines, array.opt(index));
+      }
+      return;
+    }
+
+    if (payload instanceof JSONObject) {
+      JSONObject command = (JSONObject) payload;
+
+      if (command.has("commands")) {
+        collectReceiptJsonPayload(lines, command.optJSONArray("commands"));
+        return;
+      }
+
+      if (command.has("data")) {
+        collectReceiptJsonPayload(lines, command.optJSONArray("data"));
+        return;
+      }
+
+      String type = safeLower(command.optString("type"));
+      String text = safePreserve(command.optString("content"));
+      if ("line".equals(type) && text.trim().isEmpty()) {
+        text = "--------------------------------";
+      }
+
+      collectReceiptStyledLine(
+        lines,
+        text,
+        command.optString("align"),
+        command.optString("size"),
+        command.optString("style")
+      );
+      return;
+    }
+
+    if (payload instanceof String) {
+      collectReceiptPlainText(lines, (String) payload);
+    }
+  }
+
+  private void collectReceiptPlainText(List<ReceiptPrintLine> lines, String content) {
+    String normalized = safePreserve(content).replace("\r\n", "\n").replace('\r', '\n');
+    String[] rawLines = normalized.split("\n", -1);
+    for (String line : rawLines) {
+      collectReceiptStyledLine(lines, line, "left", "medium", "");
+    }
+  }
+
+  private void collectReceiptStyledLine(
+    List<ReceiptPrintLine> lines,
+    String text,
+    String align,
+    String size,
+    String style
+  ) {
+    String value = safePreserve(text);
+    String trimmedValue = value.trim();
+
+    if (pendingSummaryMetricLine != null) {
+      if (isPeopleCountLine(trimmedValue)) {
+        collectReceiptSingleLine(lines, pendingSummaryMetricLine + "    " + trimmedValue, align, size, style);
+        pendingSummaryMetricLine = null;
+        lastPrintedSeparator = false;
+        return;
+      }
+
+      flushPendingSummaryMetricLine(lines, align, size, style);
+    }
+
+    if (value.trim().isEmpty()) {
+      return;
+    }
+
+    if (isConferenceTypeLine(trimmedValue)) {
+      return;
+    }
+
+    if ("ITENS".equals(trimmedValue.toUpperCase(Locale.ROOT))) {
+      return;
+    }
+
+    if (isConferenceLine(trimmedValue)) {
+      collectReceiptSingleLine(lines, normalizeConferenceLine(trimmedValue), "center", "medium", "bold");
+      lastPrintedSeparator = false;
+      suppressNextSeparator = true;
+      return;
+    }
+
+    if (isItemsCountLine(trimmedValue)) {
+      pendingSummaryMetricLine = trimmedValue;
+      return;
+    }
+
+    if (isPendingValueLine(value)) {
+      collectReceiptSingleLine(lines, normalizePendingValueLine(value), "center", "medium", "bold");
+      lastPrintedSeparator = false;
+      suppressNextSeparator = true;
+      return;
+    }
+
+    if (isWaiterHeaderLine(trimmedValue)) {
+      pendingWaitersHeader = true;
+      lastPrintedSeparator = false;
+      suppressNextSeparator = false;
+      return;
+    }
+
+    if (pendingWaitersHeader) {
+      if (looksLikeSeparator(value)) {
+        return;
+      }
+      collectReceiptSingleLine(lines, "GARCONS: " + trimmedValue, "center", "small", "bold");
+      pendingWaitersHeader = false;
+      lastPrintedSeparator = false;
+      suppressNextSeparator = true;
+      return;
+    }
+
+    boolean separator = looksLikeSeparator(value);
+    if (separator && (lastPrintedSeparator || suppressNextSeparator)) {
+      suppressNextSeparator = false;
+      return;
+    }
+
+    collectReceiptSingleLine(lines, value, align, size, style);
+    lastPrintedSeparator = separator;
+    suppressNextSeparator = !separator && shouldSuppressFollowingSeparator(trimmedValue);
+  }
+
+  private void flushPendingSummaryMetricLine(List<ReceiptPrintLine> lines, String align, String size, String style) {
+    if (pendingSummaryMetricLine == null) {
+      return;
+    }
+    collectReceiptSingleLine(lines, pendingSummaryMetricLine, align, size, style);
+    pendingSummaryMetricLine = null;
+    lastPrintedSeparator = false;
+  }
+
+  private void collectReceiptSingleLine(
+    List<ReceiptPrintLine> lines,
+    String text,
+    String align,
+    String size,
+    String style
+  ) {
+    lines.add(new ReceiptPrintLine(text, align, size, style));
+  }
+
+  private List<Bitmap> renderPositivoReceiptBitmapChunks(List<ReceiptPrintLine> lines) {
+    List<Bitmap> chunks = new ArrayList<>();
+    List<Bitmap> chunk = new ArrayList<>();
+    int chunkHeight = 0;
+
+    try {
+      for (ReceiptPrintLine line : lines) {
+        Bitmap bitmap = renderReceiptLineBitmap(line.text, line.align, line.size, line.style);
+        if (chunkHeight > 0 && chunkHeight + bitmap.getHeight() > POSITIVO_BITMAP_CHUNK_MAX_HEIGHT) {
+          chunks.add(combineReceiptBitmapChunk(chunk, chunkHeight));
+          recycleBitmaps(chunk);
+          chunk = new ArrayList<>();
+          chunkHeight = 0;
+        }
+        chunk.add(bitmap);
+        chunkHeight += bitmap.getHeight();
+      }
+
+      Bitmap feed = renderBlankReceiptBitmap(POSITIVO_BOTTOM_FEED_HEIGHT);
+      if (chunkHeight > 0 && chunkHeight + feed.getHeight() > POSITIVO_BITMAP_CHUNK_MAX_HEIGHT) {
+        chunks.add(combineReceiptBitmapChunk(chunk, chunkHeight));
+        recycleBitmaps(chunk);
+        chunk = new ArrayList<>();
+        chunkHeight = 0;
+      }
+      chunk.add(feed);
+      chunkHeight += feed.getHeight();
+
+      if (!chunk.isEmpty()) {
+        chunks.add(combineReceiptBitmapChunk(chunk, chunkHeight));
+      }
+    } finally {
+      recycleBitmaps(chunk);
+    }
+
+    return chunks;
+  }
+
+  private Bitmap combineReceiptBitmapChunk(List<Bitmap> bitmaps, int height) {
+    int bitmapHeight = Math.max(height, 1);
+    Bitmap combined = Bitmap.createBitmap(SUNMI_PAPER_WIDTH, bitmapHeight, Bitmap.Config.ARGB_8888);
+    Canvas canvas = new Canvas(combined);
+    canvas.drawColor(Color.WHITE);
+
+    int y = 0;
+    for (Bitmap bitmap : bitmaps) {
+      if (bitmap != null && !bitmap.isRecycled()) {
+        canvas.drawBitmap(bitmap, 0, y, null);
+        y += bitmap.getHeight();
+      }
+    }
+
+    return combined;
+  }
+
+  private Bitmap renderBlankReceiptBitmap(int height) {
+    Bitmap bitmap = Bitmap.createBitmap(SUNMI_PAPER_WIDTH, Math.max(1, height), Bitmap.Config.ARGB_8888);
+    Canvas canvas = new Canvas(bitmap);
+    canvas.drawColor(Color.WHITE);
+    return bitmap;
+  }
+
+  private void recycleBitmap(Bitmap bitmap) {
+    if (bitmap != null && !bitmap.isRecycled()) {
+      bitmap.recycle();
+    }
+  }
+
+  private void recycleBitmaps(List<Bitmap> bitmaps) {
+    if (bitmaps == null) {
+      return;
+    }
+
+    for (Bitmap bitmap : bitmaps) {
+      recycleBitmap(bitmap);
+    }
+    bitmaps.clear();
+  }
+
+  private String buildPositivoPrintableText(String content) throws JSONException {
+    String raw = safePreserve(content).replace("\r\n", "\n").replace('\r', '\n');
+    String trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      Object parsed = new JSONTokener(trimmed).nextValue();
+      StringBuilder builder = new StringBuilder();
+      appendPositivoPrintableText(builder, parsed);
+      return stripPrinterMarkup(builder.toString());
+    }
+    return stripPrinterMarkup(raw);
+  }
+
+  private void appendPositivoPrintableText(StringBuilder builder, Object payload) throws JSONException {
+    if (payload == null || payload == JSONObject.NULL) {
+      return;
+    }
+
+    if (payload instanceof JSONArray) {
+      JSONArray array = (JSONArray) payload;
+      for (int index = 0; index < array.length(); index++) {
+        appendPositivoPrintableText(builder, array.opt(index));
+      }
+      return;
+    }
+
+    if (payload instanceof JSONObject) {
+      JSONObject command = (JSONObject) payload;
+      if (command.has("commands")) {
+        appendPositivoPrintableText(builder, command.optJSONArray("commands"));
+        return;
+      }
+      if (command.has("data")) {
+        appendPositivoPrintableText(builder, command.optJSONArray("data"));
+        return;
+      }
+
+      String type = safeLower(command.optString("type"));
+      String text = safePreserve(command.optString("content"));
+      if ("line".equals(type) && text.trim().isEmpty()) {
+        text = "--------------------------------";
+      }
+      if (!text.isEmpty() || "text".equals(type) || "line".equals(type)) {
+        builder.append(text).append('\n');
+      }
+      return;
+    }
+
+    if (payload instanceof String) {
+      builder.append((String) payload).append('\n');
+    }
+  }
+
+  private String stripPrinterMarkup(String value) {
+    return safePreserve(value)
+      .replaceAll("<[^>\\n]+>", "")
+      .replaceAll("\\n[ \\t]+", "\n")
+      .replaceAll("[ \\t]+\\n", "\n")
+      .replaceAll("\\n{3,}", "\n\n")
+      .trim();
+  }
+
+  private String ensurePositivoFeed(String text) {
+    String normalized = safePreserve(text).replace("\r\n", "\n").replace('\r', '\n').trim();
+    return normalized + "\n\n\n";
+  }
+
+  private void resolvePositivoPrint(final String message) {
+    timeoutHandler.post(new Runnable() {
+      @Override
+      public void run() {
+        unbindPositivoPrinter();
+        if (pendingPromise == null || !OPERATION_PRINT.equals(pendingOperation)) {
+          return;
+        }
+
+        WritableMap response = Arguments.createMap();
+        response.putBoolean("printed", true);
+        response.putString("message", firstNonEmpty(message, "Impressão concluída na Stone L400."));
+        response.putString("operation", "positivo");
+        resolveAndClear(response);
+      }
+    });
+  }
+
+  private void rejectPositivoPrint(final String code, final String message, final Throwable error) {
+    timeoutHandler.post(new Runnable() {
+      @Override
+      public void run() {
+        unbindPositivoPrinter();
+        if (pendingPromise == null || !OPERATION_PRINT.equals(pendingOperation)) {
+          return;
+        }
+        rejectAndClear(code, message, error);
+      }
+    });
+  }
+
+  private void unbindPositivoPrinter() {
+    ReactApplicationContext context = getReactApplicationContext();
+    if (positivoPrinterConnection != null) {
+      try {
+        context.unbindService(positivoPrinterConnection);
+      } catch (Throwable ignored) {
+      }
+    }
+    positivoPrinterConnection = null;
+    positivoPrinterService = null;
   }
 
   private boolean startSunmiPrint(final String content) {
@@ -759,6 +1523,29 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     return "Estado desconhecido da impressora Stone: " + state + ".";
   }
 
+  private String resolveXchengPrinterErrorMessage(int code, String message) {
+    String normalizedMessage = safe(message).trim();
+    if (!normalizedMessage.isEmpty() && !"null".equalsIgnoreCase(normalizedMessage)) {
+      return normalizedMessage;
+    }
+    if (code == -40001) return "Erro de comunicação com a impressora Stone L400.";
+    if (code == -40002) return "Impressora Stone L400 sem papel.";
+    if (code == -40003) return "Impressora Stone L400 superaquecida.";
+    if (code == -40004) return "Imagem da impressão Stone L400 não encontrada.";
+    if (code == -40005) return "Falha genérica na impressora Stone L400.";
+    if (code == -40006) return "Parâmetro inválido para impressão Stone L400.";
+    if (code == -60009) return "Bitmap inválido para impressão Stone L400.";
+    if (code == -60010) return "Largura de bitmap inválida para Stone L400.";
+    if (code == -60011) return "Cor de bitmap inválida para Stone L400.";
+    if (code == -60012) return "Falha ao abrir arquivo de impressão Stone L400.";
+    if (code == -60013) return "Parâmetro inválido para impressão Stone L400.";
+    if (code == -60014) return "Arquivo de impressão Stone L400 não existe.";
+    if (code == -60015) return "Impressora Stone L400 ocupada.";
+    if (code == -60016) return "Buffer de impressão Stone L400 excedido.";
+    if (code == -60017) return "Impressão Stone L400 interrompida.";
+    return "Falha na impressão Stone L400. Código " + code + ".";
+  }
+
   @Override
   public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
   }
@@ -872,6 +1659,10 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     timeoutRunnable = new Runnable() {
       @Override
       public void run() {
+        if (OPERATION_PRINT.equals(pendingOperation)) {
+          unbindSunmiPrinter();
+          unbindPositivoPrinter();
+        }
         rejectAndClear("STONE_TIMEOUT", "Tempo esgotado aguardando retorno da Stone.", null);
       }
     };
@@ -889,6 +1680,7 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     Promise local = pendingPromise;
     pendingPromise = null;
     pendingOperation = null;
+    pendingPositivoPrintContent = null;
     clearTimeout();
     if (local != null) {
       local.resolve(result);
@@ -899,6 +1691,7 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     Promise local = pendingPromise;
     pendingPromise = null;
     pendingOperation = null;
+    pendingPositivoPrintContent = null;
     clearTimeout();
     if (local != null) {
       if (error != null) {

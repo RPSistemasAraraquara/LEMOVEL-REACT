@@ -9,6 +9,7 @@ import {
   LaunchItemFractionPayload,
   LaunchItemPayload,
   loadMobileSettings,
+  logSyncDiagnostic,
   MobileAppSettings,
   MenuItem,
   OPENING_SETTINGS_CONFLICT_MESSAGE,
@@ -75,7 +76,7 @@ type AppContextState = {
     forcedMode?: 'mesa' | 'comanda' | 'mesaComanda',
     options?: { force?: boolean }
   ) => Promise<void>;
-  refreshMenu: (options?: { preferCache?: boolean }) => Promise<void>;
+  refreshMenu: (options?: { preferCache?: boolean; forceRemote?: boolean }) => Promise<void>;
   addToCart: (item: Omit<CartItem, 'lineId'>) => void;
   removeFromCart: (lineId: string) => void;
   clearCart: () => void;
@@ -185,6 +186,7 @@ const AUTO_REFRESH_INTERVAL_MS = 7000;
 const AUTO_REFRESH_THROTTLE_MS = 1200;
 const AUTO_MENU_REFRESH_THROTTLE_MS = 5000;
 const PARTIAL_PAYMENT_TOTAL_TTL_MS = 4500;
+const PARTIAL_PAYMENT_TOTAL_CONCURRENCY = 3;
 const INITIAL_SCREEN_MODE_STORAGE_KEY = '@rpcheff_mobile:last_initial_screen_mode';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -223,8 +225,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const partialPaymentTotalsRef = useRef<Record<number, PartialPaymentCacheEntry>>({});
   const tablesFingerprintRef = useRef('');
   const categoriesFingerprintRef = useRef('');
-  const productsFingerprintRef = useRef('');
   const tablesRef = useRef<TableOrder[]>([]);
+  const productsRef = useRef<MenuItem[]>([]);
   const cartRef = useRef<CartItem[]>([]);
   const activeTableRef = useRef<TableOrder | null>(null);
   const userRef = useRef<UserProfile | null>(null);
@@ -388,22 +390,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .map((item) => `${item.id}|${item.descricao}`)
       .join('|');
 
-  const productsFingerprint = (list: MenuItem[]) =>
-    [...list]
-      .sort((a, b) => a.id - b.id)
-      .map(
-        (item) =>
-          `${item.id}|${item.idProduto}|${item.valorVenda}|${item.valorUnitario || 0}|${item.descricao}|${item.descricaoCurta || ''}|${item.codReferencia || ''}|${item.idCategoria || 0}|${item.b_venda_mobile === false ? 0 : 1}|${item.vendaPorTamanho ? 1 : 0}|${item.tamanhoPadrao || ''}|${item.tamanhoP || ''}|${item.tamanhoM || ''}|${item.tamanhoG || ''}|${item.tamanhoGG || ''}|${item.tamanhoExtra || ''}|${item.valorTamanhoP || 0}|${item.valorTamanhoM || 0}|${item.valorTamanhoG || 0}|${item.valorTamanhoGG || 0}|${item.valorTamanhoExtra || 0}|${item.usaQuantidadeDecimal ? 1 : 0}|${item.permiteFracao ? 1 : 0}|${item.possuiImagem ? 1 : 0}|${item.imagem ? item.imagem.length : 0}|${item.imagem_db ? item.imagem_db.length : 0}|${item.imagemLocalPath ? item.imagemLocalPath.length : 0}|${item.happyHourAtivar ? 1 : 0}|${item.happyHour?.valor || 0}|${item.happyHour?.horaInicial || ''}|${item.happyHour?.horaFinal || ''}|${item.happyHour?.tipoMesa ? 1 : 0}|${item.happyHour?.tipoComanda ? 1 : 0}|${item.happyHour?.segundaFeira ? 1 : 0}|${item.happyHour?.tercaFeira ? 1 : 0}|${item.happyHour?.quartaFeira ? 1 : 0}|${item.happyHour?.quintaFeira ? 1 : 0}|${item.happyHour?.sextaFeira ? 1 : 0}|${item.happyHour?.sabado ? 1 : 0}|${item.happyHour?.domingo ? 1 : 0}|${(item.opcionais || [])
-            .map(
-              (optional) =>
-                `${optional.idOpcional}:${optional.descricao}:${optional.valor}:${optional.gratis ? 1 : 0}:${optional.opcionalP || ''}:${optional.opcionalM || ''}:${optional.opcionalG || ''}:${optional.opcionalGG || ''}:${optional.opcionalExtra || ''}:${optional.valorOpcionalP || 0}:${optional.valorOpcionalM || 0}:${optional.valorOpcionalG || 0}:${optional.valorOpcionalGG || 0}:${optional.valorOpcionalExtra || 0}`
-            )
-            .join(',')}`
-      )
-      .join('|');
+  const sameNumber = (left: unknown, right: unknown) => Number(left || 0) === Number(right || 0);
+  const sameText = (left: unknown, right: unknown) => String(left || '') === String(right || '');
+  const sameFlag = (left: unknown, right: unknown) => Boolean(left) === Boolean(right);
+
+  const productOptionalsEqual = (left: MenuItem['opcionais'] = [], right: MenuItem['opcionais'] = []) => {
+    if (left.length !== right.length) return false;
+
+    for (let index = 0; index < left.length; index += 1) {
+      const a = left[index];
+      const b = right[index];
+      if (
+        !sameNumber(a.idOpcional, b.idOpcional) ||
+        !sameText(a.descricao, b.descricao) ||
+        !sameNumber(a.valor, b.valor) ||
+        !sameFlag(a.gratis, b.gratis) ||
+        !sameText(a.opcionalP, b.opcionalP) ||
+        !sameText(a.opcionalM, b.opcionalM) ||
+        !sameText(a.opcionalG, b.opcionalG) ||
+        !sameText(a.opcionalGG, b.opcionalGG) ||
+        !sameText(a.opcionalExtra, b.opcionalExtra) ||
+        !sameNumber(a.valorOpcionalP, b.valorOpcionalP) ||
+        !sameNumber(a.valorOpcionalM, b.valorOpcionalM) ||
+        !sameNumber(a.valorOpcionalG, b.valorOpcionalG) ||
+        !sameNumber(a.valorOpcionalGG, b.valorOpcionalGG) ||
+        !sameNumber(a.valorOpcionalExtra, b.valorOpcionalExtra)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const menuProductsEqual = (left: MenuItem[], right: MenuItem[]) => {
+    if (left === right) return true;
+    if (left.length !== right.length) return false;
+
+    const leftById = new Map<number, MenuItem>();
+    for (const item of left) {
+      leftById.set(Number(item.idProduto || item.id || 0), item);
+    }
+
+    for (const item of right) {
+      const current = leftById.get(Number(item.idProduto || item.id || 0));
+      if (!current) return false;
+
+      if (
+        !sameNumber(current.id, item.id) ||
+        !sameNumber(current.idProduto, item.idProduto) ||
+        !sameNumber(current.valorVenda, item.valorVenda) ||
+        !sameNumber(current.valorUnitario, item.valorUnitario) ||
+        !sameText(current.descricao, item.descricao) ||
+        !sameText(current.descricaoCurta, item.descricaoCurta) ||
+        !sameText(current.codReferencia, item.codReferencia) ||
+        !sameNumber(current.idCategoria, item.idCategoria) ||
+        (current.b_venda_mobile === false) !== (item.b_venda_mobile === false) ||
+        !sameFlag(current.vendaPorTamanho, item.vendaPorTamanho) ||
+        !sameText(current.tamanhoPadrao, item.tamanhoPadrao) ||
+        !sameText(current.tamanhoP, item.tamanhoP) ||
+        !sameText(current.tamanhoM, item.tamanhoM) ||
+        !sameText(current.tamanhoG, item.tamanhoG) ||
+        !sameText(current.tamanhoGG, item.tamanhoGG) ||
+        !sameText(current.tamanhoExtra, item.tamanhoExtra) ||
+        !sameNumber(current.valorTamanhoP, item.valorTamanhoP) ||
+        !sameNumber(current.valorTamanhoM, item.valorTamanhoM) ||
+        !sameNumber(current.valorTamanhoG, item.valorTamanhoG) ||
+        !sameNumber(current.valorTamanhoGG, item.valorTamanhoGG) ||
+        !sameNumber(current.valorTamanhoExtra, item.valorTamanhoExtra) ||
+        !sameFlag(current.usaQuantidadeDecimal, item.usaQuantidadeDecimal) ||
+        !sameFlag(current.permiteFracao, item.permiteFracao) ||
+        !sameFlag(current.possuiImagem, item.possuiImagem) ||
+        String(current.imagem || '').length !== String(item.imagem || '').length ||
+        String(current.imagem_db || '').length !== String(item.imagem_db || '').length ||
+        String(current.imagemLocalPath || '').length !== String(item.imagemLocalPath || '').length ||
+        !sameFlag(current.happyHourAtivar, item.happyHourAtivar) ||
+        !sameNumber(current.happyHour?.valor, item.happyHour?.valor) ||
+        !sameText(current.happyHour?.horaInicial, item.happyHour?.horaInicial) ||
+        !sameText(current.happyHour?.horaFinal, item.happyHour?.horaFinal) ||
+        !sameFlag(current.happyHour?.tipoMesa, item.happyHour?.tipoMesa) ||
+        !sameFlag(current.happyHour?.tipoComanda, item.happyHour?.tipoComanda) ||
+        !sameFlag(current.happyHour?.segundaFeira, item.happyHour?.segundaFeira) ||
+        !sameFlag(current.happyHour?.tercaFeira, item.happyHour?.tercaFeira) ||
+        !sameFlag(current.happyHour?.quartaFeira, item.happyHour?.quartaFeira) ||
+        !sameFlag(current.happyHour?.quintaFeira, item.happyHour?.quintaFeira) ||
+        !sameFlag(current.happyHour?.sextaFeira, item.happyHour?.sextaFeira) ||
+        !sameFlag(current.happyHour?.sabado, item.happyHour?.sabado) ||
+        !sameFlag(current.happyHour?.domingo, item.happyHour?.domingo) ||
+        !productOptionalsEqual(current.opcionais, item.opcionais)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const applyCachedPartialPaymentTotals = (list: TableOrder[]) => {
-    const now = Date.now();
     return list.map((table) => {
       const idVenda = Number(table.idVenda || table.venda?.idVenda || 0);
       if (!idVenda) {
@@ -411,7 +494,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const cached = partialPaymentTotalsRef.current[idVenda];
-      const cachedTotal = cached && now - cached.fetchedAt < PARTIAL_PAYMENT_TOTAL_TTL_MS ? cached.total : 0;
+      const cachedTotal = cached?.total || 0;
 
       return {
         ...table,
@@ -437,11 +520,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const now = Date.now();
-    const totalsEntries = await Promise.all(
-      saleIds.map(async (idVenda) => {
+    const totalsEntries: Array<readonly [number, number]> = [];
+    let nextSaleIdIndex = 0;
+    const runPaymentTotalWorker = async () => {
+      while (nextSaleIdIndex < saleIds.length) {
+        const idVenda = saleIds[nextSaleIdIndex];
+        nextSaleIdIndex += 1;
         const cached = partialPaymentTotalsRef.current[idVenda];
         if (cached && !force && now - cached.fetchedAt < PARTIAL_PAYMENT_TOTAL_TTL_MS) {
-          return [idVenda, cached.total] as const;
+          totalsEntries.push([idVenda, cached.total] as const);
+          continue;
         }
 
         try {
@@ -451,11 +539,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             total,
             fetchedAt: Date.now()
           };
-          return [idVenda, total] as const;
+          totalsEntries.push([idVenda, total] as const);
         } catch {
-          return [idVenda, cached?.total || 0] as const;
+          totalsEntries.push([idVenda, cached?.total || 0] as const);
         }
-      })
+      }
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(PARTIAL_PAYMENT_TOTAL_CONCURRENCY, saleIds.length) },
+        () => runPaymentTotalWorker()
+      )
     );
 
     const totalsBySale = Object.fromEntries(totalsEntries) as Record<number, number>;
@@ -698,7 +793,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return refreshMenuQueuePromiseRef.current;
   };
 
-  const queueRefreshMenu = (delayMs: number): Promise<void> => {
+  const queueRefreshMenu = (
+    delayMs: number,
+    options: { preferCache?: boolean; forceRemote?: boolean } = {}
+  ): Promise<void> => {
     const promise = addRefreshMenuQueueWaiter();
 
     if (refreshMenuQueueTimerRef.current) {
@@ -708,11 +806,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshMenuQueueTimerRef.current = setTimeout(() => {
       refreshMenuQueueTimerRef.current = null;
       if (refreshMenuInFlightRef.current) {
-        queueRefreshMenu(150);
+        queueRefreshMenu(150, options);
         return;
       }
 
-      refreshMenu()
+      refreshMenu(options)
         .then(() => settleQueuedMenuRefresh())
         .catch((error) => settleQueuedMenuRefresh(error));
     }, delayMs);
@@ -727,8 +825,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const mode = (forcedMode || appSettings.modoExibicao || 'mesa') as DashboardMode;
 
     if (refreshInFlightRef.current) {
-      refreshQueueModeRef.current = mode;
-      return refreshInFlightRef.current;
+      return queueDashboardRefresh(mode, 0);
     }
 
     const now = Date.now();
@@ -744,7 +841,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const currentFingerprint = tablesFingerprintRef.current;
       const shouldReplaceList = nextFingerprint !== currentFingerprint;
 
-      setTables(shouldReplaceList ? list : [...list]);
+      if (shouldReplaceList) {
+        tablesFingerprintRef.current = nextFingerprint;
+        setTables(list);
+      }
       setActiveTableState((prev) => {
         if (!prev) return prev;
         const updated = list.find((item) => isSameTableIdentity(item, prev));
@@ -756,15 +856,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           prev.idVenda === updated.idVenda &&
           prev.valorTotal === updated.valorTotal &&
           prev.nomeMesaComanda === updated.nomeMesaComanda &&
+          prev.venda?.idVenda === updated.venda?.idVenda &&
           prev.venda?.situacao === updated.venda?.situacao &&
+          prev.venda?.valorTotal === updated.venda?.valorTotal &&
           prev.venda?.valorPagamentoAntecipado === updated.venda?.valorPagamentoAntecipado
         ) {
           return prev;
         }
-        return {
-          ...updated,
-          idVenda: isPresent(updated.idVenda) ? updated.idVenda : prev.idVenda
-        };
+        return updated;
       });
 
       void enrichPartialPaymentTotals(rawList, Boolean(options.force))
@@ -773,7 +872,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const currentEnrichedFingerprint = tablesFingerprintRef.current;
           const shouldReplaceEnriched = enrichedFingerprint !== currentEnrichedFingerprint;
 
-          setTables(shouldReplaceEnriched ? enrichedList : [...enrichedList]);
+          if (shouldReplaceEnriched) {
+            tablesFingerprintRef.current = enrichedFingerprint;
+            setTables(enrichedList);
+          }
           setActiveTableState((prev) => {
             if (!prev) return prev;
             const updated = enrichedList.find((item) => isSameTableIdentity(item, prev));
@@ -785,15 +887,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               prev.idVenda === updated.idVenda &&
               prev.valorTotal === updated.valorTotal &&
               prev.nomeMesaComanda === updated.nomeMesaComanda &&
+              prev.venda?.idVenda === updated.venda?.idVenda &&
               prev.venda?.situacao === updated.venda?.situacao &&
+              prev.venda?.valorTotal === updated.venda?.valorTotal &&
               prev.venda?.valorPagamentoAntecipado === updated.venda?.valorPagamentoAntecipado
             ) {
               return prev;
             }
-            return {
-              ...updated,
-              idVenda: isPresent(updated.idVenda) ? updated.idVenda : prev.idVenda
-            };
+            return updated;
           });
         })
         .catch(() => null);
@@ -811,30 +912,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshInFlightRef.current = null;
       const queuedMode = refreshQueueModeRef.current;
       refreshQueueModeRef.current = null;
-      settleQueuedRefresh(executionError);
 
-      if (!executionError && queuedMode) {
+      if (executionError) {
+        settleQueuedRefresh(executionError);
+      } else if (queuedMode) {
+        if (refreshQueueTimerRef.current) {
+          clearTimeout(refreshQueueTimerRef.current);
+          refreshQueueTimerRef.current = null;
+        }
         setTimeout(() => {
           void refreshDashboard(queuedMode, { force: true }).catch(() => null);
         }, 0);
+      } else {
+        settleQueuedRefresh();
       }
     }
   };
 
-  const refreshMenu = async (options: { preferCache?: boolean } = {}) => {
+  const refreshMenu = async (options: { preferCache?: boolean; forceRemote?: boolean } = {}) => {
     if (refreshMenuInFlightRef.current) {
-      return queueRefreshMenu(0);
+      return queueRefreshMenu(0, options);
     }
 
     const now = Date.now();
     const timeSinceLastRefresh = now - lastMenuRefreshAtRef.current;
     if (!options.preferCache && timeSinceLastRefresh < AUTO_MENU_REFRESH_THROTTLE_MS) {
-      return queueRefreshMenu(AUTO_MENU_REFRESH_THROTTLE_MS - timeSinceLastRefresh);
+      return queueRefreshMenu(AUTO_MENU_REFRESH_THROTTLE_MS - timeSinceLastRefresh, options);
     }
 
     const refreshMenuTask = (async () => {
+      const startedAt = Date.now();
+      logSyncDiagnostic(
+        `menu refresh inicio preferCache=${Boolean(options.preferCache)} forceRemote=${Boolean(options.forceRemote)}`
+      );
       const categoriesPromise = api.listCategories({ preferCache: options.preferCache });
-      const productsPromise = api.listProducts(false, { preferCache: options.preferCache });
+      const productsPromise = api.listProducts(false, {
+        preferCache: options.preferCache,
+        requireRemote: options.forceRemote,
+        forceRemote: options.forceRemote,
+        compact: true
+      });
 
       const cats = await categoriesPromise;
       const categoryFingerprint = categoriesFingerprint(cats);
@@ -856,10 +973,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const rawProducts = await productsPromise;
-      const prod = rawProducts;
-      const productFingerprint = productsFingerprint(prod);
-      const currentProductFingerprint = productsFingerprintRef.current;
-      setProducts(currentProductFingerprint === productFingerprint ? products : prod);
+      const prod = rawProducts.filter((p) => p.b_venda_mobile !== false);
+      const currentProducts = productsRef.current;
+      setProducts(menuProductsEqual(currentProducts, prod) ? currentProducts : prod);
+      logSyncDiagnostic(`menu refresh fim categorias=${cats.length} produtos=${prod.length} em ${Date.now() - startedAt}ms`);
     })();
 
     refreshMenuInFlightRef.current = refreshMenuTask;
@@ -1102,7 +1219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [categories]);
 
   useEffect(() => {
-    productsFingerprintRef.current = productsFingerprint(products);
+    productsRef.current = products;
   }, [products]);
 
   useEffect(() => {
@@ -1189,20 +1306,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const flushPendingItems = async () => {
     if (flushPendingInFlightRef.current) {
+      logSyncDiagnostic('fluxo pendencias reutilizando envio em andamento');
       return flushPendingInFlightRef.current;
     }
 
     const task = (async () => {
+      const startedAt = Date.now();
       const pending = cartRef.current;
       if (pending.length === 0) {
+        logSyncDiagnostic('fluxo pendencias ignorado: carrinho vazio');
         retryPendingAfterFailureRef.current = false;
         return false;
       }
 
       let table = activeTableRef.current;
       if (!table) {
+        logSyncDiagnostic(`fluxo pendencias falhou sem mesa itens=${pending.length}`, 2);
         throw new Error('Selecione uma mesa antes de enviar os itens.');
       }
+
+      logSyncDiagnostic(
+        `fluxo pendencias inicio mesa=${table.idMesa} tipo=${table.tipo || 'mesa'} venda=${table.idVenda || 0} itens=${pending.length}`
+      );
 
       if (!table.idVenda || Number(table.idVenda) === 0) {
         const reopenedName = isDefaultTableDisplayName(
@@ -1212,23 +1337,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         )
           ? undefined
           : table.nomeMesaComanda;
+        logSyncDiagnostic(`fluxo pendencias abrindo venda mesa=${table.idMesa} tipo=${table.tipo || 'mesa'}`);
         const opened = await openTableByCard(table.idMesa, reopenedName, table.tipo);
         table = opened;
         activeTableRef.current = opened;
         setActiveTableState(opened);
+        logSyncDiagnostic(`fluxo pendencias venda aberta idVenda=${opened.idVenda || 0}`);
       }
 
       if (!table.idVenda) {
+        logSyncDiagnostic(`fluxo pendencias falhou sem venda aberta mesa=${table.idMesa}`, 2);
         throw new Error('Não foi possível abrir a venda da mesa.');
       }
 
+      const payload = pending.map(asPayload);
+      const totalQuantidade = payload.reduce((acc, item) => acc + Number(item.quantidade || 0), 0);
+      logSyncDiagnostic(
+        `fluxo pendencias enviando idVenda=${table.idVenda} linhas=${payload.length} quantidade=${totalQuantidade.toFixed(3)}`
+      );
       await api.launchItemsBatch(
         table.idVenda,
-        pending.map(asPayload)
+        payload
       );
+      logSyncDiagnostic(`fluxo pendencias itens enviados idVenda=${table.idVenda}`);
       clearCart();
       await refreshDashboard();
       retryPendingAfterFailureRef.current = false;
+      logSyncDiagnostic(`fluxo pendencias fim ok idVenda=${table.idVenda} em ${Date.now() - startedAt}ms`);
       return true;
     })();
 
@@ -1237,6 +1372,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return await task;
     } catch (error) {
       retryPendingAfterFailureRef.current = true;
+      const message = error instanceof Error ? error.message : String(error || 'erro desconhecido');
+      logSyncDiagnostic(`fluxo pendencias erro: ${message}`, 2);
       throw error;
     } finally {
       if (flushPendingInFlightRef.current === task) {

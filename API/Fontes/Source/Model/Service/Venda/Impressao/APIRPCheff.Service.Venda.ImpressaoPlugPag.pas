@@ -217,20 +217,13 @@ begin
 end;
 
 procedure TAPIRPCheffServiceVendaImpressaoPlugPag.CarregarOpcionais( AItem: TAPIRPCheffEntityVendaItem);
-var
-  LOpcionais: TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
 begin
   if not FImprimirOpcionais then
     Exit;
-  LOpcionais := FDAO.VendaItemOpcionalDAO.Listar(FIdVenda, AItem.numeroItem);
-  try
-    for var LOpcional in LOpcionais do
-      FImpressao := FImpressao +
-       'Opc.:'+ LOpcional.descricao + slinebreak ;
-  finally
-    LOpcionais.Free;
-  end;
 
+  for var LOpcional in AItem.opcionais do
+    FImpressao := FImpressao +
+     'Opc.:'+ LOpcional.descricao + slinebreak ;
 end;
 
 procedure TAPIRPCheffServiceVendaImpressaoPlugPag.CarregarPagamentos;

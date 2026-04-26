@@ -48,11 +48,11 @@ export const CartScreen: React.FC = () => {
   const goToMesas = () => {
     const parent = navigation.getParent<NativeStackNavigationProp<RootStackParams>>();
     if (parent) {
-      parent.navigate('Tabs' as never, { screen: 'Mesas' } as never);
+      parent.navigate('Tabs', { screen: 'Mesas' });
       return;
     }
 
-    navigation.navigate('Tabs' as never, { screen: 'Mesas' } as never);
+    navigation.navigate('Tabs', { screen: 'Mesas' });
   };
 
   return (

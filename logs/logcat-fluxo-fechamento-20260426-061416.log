@@ -1,0 +1,184 @@
+--------- beginning of main
+--------- beginning of system
+04-26 06:14:54.593 I/ReactNativeJS( 9852): Running "main"
+04-26 06:15:21.725 I/ReactNativeJS( 9852): [RP_SYNC] syncAll inicio tasks=catalogo,mesas,formas,configuracoes,usuarios
+04-26 06:15:21.726 I/ReactNativeJS( 9852): [RP_SYNC] etapa catalogo inicio
+04-26 06:15:21.729 I/ReactNativeJS( 9852): [RP_SYNC] etapa mesas inicio
+04-26 06:15:21.738 I/ReactNativeJS( 9852): [RP_SYNC] etapa formas inicio
+04-26 06:15:21.742 I/ReactNativeJS( 9852): [RP_SYNC] etapa configuracoes inicio
+04-26 06:15:22.549 I/ReactNativeJS( 9852): [RP_SYNC] produtos remoto count=215 exibirImagem=false preserveCachedImages=false em 630ms
+04-26 06:15:23.063 I/ReactNativeJS( 9852): [RP_SYNC] etapa formas ok em 1324ms | 2 formas de pagamento atualizadas
+04-26 06:15:23.063 I/ReactNativeJS( 9852): [RP_SYNC] etapa usuarios inicio
+04-26 06:15:23.320 I/ReactNativeJS( 9852): [RP_SYNC] categorias remoto count=19 em 57ms
+04-26 06:15:23.339 I/ReactNativeJS( 9852): [RP_SYNC] etapa mesas ok em 1610ms | 200 mesas atualizadas
+04-26 06:15:23.341 I/ReactNativeJS( 9852): [RP_SYNC] etapa configuracoes ok em 1599ms | Configurações de mesa/comanda carregadas
+04-26 06:15:23.353 I/ReactNativeJS( 9852): [RP_SYNC] etapa usuarios ok em 290ms | 5 usuários carregados
+04-26 06:15:24.290 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm adiado origem=inicial-focus: syncAll em andamento
+04-26 06:15:25.411 I/ReactNativeJS( 9852): [RP_SYNC] produtos prontos inalterado count=215 em 3492ms
+04-26 06:15:25.411 I/ReactNativeJS( 9852): [RP_SYNC] etapa catalogo ok em 3685ms | Catálogo: 19 categorias | 215 produtos | imagens por demanda
+04-26 06:15:25.411 I/ReactNativeJS( 9852): [RP_SYNC] syncAll fim status=ok em 3686ms
+04-26 06:15:25.957 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=0 produtos=0
+04-26 06:15:25.958 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:15:27.638 I/ReactNativeJS( 9852): [RP_SYNC] cache produtos sqlite compacto count=215 em 1482ms
+04-26 06:15:27.638 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 1680ms
+04-26 06:15:27.639 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 1682ms
+04-26 06:16:12.415 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pendencias inicio mesa=6 tipo=mesa venda=44658 itens=2
+04-26 06:16:12.415 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pendencias enviando idVenda=44658 linhas=2 quantidade=3.000
+04-26 06:16:12.609 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:16:12.610 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:16:12.634 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 24ms
+04-26 06:16:12.634 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 25ms
+04-26 06:16:13.382 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pendencias itens enviados idVenda=44658
+04-26 06:16:15.897 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pendencias fim ok idVenda=44658 em 3482ms
+04-26 06:16:24.488 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial abrir idVenda=44658 mesa=6 tipo=mesa
+04-26 06:16:24.679 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial carregar inicio idVenda=44658
+04-26 06:16:25.502 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial carregar fim idVenda=44658 formas=2 pagamentos=0 total=232.10 em 823ms
+04-26 06:16:36.880 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial terminal inicio idVenda=44658 linha=0 forma=4 valor=50.00 provider=stone
+04-26 06:16:38.418 W/System.err( 9991): java.io.FileNotFoundException: /jacoco.exec (Read-only file system)
+04-26 06:16:38.425 W/System.err( 9991): 	at java.io.FileOutputStream.open(Native Method)
+04-26 06:16:38.425 W/System.err( 9991): 	at java.io.FileOutputStream.<init>(FileOutputStream.java:221)
+04-26 06:16:38.425 W/System.err( 9991): 	at org.jacoco.agent.rt.internal_8ff85ea.output.FileOutput.openFile(FileOutput.java:67)
+04-26 06:16:38.425 W/System.err( 9991): 	at org.jacoco.agent.rt.internal_8ff85ea.output.FileOutput.startup(FileOutput.java:49)
+04-26 06:16:38.425 W/System.err( 9991): 	at org.jacoco.agent.rt.internal_8ff85ea.Agent.startup(Agent.java:122)
+04-26 06:16:38.425 W/System.err( 9991): 	at org.jacoco.agent.rt.internal_8ff85ea.Agent.getInstance(Agent.java:50)
+04-26 06:16:38.425 W/System.err( 9991): 	at org.jacoco.agent.rt.internal_8ff85ea.Offline.<clinit>(Offline.java:31)
+04-26 06:16:38.425 W/System.err( 9991): 	at br.com.stone.posandroid.datacontainer.data.contentprovider.DataContainerProvider.$jacocoInit(DataContainerProvider.kt)
+04-26 06:16:38.425 W/System.err( 9991): 	at br.com.stone.posandroid.datacontainer.data.contentprovider.DataContainerProvider.<init>(DataContainerProvider.kt)
+04-26 06:16:38.425 W/System.err( 9991): 	at java.lang.Class.newInstance(Native Method)
+04-26 06:16:38.425 W/System.err( 9991): 	at android.app.ActivityThread.installProvider(ActivityThread.java:6048)
+04-26 06:16:38.425 W/System.err( 9991): 	at android.app.ActivityThread.installContentProviders(ActivityThread.java:5632)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.app.ActivityThread.handleBindApplication(ActivityThread.java:5571)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.app.ActivityThread.-wrap2(ActivityThread.java)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1629)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.os.Handler.dispatchMessage(Handler.java:110)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.os.Looper.loop(Looper.java:203)
+04-26 06:16:38.426 W/System.err( 9991): 	at android.app.ActivityThread.main(ActivityThread.java:6337)
+04-26 06:16:38.426 W/System.err( 9991): 	at java.lang.reflect.Method.invoke(Native Method)
+04-26 06:16:38.426 W/System.err( 9991): 	at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:1084)
+04-26 06:16:38.426 W/System.err( 9991): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:945)
+04-26 06:16:40.329 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:16:40.336 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:16:40.336 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:16:40.336 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:16:40.336 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:16:40.336 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:16:40.336 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:16:40.336 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:16:40.464 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:16:40.464 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:16:40.464 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:16:40.464 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:16:40.464 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:16:40.465 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:16:40.465 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:16:40.465 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:16:42.299 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:16:42.314 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:16:42.315 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:16:42.315 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:16:42.315 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:16:42.315 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:16:42.316 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:16:42.316 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:16:56.102 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial terminal ok idVenda=44658 linha=0 forma=4 provider=stone em 19220ms
+04-26 06:16:56.103 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial registrar terminal inicio idVenda=44658 forma=4 valor=50.00
+04-26 06:16:57.373 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial registrar terminal ok idVenda=44658 forma=4 em 1270ms
+04-26 06:16:57.373 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial carregar inicio idVenda=44658
+04-26 06:16:59.030 I/ReactNativeJS( 9852): [RP_SYNC] fluxo pagamento parcial carregar fim idVenda=44658 formas=2 pagamentos=1 total=232.10 em 1657ms
+04-26 06:17:13.918 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:17:13.918 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:17:13.934 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 15ms
+04-26 06:17:13.934 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 16ms
+04-26 06:17:22.655 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44660 modo=pre
+04-26 06:17:22.668 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44660 modo=pre
+04-26 06:17:25.215 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44660 modo=pre itens=1 pagamentos=0 em 2560ms
+04-26 06:17:25.217 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44660 modo=pre itens=1 pagamentos=0 em 2549ms
+04-26 06:17:40.293 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44660 modo=pre total=42.90 desconto=0.00 parcial=0.00
+04-26 06:17:40.293 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre enviar idVenda=44660 pessoas=1 masc=0 fem=0 taxa=3.90 imprimir=true
+04-26 06:17:40.440 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre api ok idVenda=44660 em 147ms
+04-26 06:17:41.132 W/System.err( 1152): java.util.concurrent.TimeoutException
+04-26 06:17:41.155 W/System.err( 1152): 	at java.util.concurrent.CyclicBarrier.dowait(CyclicBarrier.java:229)
+04-26 06:17:41.155 W/System.err( 1152): 	at java.util.concurrent.CyclicBarrier.await(CyclicBarrier.java:407)
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.h.a()
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.d()
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.o()
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.f()
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.a()
+04-26 06:17:41.155 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.h.run()
+04-26 06:17:41.155 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:17:41.155 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:17:41.155 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:17:42.842 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44660 modo=pre
+04-26 06:17:42.858 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre fim ok idVenda=44660 em 2565ms
+04-26 06:17:47.192 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44660 modo=pre itens=1 pagamentos=0 em 4349ms
+04-26 06:17:47.417 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:17:47.418 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:17:47.457 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 39ms
+04-26 06:17:47.458 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 41ms
+04-26 06:18:00.306 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44658 modo=pre
+04-26 06:18:00.314 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44658 modo=pre
+04-26 06:18:02.088 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44658 modo=pre itens=2 pagamentos=0 em 1774ms
+04-26 06:18:02.093 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44658 modo=pre itens=2 pagamentos=0 em 1787ms
+04-26 06:18:14.524 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44658 modo=pre total=232.10 desconto=0.00 parcial=50.00
+04-26 06:18:14.524 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre enviar idVenda=44658 pessoas=1 masc=0 fem=0 taxa=21.10 imprimir=true
+04-26 06:18:14.703 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre api ok idVenda=44658 em 179ms
+04-26 06:18:17.463 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44658 modo=pre
+04-26 06:18:17.481 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pre fim ok idVenda=44658 em 2956ms
+04-26 06:18:19.041 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:18:19.041 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:18:19.070 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 29ms
+04-26 06:18:19.070 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 30ms
+04-26 06:18:19.237 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44658 modo=pre itens=2 pagamentos=0 em 1774ms
+04-26 06:18:37.072 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44658 modo=final
+04-26 06:18:37.085 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar inicio idVenda=44658 modo=final
+04-26 06:18:39.003 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44658 modo=final itens=2 pagamentos=1 em 1931ms
+04-26 06:18:39.008 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento carregar fim idVenda=44658 modo=final itens=2 pagamentos=1 em 1923ms
+04-26 06:18:44.984 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44658 modo=final total=232.10 desconto=0.00 parcial=50.00
+04-26 06:18:54.832 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pagamento selecionar inicio idVenda=44658 linha=0 forma=4 valor=182.10 provider=stone
+04-26 06:18:57.715 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:18:57.725 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:18:57.725 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:18:57.725 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:18:57.725 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:18:57.725 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:18:57.725 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:18:57.725 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:18:57.849 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:18:57.850 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:18:57.850 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:18:57.850 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:18:57.850 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:18:57.850 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:18:57.851 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:18:57.851 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:18:59.788 W/System.err( 1152): java.lang.InterruptedException
+04-26 06:18:59.791 W/System.err( 1152): 	at java.lang.Thread.sleep(Native Method)
+04-26 06:18:59.791 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:371)
+04-26 06:18:59.792 W/System.err( 1152): 	at java.lang.Thread.sleep(Thread.java:313)
+04-26 06:18:59.792 W/System.err( 1152): 	at com.sunmi.pay.hardware.e.f.d$b.run()
+04-26 06:18:59.792 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:18:59.792 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:18:59.792 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)
+04-26 06:19:21.467 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pagamento selecionar ok idVenda=44658 linha=0 forma=4 provider=stone em 26635ms
+04-26 06:19:29.186 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento salvar inicio idVenda=44658 modo=final total=232.10 desconto=0.00 parcial=50.00
+04-26 06:19:29.187 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento pagamento ja processado idVenda=44658 forma=4 valor=182.10 provider=stone
+04-26 06:19:29.188 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento final enviar idVenda=44658 pagamentos=1 totalPago=232.10 liquido=232.10 troco=0.00 taxa=21.10
+04-26 06:19:29.385 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento final api ok idVenda=44658 em 199ms
+04-26 06:19:33.620 I/ReactNativeJS( 9852): [RP_SYNC] fluxo fechamento final fim ok idVenda=44658 em 4433ms
+04-26 06:19:38.528 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm inicio origem=inicial-focus cats=19 produtos=215
+04-26 06:19:38.528 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh inicio preferCache=true forceRemote=false
+04-26 06:19:38.560 I/ReactNativeJS( 9852): [RP_SYNC] menu refresh fim categorias=19 produtos=215 em 32ms
+04-26 06:19:38.560 I/ReactNativeJS( 9852): [RP_SYNC] menu prewarm fim origem=inicial-focus em 32ms
+04-26 06:19:58.786 W/System.err( 1152): java.util.concurrent.TimeoutException
+04-26 06:19:58.791 W/System.err( 1152): 	at java.util.concurrent.CyclicBarrier.dowait(CyclicBarrier.java:229)
+04-26 06:19:58.791 W/System.err( 1152): 	at java.util.concurrent.CyclicBarrier.await(CyclicBarrier.java:407)
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.h.a()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.d()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.G()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.o()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.f()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.k.a()
+04-26 06:19:58.791 W/System.err( 1152): 	at com.sunmi.pay.hardware.f.a.h.run()
+04-26 06:19:58.791 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1133)
+04-26 06:19:58.791 W/System.err( 1152): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:607)
+04-26 06:19:58.791 W/System.err( 1152): 	at java.lang.Thread.run(Thread.java:761)

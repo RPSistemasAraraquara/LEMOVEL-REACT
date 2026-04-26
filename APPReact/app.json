@@ -2,17 +2,17 @@
   "expo": {
     "name": "RPMOVEL",
     "slug": "rpcheff-rn",
-    "version": "52.0.1",
+    "version": "52.0.3",
     "icon": "./assets/Logo.png",
     "orientation": "portrait",
     "ios": {
       "infoPlist": {
-        "NSCameraUsageDescription": "Permitir abrir a camera para ler o QRCode da mesa"
+        "NSCameraUsageDescription": "Permitir abrir o Leitor"
       }
     },
     "android": {
       "package": "br.com.sistemalechef.rpmobile",
-      "versionCode": 105808,
+      "versionCode": 105810,
       "adaptiveIcon": {
         "foregroundImage": "./assets/Logo.png",
         "backgroundColor": "#FFFFFF"
@@ -22,7 +22,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permitir abrir a camera para ler o QRCode da mesa"
+          "cameraPermission": "Permitir abrir o Leitor"
         }
       ],
       "./plugins/with-rpcheff-plugpag",

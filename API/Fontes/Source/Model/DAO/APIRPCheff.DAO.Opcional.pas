@@ -13,12 +13,13 @@ uses
 type
   TAPIRPCheffDAOOpcional = class(TAPIRPCheffDAOBase<TAPIRPCheffEntityOpcional>)
   private
-    procedure Select;
+    procedure Select(const AIncludeProductId: Boolean = False);
   protected
     function DataSetToEntity(ADataSet: TDataSet): TAPIRPCheffEntityOpcional; override;
   public
     function Lista(AIdProduto: Integer): TObjectList<TAPIRPCheffEntityOpcional>; overload;
-     function Buscar(AidProduto: Integer): TAPIRPCheffEntityOpcional;overload;
+    function ListaPorProdutos(const AIdsProduto: TArray<Integer>): TDictionary<Integer, TObjectList<TAPIRPCheffEntityOpcional>>;
+    function Buscar(AidProduto: Integer): TAPIRPCheffEntityOpcional;overload;
   end;
 
 implementation
@@ -93,9 +94,75 @@ begin
   end;
 end;
 
-procedure TAPIRPCheffDAOOpcional.Select;
+function TAPIRPCheffDAOOpcional.ListaPorProdutos(
+  const AIdsProduto: TArray<Integer>): TDictionary<Integer, TObjectList<TAPIRPCheffEntityOpcional>>;
+var
+  LDataSet: TDataSet;
+  LIdProduto: Integer;
+  LLista: TObjectList<TAPIRPCheffEntityOpcional>;
+  LOpcional: TAPIRPCheffEntityOpcional;
+  LPair: TPair<Integer, TObjectList<TAPIRPCheffEntityOpcional>>;
+  LInClause: string;
+  I: Integer;
 begin
-  Query.SQL('select opcional.id_opcional, opcional.id_empresa,opcional.valor_custo,  ')
+  Result := TDictionary<Integer, TObjectList<TAPIRPCheffEntityOpcional>>.Create;
+  if Length(AIdsProduto) = 0 then
+    Exit;
+
+  LInClause := '';
+  for I := Low(AIdsProduto) to High(AIdsProduto) do
+  begin
+    if LInClause <> '' then
+      LInClause := LInClause + ', ';
+    LInClause := LInClause + ':idProduto' + IntToStr(I);
+  end;
+
+  try
+    Select(True);
+    Query.SQL('join materiais_opcional on opcional.id_opcional = materiais_opcional.id_opcional')
+      .SQL('and opcional.id_empresa = materiais_opcional.id_empresa')
+      .SQL('where opcional.id_empresa = :idEmpresa')
+      .SQL('and materiais_opcional.id_material in (' + LInClause + ')')
+      .SQL('and opcional.id_situacao = 4')
+      .ParamAsInteger('idEmpresa', FIdEmpresa);
+    for I := Low(AIdsProduto) to High(AIdsProduto) do
+      Query.ParamAsInteger('idProduto' + IntToStr(I), AIdsProduto[I]);
+
+    LDataSet := Query.OpenDataSet;
+    try
+      LDataSet.First;
+      while not LDataSet.Eof do
+      begin
+        LIdProduto := LDataSet.FieldByName('id_material_relacao').AsInteger;
+        LOpcional := DataSetToEntity(LDataSet);
+        if not Result.TryGetValue(LIdProduto, LLista) then
+        begin
+          LLista := TObjectList<TAPIRPCheffEntityOpcional>.Create(True);
+          Result.Add(LIdProduto, LLista);
+        end;
+
+        LLista.Add(LOpcional);
+        LDataSet.Next;
+      end;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+  except
+    for LPair in Result do
+      LPair.Value.Free;
+    Result.Free;
+    raise;
+  end;
+end;
+
+procedure TAPIRPCheffDAOOpcional.Select(const AIncludeProductId: Boolean);
+begin
+  if AIncludeProductId then
+    Query.SQL('select materiais_opcional.id_material as id_material_relacao, ')
+  else
+    Query.SQL('select ');
+
+  Query.SQL(' opcional.id_opcional, opcional.id_empresa,opcional.valor_custo,  ')
     .SQL(' opcional.descricao, opcional.valor, opcional.opc_p,opcional.opc_m,        ')
     .SQL(' opcional.opc_g, opcional.opc_gg, opcional.opc_extra,opcional.id_setor,    ')
     .SQL(' opcional.valor_opc_p, opcional.valor_opc_m, opcional.valor_opc_g,         ')

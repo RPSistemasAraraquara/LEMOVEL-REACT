@@ -5,9 +5,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../context/AppContext';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SweetAlert, SweetAlertType } from '../components/SweetAlert';
-import { api, normalizeSaleStatus, PaymentMethod, Sale, SalePayment } from '../services/api';
+import { api, logSyncDiagnostic, normalizeSaleStatus, PaymentMethod, Sale, SalePayment } from '../services/api';
 import {
   abortActivePayment,
+  describeMachinePaymentError,
   ensureGetNetReadyForLivePayment,
   executePayment,
   formatPaymentProviderLabel,
@@ -189,15 +190,26 @@ export const SaleClosureScreen: React.FC = () => {
   const [cobrarTaxaGarcom, setCobrarTaxaGarcom] = useState(false);
   const activePaymentTokenRef = useRef<string | null>(null);
   const paymentSelectionBusyRef = useRef(false);
+  const loadDataPromiseRef = useRef<Promise<void> | null>(null);
+  const loadDataKeyRef = useRef('');
 
   const returnTo = routeReturnTo as ReturnTarget;
   const canPreviewPreClosure = Boolean(user?.permitePreFechamentoMesaComanda);
   const canApplyDiscount = Boolean(user?.permiteDescontoFechamento);
 
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     if (!idVenda) return;
+    const loadKey = `${idVenda}:${mode}:${tableType || 'sem-tipo'}`;
+    const currentLoad = loadDataPromiseRef.current;
+    if (currentLoad && loadDataKeyRef.current === loadKey) {
+      logSyncDiagnostic(`fluxo fechamento carregar reutilizando idVenda=${idVenda} modo=${mode}`);
+      return currentLoad;
+    }
+
+    const startedAt = Date.now();
+    logSyncDiagnostic(`fluxo fechamento carregar inicio idVenda=${idVenda} modo=${mode}`);
     setLoading(true);
-    try {
+    const loadPromise = (async () => {
       const [saleResult, methodsResult, partialPaymentsResult, companyConfigResult] = await Promise.allSettled([
         api.getSale(idVenda, true),
         mode === 'final' ? api.listPaymentMethods() : Promise.resolve([] as PaymentMethod[]),
@@ -238,21 +250,32 @@ export const SaleClosureScreen: React.FC = () => {
             Number(currentCompanyConfig?.taxaServicoPct || 0) > 0
         );
       }
+      logSyncDiagnostic(
+        `fluxo fechamento carregar fim idVenda=${idVenda} modo=${mode} itens=${saleLoaded?.itens?.length || 0} pagamentos=${mergedPartialPayments.length} em ${Date.now() - startedAt}ms`
+      );
+    })();
+
+    loadDataKeyRef.current = loadKey;
+    loadDataPromiseRef.current = loadPromise;
+    try {
+      await loadPromise;
     } finally {
-      setLoading(false);
+      if (loadDataPromiseRef.current === loadPromise) {
+        loadDataPromiseRef.current = null;
+        loadDataKeyRef.current = '';
+        setLoading(false);
+      }
     }
-  };
+  }, [idVenda, mode, tableType]);
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idVenda, mode]);
+  }, [loadData]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idVenda, mode, tableType])
+    }, [loadData])
   );
 
   useEffect(() => () => {
@@ -287,6 +310,11 @@ export const SaleClosureScreen: React.FC = () => {
   const originalMascCouvertTotal = Number(sale?.valorCouvertMasculino || 0);
   const originalFemCouvertTotal = Number(sale?.valorCouvertFeminino || 0);
   const originalTaxaServico = Number(sale?.valorTaxaServico || 0);
+  const activeTableSaleId = Number(activeTable?.idVenda || activeTable?.venda?.idVenda || 0);
+  const activeTablePartialPaid =
+    activeTableSaleId === Number(idVenda)
+      ? Number(activeTable?.venda?.valorPagamentoAntecipado || 0)
+      : 0;
   const unitMascCouvert =
     Number(companyCouvertConfig.valorCouvertMasculino || 0) > 0
       ? Number(companyCouvertConfig.valorCouvertMasculino || 0)
@@ -305,7 +333,12 @@ export const SaleClosureScreen: React.FC = () => {
     parseInteger(fem) * unitFemCouvert;
   const effectiveTaxaServico = cobrarTaxaGarcom ? originalTaxaServico : 0;
   const total = Math.max(0, saleTotal - originalCouvertTotal - originalTaxaServico + currentCouvertTotal + effectiveTaxaServico);
-  const partialPaid = partialPayments.reduce((acc, item) => acc + Number(item.valor || 0), 0);
+  const partialPaidFromList = partialPayments.reduce((acc, item) => acc + Number(item.valor || 0), 0);
+  const partialPaid = Math.max(
+    partialPaidFromList,
+    Number(sale?.valorPagamentoAntecipado || 0),
+    activeTablePartialPaid
+  );
   const descontoNum = discountInputMode === 'percent'
     ? calculateDiscountValueFromPercent(total, descontoPercentual)
     : normalizeDiscountNumber(parseMoney(descontoValor));
@@ -688,6 +721,10 @@ export const SaleClosureScreen: React.FC = () => {
     }
 
     setSaving(true);
+    const operationStartedAt = Date.now();
+    logSyncDiagnostic(
+      `fluxo fechamento salvar inicio idVenda=${idVenda} modo=${mode} total=${total.toFixed(2)} desconto=${descontoNum.toFixed(2)} parcial=${partialPaid.toFixed(2)}`
+    );
     setActionStatus({ kind: 'info', message: mode === 'pre' ? 'Salvando pré-fechamento...' : 'Fechando venda...' });
     try {
     if (mode === 'pre') {
@@ -708,6 +745,9 @@ export const SaleClosureScreen: React.FC = () => {
         useStoneCieloOrGetNetPrinter && shouldPrintPreClosure && !previewRequested;
       const shouldUseLocalTerminalPrint = shouldUseLocalPagBankPrint || shouldUseLocalStoneCieloOrGetNetPrint;
       const shouldRequestPreClosePrintContent = previewRequested || shouldUseLocalTerminalPrint;
+      logSyncDiagnostic(
+        `fluxo fechamento pre enviar idVenda=${idVenda} pessoas=${numeroPessoas} masc=${parseInteger(masc)} fem=${parseInteger(fem)} taxa=${effectiveTaxaServico.toFixed(2)} imprimir=${Boolean(shouldPrintPreClosure)}`
+      );
       const previewResponse = await api.preCloseSale(idVenda, {
         idUsuario,
         numeroPessoas,
@@ -731,6 +771,7 @@ export const SaleClosureScreen: React.FC = () => {
           }
         : {}
       );
+      logSyncDiagnostic(`fluxo fechamento pre api ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
 
         let printPreviewMessage = '';
         let previewLoaded = false;
@@ -807,6 +848,7 @@ export const SaleClosureScreen: React.FC = () => {
               ? `Pré-fechamento salvo com sucesso. ${printExecutionMessage.trim()}`
               : 'Pré-fechamento salvo com sucesso.'
         });
+        logSyncDiagnostic(`fluxo fechamento pre fim ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
         Alert.alert('Concluído', `Pré-fechamento salvo com sucesso.${printPreviewMessage}${printExecutionMessage}`);
         goToInitial();
         return;
@@ -865,6 +907,9 @@ export const SaleClosureScreen: React.FC = () => {
         }
 
         if (requireMachinePaymentAtAdd && linha.processed) {
+          logSyncDiagnostic(
+            `fluxo fechamento pagamento ja processado idVenda=${idVenda} forma=${linha.codigo} valor=${linha.valor.toFixed(2)} provider=${paymentProvider}`
+          );
           aprovados.push({
             idFormaPgto: linha.codigo,
             valor: linha.valor,
@@ -873,6 +918,10 @@ export const SaleClosureScreen: React.FC = () => {
           continue;
         }
 
+        logSyncDiagnostic(
+          `fluxo fechamento pagamento terminal inicio idVenda=${idVenda} forma=${formaSelecionada.codigo} valor=${linha.valor.toFixed(2)} provider=${paymentProvider}`
+        );
+        const paymentStartedAt = Date.now();
         const pagamentoProcessado = await executePayment({
           value: linha.valor,
           method: formaSelecionada,
@@ -880,6 +929,9 @@ export const SaleClosureScreen: React.FC = () => {
           settings: appSettings,
           idVenda
         });
+        logSyncDiagnostic(
+          `fluxo fechamento pagamento terminal ok idVenda=${idVenda} forma=${pagamentoProcessado.method.codigo} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
+        );
 
         aprovados.push({
           idFormaPgto: pagamentoProcessado.method.codigo,
@@ -925,6 +977,9 @@ export const SaleClosureScreen: React.FC = () => {
 
       const valorTaxaServico = effectiveTaxaServico;
 
+      logSyncDiagnostic(
+        `fluxo fechamento final enviar idVenda=${idVenda} pagamentos=${linhas.length} totalPago=${totalPago.toFixed(2)} liquido=${totalLiquido.toFixed(2)} troco=${troco.toFixed(2)} taxa=${valorTaxaServico.toFixed(2)}`
+      );
       await api.closeSale({
         idVenda,
         idUsuario,
@@ -944,6 +999,7 @@ export const SaleClosureScreen: React.FC = () => {
         impressaoInterna: false,
         tipoMaquina: resolveMachineType(appSettings, true)
       });
+      logSyncDiagnostic(`fluxo fechamento final api ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
 
       let closePrintMessage = '';
       if (printOnlyAtClose) {
@@ -976,8 +1032,13 @@ export const SaleClosureScreen: React.FC = () => {
           ? `Venda fechada com sucesso.${closePrintMessage}`
           : 'Venda fechada com sucesso.'
       });
+      logSyncDiagnostic(`fluxo fechamento final fim ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
       goToInitial();
     } catch (error: any) {
+      logSyncDiagnostic(
+        `fluxo fechamento salvar erro idVenda=${idVenda} modo=${mode}: ${error?.message || 'erro desconhecido'}`,
+        2
+      );
       setActionStatus({ kind: 'error', message: error?.message || 'Não foi possível concluir a operação.' });
       Alert.alert('Erro', error?.message || 'Não foi possível concluir a operação.');
     } finally {
@@ -1007,7 +1068,7 @@ export const SaleClosureScreen: React.FC = () => {
     )
     : '';
   const heroSubtitle = mode === 'pre'
-    ? 'Ajuste pessoas, couvert e impressão em um fechamento mais claro, mantendo a mesma lógica operacional do sistema.'
+    ? ''
     : 'Revise totais, pagamentos e descontos em uma tela reorganizada para facilitar a conferência antes de concluir.';
 
   const openPaymentPicker = async (index: number) => {
@@ -1121,10 +1182,25 @@ export const SaleClosureScreen: React.FC = () => {
     setPaymentProcessingLabel(`${providerLabel} · ${selectedMethod.descricao}`);
     setPaymentProcessingMessage(`Processando venda com ${providerLabel}. Aguarde na maquininha.`);
     setPaymentProcessingVisible(true);
+    let slowPaymentTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
       setActionStatus({ kind: 'info', message: `Processando venda com ${providerLabel}...` });
 
+      logSyncDiagnostic(
+        `fluxo fechamento pagamento selecionar inicio idVenda=${idVenda} linha=${lineIndex} forma=${selectedMethod.codigo} valor=${valorSelecionado.toFixed(2)} provider=${paymentProvider}`
+      );
+      const paymentStartedAt = Date.now();
+      slowPaymentTimer = setTimeout(() => {
+        if (activePaymentTokenRef.current !== paymentToken) {
+          return;
+        }
+        const message = `Aguardando retorno da ${providerLabel}. Não feche o app nem tente finalizar de novo.`;
+        setPaymentProcessingMessage(message);
+        logSyncDiagnostic(
+          `fluxo fechamento pagamento selecionar aguardando idVenda=${idVenda} linha=${lineIndex} provider=${paymentProvider} em ${Date.now() - paymentStartedAt}ms`
+        );
+      }, 15000);
       const pagamentoProcessado = await executePayment({
         value: valorSelecionado,
         method: selectedMethod,
@@ -1135,6 +1211,9 @@ export const SaleClosureScreen: React.FC = () => {
           setPaymentProcessingMessage(message);
         }
       });
+      logSyncDiagnostic(
+        `fluxo fechamento pagamento selecionar ok idVenda=${idVenda} linha=${lineIndex} forma=${pagamentoProcessado.method.codigo} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
+      );
 
       if (activePaymentTokenRef.current !== paymentToken) {
         return;
@@ -1178,14 +1257,22 @@ export const SaleClosureScreen: React.FC = () => {
       if (activePaymentTokenRef.current !== paymentToken) {
         return;
       }
+      const details = describeMachinePaymentError(providerLabel, error);
+      logSyncDiagnostic(
+        `fluxo fechamento pagamento selecionar erro idVenda=${idVenda} linha=${lineIndex} provider=${paymentProvider} ${details.diagnostic}`,
+        2
+      );
       releaseMachinePaymentFlow(paymentToken);
       discardPaymentLine(lineIndex);
       setActionStatus({
         kind: 'error',
-        message: error?.message || `Falha ao processar pagamento na ${providerLabel}.`
+        message: details.message
       });
-      Alert.alert('Erro', error?.message || `Falha ao processar pagamento na ${providerLabel}.`);
+      Alert.alert('Erro', details.message);
     } finally {
+      if (slowPaymentTimer) {
+        clearTimeout(slowPaymentTimer);
+      }
       if (activePaymentTokenRef.current === paymentToken || paymentSelectionBusyRef.current) {
         releaseMachinePaymentFlow(paymentToken);
       }
@@ -1220,7 +1307,7 @@ export const SaleClosureScreen: React.FC = () => {
       <View style={styles.heroShell}>
         <Text style={styles.heroEyebrow}>{mode === 'pre' ? 'Pré fechamento' : 'Fechamento da venda'}</Text>
         <Text style={styles.heroTitle}>{title} da venda #{idVenda}</Text>
-        <Text style={styles.heroSubtitle}>{heroSubtitle}</Text>
+        {heroSubtitle ? <Text style={styles.heroSubtitle}>{heroSubtitle}</Text> : null}
 
         <View style={styles.metricGrid}>
           <View style={[styles.metricCard, styles.metricCardAccent]}>
@@ -1253,7 +1340,6 @@ export const SaleClosureScreen: React.FC = () => {
       <ClosureSection
         eyebrow="Atendimento"
         title="Pessoas e couvert"
-        subtitle="Ajuste os contadores mantendo exatamente o mesmo comportamento atual da tela."
       >
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Pessoas</Text>
@@ -1319,7 +1405,6 @@ export const SaleClosureScreen: React.FC = () => {
         <ClosureSection
           eyebrow="Serviço"
           title="Taxa de serviço"
-          subtitle="Volte a controlar a cobrança da taxa como no legado, sem alterar o restante do fechamento."
         >
           <View style={styles.summaryCard}>
             <View style={styles.switchRow}>

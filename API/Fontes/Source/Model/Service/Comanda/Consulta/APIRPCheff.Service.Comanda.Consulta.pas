@@ -24,6 +24,7 @@ type
 
     function DAO(AValue: TAPIRPCheffDAOFactory): TAPIRPCheffServiceComandaConsulta;
     function Listar: TObjectList<TAPIRPCheffEntityComanda>;
+    function ListarPorSituacao(ASituacao: TRPCheffSituacaoVenda): TObjectList<TAPIRPCheffEntityComanda>;
     function ListarPrePago: TObjectList<TAPIRPCheffEntityComanda>;
     function Consultar(AIdComanda: Integer): TAPIRPCheffEntityComanda;
   end;
@@ -74,6 +75,21 @@ var
   LComanda: TAPIRPCheffEntityComanda;
 begin
   Result := FDAO.ComandaDAO.List;
+  try
+    for LComanda in Result do
+      CarregarVenda(LComanda);
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+function TAPIRPCheffServiceComandaConsulta.ListarPorSituacao(
+  ASituacao: TRPCheffSituacaoVenda): TObjectList<TAPIRPCheffEntityComanda>;
+var
+  LComanda: TAPIRPCheffEntityComanda;
+begin
+  Result := FDAO.ComandaDAO.ListarPorSituacaoVenda(ASituacao);
   try
     for LComanda in Result do
       CarregarVenda(LComanda);

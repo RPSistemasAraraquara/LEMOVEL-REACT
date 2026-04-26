@@ -2,7 +2,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
   Left = 0
   Top = 0
   BorderStyle = bsDialog
-  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 11.0.0.0'
+  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 12.0.0.0'
   ClientHeight = 375
   ClientWidth = 629
   Color = clBtnFace
@@ -28,13 +28,13 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
       object GroupBox2: TGroupBox
         Left = 0
         Top = 0
-        Width = 621
-        Height = 218
+        Width = 613
+        Height = 205
         Align = alClient
         Caption = 'Impressora'
         TabOrder = 0
-        ExplicitWidth = 625
-        ExplicitHeight = 222
+        ExplicitWidth = 621
+        ExplicitHeight = 218
         object Label5: TLabel
           Left = 16
           Top = 24
@@ -83,7 +83,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
           Left = 16
           Top = 43
           Width = 232
-          Height = 38
+          Height = 40
           TabOrder = 0
         end
         object EdtImpressoraColunas: TEdit
@@ -124,7 +124,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
           Left = 16
           Top = 94
           Width = 232
-          Height = 38
+          Height = 40
           TabOrder = 5
         end
         object cbCortarPapel: TCheckBox
@@ -144,7 +144,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
           Left = 255
           Top = 94
           Width = 117
-          Height = 38
+          Height = 40
           Hint = 'Pagina de c'#243'digo usada pela Impressora POS'
           Style = csDropDownList
           TabOrder = 7

@@ -23,7 +23,7 @@ const parseInteger = (value: string) => {
 
 export const CouvertManagerScreen: React.FC = () => {
   const route = useRoute<Route>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { activeTable, refreshDashboard } = useApp();
   const [idVenda] = useState<number | undefined>(route.params?.idVenda || undefined);
   const [loading, setLoading] = useState(false);

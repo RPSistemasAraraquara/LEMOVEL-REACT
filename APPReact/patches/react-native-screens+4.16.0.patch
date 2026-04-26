@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+index 2b7dcff..996d4f2 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment
+ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+ import com.facebook.react.bridge.GuardedRunnable
+ import com.facebook.react.bridge.ReactContext
++import com.facebook.react.bridge.UiThreadUtil
+ import com.facebook.react.uimanager.PixelUtil
+ import com.facebook.react.uimanager.ThemedReactContext
+ import com.facebook.react.uimanager.UIManagerHelper
+@@ -460,7 +461,9 @@ class Screen(
+     fun startRemovalTransition() {
+         if (!isBeingRemoved) {
+             isBeingRemoved = true
+-            startTransitionRecursive(this)
++            UiThreadUtil.runOnUiThread {
++                startTransitionRecursive(this)
++            }
+         }
+     }
+ 

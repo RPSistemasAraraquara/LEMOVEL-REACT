@@ -135,8 +135,8 @@ const goToReturnScreen = (navigation: Nav, returnTo: ReturnTarget, returnCategor
 const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
   const tabParams =
     typeof returnCategoryId === 'number'
-      ? { screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } }
-      : { screen: 'Cardapio' };
+      ? ({ screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } } as const)
+      : ({ screen: 'Cardapio' } as const);
   const targetReset = {
     index: 1,
     routes: [
@@ -163,10 +163,10 @@ const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
   }
 
   try {
-    navigation.navigate('Tabs' as never, tabParams as never);
+    navigation.navigate('Tabs', tabParams);
   } catch (error: unknown) {
     void error;
-    navigation.navigate('Inicial' as never);
+    navigation.navigate('Inicial');
   }
 };
 
@@ -319,8 +319,9 @@ export const ItemLaunchScreen: React.FC = () => {
     const hasLocalOptionals =
       (Array.isArray(routeProduct?.opcionais) && routeProduct.opcionais.length > 0) ||
       (Array.isArray(syncedRouteProduct?.opcionais) && syncedRouteProduct.opcionais.length > 0);
+    const routeNeedsFullProduct = Boolean(routeProduct?.catalogCompact || syncedRouteProduct?.catalogCompact);
 
-    if (hasLocalOptionals && !shouldRefreshHappyHourPricing) {
+    if (hasLocalOptionals && !shouldRefreshHappyHourPricing && !routeNeedsFullProduct) {
       return () => {
         active = false;
       };
@@ -341,7 +342,7 @@ export const ItemLaunchScreen: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [routeProduct?.idProduto, routeProduct?.opcionais, syncedRouteProduct]);
+  }, [routeProduct?.idProduto, routeProduct?.opcionais, routeProduct?.catalogCompact, syncedRouteProduct]);
 
   const getPriceBySize = useCallback((item: MenuItem, sizeCode: string) => {
     return getMenuItemLaunchUnitPrice(item, sizeCode, {
@@ -476,27 +477,23 @@ export const ItemLaunchScreen: React.FC = () => {
     navigation.setOptions({
       title: '',
       headerTitle: () => null,
-      headerLeftContainerStyle: {
-        paddingLeft: 6,
-        paddingRight: 14
-      },
       headerLeft: () => (
         <Pressable
-      onPress={() => {
-        if (isReturningRef.current) {
-          return;
-        }
-        isReturningRef.current = true;
-        void goToReturnWithPending(
-          navigation,
-          returnTo,
-          returnCategoryId,
-          cart.length > 0,
-          flushPendingItems
-        ).finally(() => {
-          isReturningRef.current = false;
-        });
-      }}
+          onPress={() => {
+            if (isReturningRef.current) {
+              return;
+            }
+            isReturningRef.current = true;
+            void goToReturnWithPending(
+              navigation,
+              returnTo,
+              returnCategoryId,
+              cart.length > 0,
+              flushPendingItems
+            ).finally(() => {
+              isReturningRef.current = false;
+            });
+          }}
           style={styles.backButton}
         >
           <Text style={styles.backText}>‹</Text>
@@ -527,7 +524,7 @@ export const ItemLaunchScreen: React.FC = () => {
 
   const sizeOptions = useMemo<SizeOption[]>(() => {
     const defaultPrice = getPriceBySize(resolvedProduct, String(resolvedProduct.tamanhoPadrao || ''));
-    const hasSizeByFlow = resolvedProduct.vendaPorTamanho || resolvedProduct.permiteFracao;
+    const hasSizeByFlow = resolvedProduct.vendaPorTamanho;
 
     if (!hasSizeByFlow) {
       return [{
@@ -554,7 +551,7 @@ export const ItemLaunchScreen: React.FC = () => {
   }, [getPriceBySize, resolvedProduct]);
 
   const hasConfiguredSizeOptions = useMemo(() => {
-    if (!(resolvedProduct.vendaPorTamanho || resolvedProduct.permiteFracao)) {
+    if (!resolvedProduct.vendaPorTamanho) {
       return false;
     }
 
@@ -757,12 +754,12 @@ export const ItemLaunchScreen: React.FC = () => {
     const shouldRefreshHappyHourPricing =
       !hasMenuItemHappyHourMetadata(cached || baseProduct || null);
 
-    if (cached?.opcionais && cached.opcionais.length > 0 && !shouldRefreshHappyHourPricing) {
+    if (cached?.opcionais && cached.opcionais.length > 0 && !shouldRefreshHappyHourPricing && !cached.catalogCompact) {
       loadedFractionProductIdsRef.current[idProduto] = true;
       return;
     }
 
-    if (baseProduct?.opcionais && baseProduct.opcionais.length > 0 && !shouldRefreshHappyHourPricing) {
+    if (baseProduct?.opcionais && baseProduct.opcionais.length > 0 && !shouldRefreshHappyHourPricing && !baseProduct.catalogCompact) {
       loadedFractionProductIdsRef.current[idProduto] = true;
       mergeFractionProductDetails(baseProduct);
       return;
@@ -1412,7 +1409,6 @@ export const ItemLaunchScreen: React.FC = () => {
 
           <View style={styles.summary}>
             <Text style={styles.summaryText}>Subtotal: R$ {(fractionMode ? fractionEstimatedTotal : lineTotal).toFixed(2)}</Text>
-            <Text style={styles.summaryTextMuted}>Valor unitário: R$ {selectedPrice.toFixed(2)}</Text>
             {priceLineItems.map((item) => (
               <View key={item.label} style={styles.summaryRow}>
                 <Text style={styles.summaryTextMuted}>{item.label}</Text>
@@ -1864,4 +1860,3 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   }
 });
-
