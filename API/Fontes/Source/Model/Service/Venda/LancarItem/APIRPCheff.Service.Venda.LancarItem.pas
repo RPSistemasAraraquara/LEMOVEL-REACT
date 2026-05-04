@@ -85,6 +85,7 @@ begin
   if not FBatchMode then
     ValidarVenda;
   CarregarProduto;
+  FDAO.VendaItemDAO.GarantirPrecisaoQuantidadeDecimal;
 
   if FItem.fracoes.Count > 0 then
     LStrategy := TAPIRPCheffServiceVendaLancarItemFracionado.Create(FProduto)

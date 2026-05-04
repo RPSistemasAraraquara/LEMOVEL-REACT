@@ -19,7 +19,6 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
 }) => {
   return (
     <View style={s.wrap}>
-      {showAccentLine ? <View pointerEvents="none" style={s.glow} /> : null}
       <View style={[s.card, !showAccentLine ? s.cardWithoutGlow : null]}>
         {showAccentLine ? <View style={s.accentLine} /> : null}
         {showBadge ? (
@@ -36,22 +35,13 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
 
 const s = StyleSheet.create({
   wrap: {
-    marginBottom: Space.lg,
+    marginBottom: Space.md,
     position: 'relative'
   },
-  glow: {
-    position: 'absolute',
-    top: -18,
-    right: 24,
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: 'rgba(242, 153, 74, 0.14)'
-  },
   card: {
-    borderRadius: Radius.xl,
+    borderRadius: Radius.lg,
     paddingHorizontal: Space.lg,
-    paddingVertical: Space.lg,
+    paddingVertical: Space.md,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.card,
@@ -71,16 +61,16 @@ const s = StyleSheet.create({
   },
   badgeWrap: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: Radius.sm,
     backgroundColor: Colors.accentSoft,
-    marginBottom: 12
+    marginBottom: 8
   },
   badge: {
     color: Colors.accent,
     fontSize: 11,
-    letterSpacing: 0.8,
+    letterSpacing: 0,
     fontWeight: '900',
     textTransform: 'uppercase'
   },
@@ -88,10 +78,10 @@ const s = StyleSheet.create({
     fontSize: Typography.subtitle,
     color: Colors.text,
     fontWeight: '900',
-    letterSpacing: 0.1
+    letterSpacing: 0
   },
   subtitle: {
-    marginTop: 6,
+    marginTop: 4,
     color: Colors.textMuted,
     fontSize: Typography.body,
     lineHeight: 21

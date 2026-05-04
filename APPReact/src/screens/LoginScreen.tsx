@@ -192,10 +192,10 @@ export const LoginScreen: React.FC = () => {
           </Pressable>
 
           <Pressable onPress={goConfig} style={styles.configButton} disabled={loading}>
-            <Text style={styles.configButtonLabel}>Abrir configuração</Text>
+            <Text style={styles.configButtonLabel}>Configurar servidor</Text>
           </Pressable>
 
-          <Text style={styles.versionLabel}>Versão 12.0.0</Text>
+          <Text style={styles.versionLabel}>Versão 13.0.0</Text>
         </View>
       </ScrollView>
       <Text style={styles.footer}>www.sistemalechef.com.br</Text>
@@ -206,7 +206,7 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fc',
+    backgroundColor: Colors.background,
     paddingHorizontal: Space.xl,
     paddingTop: Space.xl,
     paddingBottom: Space.lg
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(242, 153, 74, 0.18)'
+    backgroundColor: 'rgba(242, 153, 74, 0.08)'
   },
   backgroundGlowMiddle: {
     position: 'absolute',
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: 'rgba(46, 134, 193, 0.12)'
+    backgroundColor: 'rgba(46, 134, 193, 0.06)'
   },
   backgroundGlowBottom: {
     position: 'absolute',
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(27, 79, 114, 0.08)'
+    backgroundColor: 'rgba(27, 79, 114, 0.04)'
   },
   scroll: {
     flex: 1
@@ -248,44 +248,44 @@ const styles = StyleSheet.create({
     paddingVertical: Space.md
   },
   heroCard: {
-    borderRadius: 28,
-    paddingHorizontal: Space.xl,
-    paddingVertical: Space.lg,
+    borderRadius: Radius.xl,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
     borderWidth: 1,
-    borderColor: 'rgba(242, 153, 74, 0.18)',
-    backgroundColor: '#fffaf4',
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
     shadowColor: '#684327',
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
   },
   heroBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.sm,
     backgroundColor: 'rgba(242, 153, 74, 0.14)',
-    marginBottom: 14
+    marginBottom: 10
   },
   heroBadgeText: {
     color: '#d46c15',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
     textTransform: 'uppercase'
   },
   card: {
     backgroundColor: 'rgba(255,255,255,0.98)',
-    borderRadius: 28,
-    padding: Space.xl,
+    borderRadius: Radius.xl,
+    padding: Space.lg,
     borderColor: 'rgba(217, 228, 239, 0.96)',
     borderWidth: 1,
     shadowColor: '#0f172a',
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
   },
   cardHeader: {
     marginBottom: Space.lg
@@ -294,18 +294,18 @@ const styles = StyleSheet.create({
     color: '#1b4f72',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0,
     textTransform: 'uppercase',
     marginBottom: 0
   },
   logo: {
-    width: 84,
-    height: 84,
+    width: 70,
+    height: 70,
     alignSelf: 'center',
-    marginBottom: 16
+    marginBottom: 10
   },
   title: {
-    fontSize: 30,
+    fontSize: 26,
     color: '#23314d',
     fontWeight: '900',
     alignSelf: 'center'
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   inputShell: {
     borderWidth: 1,
     borderColor: 'rgba(27, 79, 114, 0.12)',
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     backgroundColor: '#f8fbff',
     paddingHorizontal: 4
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   },
   connectionCard: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12
@@ -352,13 +352,13 @@ const styles = StyleSheet.create({
     color: '#1b4f72',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0,
     textTransform: 'uppercase',
     marginBottom: 4
   },
   button: {
     marginTop: 4,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     backgroundColor: '#1b4f72',
     paddingVertical: 16,
     alignItems: 'center',
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   },
   configButton: {
     marginTop: 10,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: 'rgba(27, 79, 114, 0.14)',
     backgroundColor: '#f6f9fc',

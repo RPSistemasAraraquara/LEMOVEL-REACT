@@ -18,7 +18,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { useApp } from '../context/AppContext';
 import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
-import { isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
+import { getTableOrderDisplayLabel, isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
 import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 
 type TabsNav = BottomTabNavigationProp<{
@@ -247,7 +247,7 @@ export const HomeScreen: React.FC = () => {
       {!!activeTable && (
         <View style={styles.active}>
           <Text style={styles.activeText}>
-            Mesa ativa: {activeTable.nomeMesaComanda || `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`}
+            Mesa ativa: {getTableOrderDisplayLabel(activeTable)}
           </Text>
           <Pressable
             style={styles.actionBtn}

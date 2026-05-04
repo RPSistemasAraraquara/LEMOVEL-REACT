@@ -5,6 +5,7 @@ import {
   api,
   Category,
   defaultMobileSettings,
+  getTableOrderDisplayLabel,
   hasConflictingOpeningSettings,
   LaunchItemFractionPayload,
   LaunchItemPayload,
@@ -1089,7 +1090,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLinkedMesaSelectionState({
       ...table,
       tipo: 'mesa',
-      nomeMesaComanda: String(table.nomeMesaComanda || '').trim() || `Mesa ${Number(table.idMesa || 0)}`
+      nomeMesaComanda: String(table.nomeMesaComanda || '').trim() || getTableOrderDisplayLabel({
+        ...table,
+        tipo: 'mesa'
+      })
     });
   };
 

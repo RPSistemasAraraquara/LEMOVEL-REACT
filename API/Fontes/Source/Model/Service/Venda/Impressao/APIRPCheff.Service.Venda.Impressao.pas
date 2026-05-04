@@ -27,6 +27,7 @@ type
     FMensagemCouvert           : string;
     FImprimir                  : Boolean;
 
+    function FormatarQuantidadeFracionada(AQuantidade, AValorUnitario, AValorTotal: Currency): string;
     procedure Imprimir(AConteudo: string); overload;
     function CriarImpressaoStone: TAPIRPCheffServiceVendaImpressao;
     function CriarImpressaoPlugPag: TAPIRPCheffServiceVendaImpressao;
@@ -58,6 +59,25 @@ uses
   APIRPCheff.Service.Venda.Impressao32Colunas,
   APIRPCheff.Service.Venda.Impressao42Colunas,
   APIRPCheff.Service.Venda.Impressao48Colunas;
+
+function TAPIRPCheffServiceVendaImpressao.FormatarQuantidadeFracionada(
+  AQuantidade, AValorUnitario, AValorTotal: Currency): string;
+const
+  TOLERANCIA = 0.01;
+var
+  LQuantidade: Currency;
+  LDenominador: Integer;
+begin
+  LQuantidade := AQuantidade;
+  if (LQuantidade <= 0) and (AValorUnitario <> 0) then
+    LQuantidade := AValorTotal / AValorUnitario;
+
+  for LDenominador := 2 to 10 do
+    if Abs(Double(LQuantidade) - (1 / LDenominador)) < TOLERANCIA then
+      Exit('1/' + LDenominador.ToString);
+
+  Result := FormatFloat('0.###', LQuantidade);
+end;
 
 function TAPIRPCheffServiceVendaImpressao.Components(
   AValue: TAPIRPCheffComponents): TAPIRPCheffServiceVendaImpressao;

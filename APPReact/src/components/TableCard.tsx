@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Radius, Shadows, Space } from '../theme';
-import { isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
+import { getTableOrderDisplayNumber, isTableStatusReserved, normalizeSaleStatus, TableOrder } from '../services/api';
 import { SafeMaterialCommunityIcons } from './SafeExpoIcons';
 
 type DisplayMode = 'mesa' | 'comanda' | 'mesaComanda';
@@ -139,14 +139,7 @@ const TableCardComponent: React.FC<TableCardProps> = ({
   const status = resolveStatus(table);
   const palette = resolvePalette(table, paletteMode);
   const isComanda = displayMode === 'comanda' || table.tipo === 'comanda';
-  const numero =
-    Number(
-      table.idMesa ||
-        table.idComanda ||
-        table.venda?.nomeMesaComanda?.match(/\d+/)?.[0] ||
-        table.nomeMesaComanda?.match(/\d+/)?.[0] ||
-        0
-    ) || '';
+  const numero = getTableOrderDisplayNumber(table) || '';
   const title = `${isComanda ? 'COMANDA' : 'MESA'} ${numero}`.trim();
   const rawDisplayName = String(table.venda?.nomeMesaComanda || table.nomeMesaComanda || '').trim();
   const displayPrefix = `${isComanda ? 'Comanda' : 'Mesa'} ${numero}`.trim();
@@ -247,35 +240,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E6DDD3',
     overflow: 'hidden',
-    height: 168,
+    height: 154,
     marginBottom: Space.sm,
     ...Shadows.card
   },
   topAccent: {
-    height: 4,
+    height: 3,
     width: '100%'
   },
   contentWrap: {
-    padding: 14,
-    gap: 10,
+    padding: 12,
+    gap: 8,
     flex: 1,
     justifyContent: 'space-between'
   },
   topLine: {
     width: '100%',
-    gap: 8,
-    minHeight: 92
+    gap: 6,
+    minHeight: 82
   },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    minHeight: 34
+    minHeight: 32
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
     backgroundColor: '#E8E0D8',
     borderWidth: 1,
     borderColor: '#E6DDD3',
@@ -284,10 +277,10 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     alignSelf: 'center',
     flexShrink: 0,
-    minWidth: 114,
+    minWidth: 108,
     maxWidth: '100%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -295,14 +288,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3
   },
   statusText: {
-    fontWeight: '700',
-    fontSize: 9,
+    fontWeight: '800',
+    fontSize: 10,
     textAlign: 'center'
   },
   tableTitle: {
     flex: 1,
-    fontWeight: '800',
-    fontSize: 14
+    fontWeight: '900',
+    fontSize: 16
   },
   tableSubtitle: {
     color: Colors.textMuted,
@@ -321,11 +314,11 @@ const styles = StyleSheet.create({
     minHeight: 24
   },
   valueCard: {
-    borderRadius: 14,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: '#FFF0E5',
     backgroundColor: '#FFF0E5',
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -338,7 +331,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 0.3
+    letterSpacing: 0
   },
   valueAmount: {
     color: Colors.primary,

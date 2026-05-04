@@ -648,6 +648,23 @@ export const SaleManagerScreen: React.FC = () => {
     if (!Number.isFinite(numeric)) return '0';
     return Number.isInteger(numeric) ? numeric.toString() : numeric.toFixed(3);
   };
+  const formatFractionQuantity = (value?: number, unitValue?: number, totalValue?: number) => {
+    let numeric = Number(value || 0);
+    const unit = Number(unitValue || 0);
+    const totalValueNumber = Number(totalValue || 0);
+    if (numeric <= 0 && unit > 0 && totalValueNumber > 0) {
+      numeric = totalValueNumber / unit;
+    }
+    if (!Number.isFinite(numeric)) return '0';
+
+    for (let denominator = 2; denominator <= 10; denominator += 1) {
+      if (Math.abs(numeric - 1 / denominator) < 0.01) {
+        return `1/${denominator}`;
+      }
+    }
+
+    return formatQuantity(numeric);
+  };
   const getOptionalText = (optional: SaleLineOptional): string => {
     const description = String(optional.descricao || '').trim();
     const value = Number(optional.valor || 0);
@@ -694,7 +711,8 @@ export const SaleManagerScreen: React.FC = () => {
       }
 
       const lines = getFractionGroupLines(line, visibleItems);
-      const isFractionGroup = lines.length > 1;
+      const hasNestedFractions = Boolean(line.fracoes?.length);
+      const isFractionGroup = lines.length > 1 || hasNestedFractions;
 
       lines.forEach((item) => {
         const itemNumber = toItemNumber(item.numeroItem);
@@ -711,12 +729,14 @@ export const SaleManagerScreen: React.FC = () => {
         key: isFractionGroup
           ? fallbackGroupKey
             ? `fraction-auto-${fallbackGroupKey}`
-            : `fraction-${rootItemNumber || lineNumber}`
+            : `fraction-${rootItemNumber || lineNumber || toItemNumber(line.itemFracionado)}`
           : `item-${lineNumber}`,
         lines,
         primaryLine,
         isFractionGroup,
-        total: lines.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
+        total: hasNestedFractions
+          ? (line.fracoes || []).reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
+          : lines.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
       });
 
       return acc;
@@ -817,6 +837,21 @@ export const SaleManagerScreen: React.FC = () => {
     const lineSizeLabel = getLineSizeLabel(group.primaryLine);
     const lineWaiterName = getLineWaiterName(group.primaryLine);
     const lineLaunchDateTime = getGroupLaunchDateTime(group.lines);
+    const fractionLines = group.primaryLine.fracoes?.length
+      ? group.primaryLine.fracoes.map((fraction, index) => ({
+          ...group.primaryLine,
+          idProduto: fraction.idProduto,
+          produtoDescricao: fraction.produtoDescricao,
+          numeroItem: fraction.numeroItem || group.primaryLine.numeroItem + index,
+          quantidade: fraction.quantidade,
+          valorUnitario: fraction.valorUnitario,
+          valorTotal: fraction.valorTotal,
+          acrescimo: fraction.acrescimo || 0,
+          observacao: fraction.observacao,
+          descricaoTamanho: fraction.descricaoTamanho || group.primaryLine.descricaoTamanho,
+          opcionais: fraction.opcionais || []
+        }))
+      : group.lines;
 
     return (
       <View style={styles.lineCard}>
@@ -832,20 +867,22 @@ export const SaleManagerScreen: React.FC = () => {
           {group.isFractionGroup ? (
             <>
               <View style={styles.lineMetaRow}>
-                <Text style={styles.lineText}>Frações: {group.lines.length}</Text>
+                <Text style={styles.lineText}>Frações: {fractionLines.length}</Text>
                 {lineSizeLabel ? <Text style={styles.lineText}>Tamanho: {lineSizeLabel}</Text> : null}
               </View>
               {lineWaiterName ? <Text style={styles.lineText}>Garçom: {lineWaiterName}</Text> : null}
               {lineLaunchDateTime ? <Text style={styles.lineText}>Lançado em: {lineLaunchDateTime}</Text> : null}
               <View style={styles.fractionList}>
-                {group.lines.map((fractionLine, index) => (
+                {fractionLines.map((fractionLine, index) => (
                   <View
                     key={`${fractionLine.numeroItem}-${fractionLine.idProduto}`}
                     style={index > 0 ? styles.fractionItemDivider : undefined}
                   >
                     <Text style={styles.lineText}>{fractionLine.produtoDescricao}</Text>
                     <View style={styles.lineMetaRow}>
-                      <Text style={styles.lineText}>Qtde: {formatQuantity(fractionLine.quantidade)}</Text>
+                      <Text style={styles.lineText}>
+                        Qtde: {formatFractionQuantity(fractionLine.quantidade, fractionLine.valorUnitario, fractionLine.valorTotal)}
+                      </Text>
                     </View>
                     {getVisibleLineObservation(fractionLine) ? (
                       <Text style={styles.lineText}>Obs: {getVisibleLineObservation(fractionLine)}</Text>

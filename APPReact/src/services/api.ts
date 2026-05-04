@@ -147,6 +147,19 @@ export type SaleLineOptional = {
   gratis?: boolean;
 };
 
+export type SaleLineFraction = {
+  idProduto: number;
+  produtoDescricao: string;
+  numeroItem?: number;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  acrescimo?: number;
+  observacao?: string;
+  descricaoTamanho?: string;
+  opcionais?: SaleLineOptional[];
+};
+
 export type SaleLine = {
   idProduto: number;
   produtoDescricao: string;
@@ -168,6 +181,7 @@ export type SaleLine = {
   vendaPorTamanho: boolean;
   idMesaVinculada?: number;
   opcionais?: SaleLineOptional[];
+  fracoes?: SaleLineFraction[];
 };
 
 export type SalePayment = {
@@ -290,6 +304,8 @@ type UserListOptions = {
 export type TableOrder = {
   idMesa: number;
   idComanda?: number;
+  numeroMesa?: number;
+  numeroComanda?: number;
   nomeMesaComanda: string;
   situacao: string;
   statusOriginal?: string;
@@ -305,6 +321,42 @@ export type TableOrder = {
     valorPagamentoAntecipado?: number;
   };
 };
+
+const extractTableDisplayNumber = (value?: string): number => {
+  const match = String(value || '').match(/\d+/);
+  return match ? Number(match[0]) || 0 : 0;
+};
+
+export function getTableOrderDisplayNumber(table: TableOrder): number {
+  const isComanda = table.tipo === 'comanda' || Number(table.idComanda || 0) > 0;
+  const explicitNumber = isComanda
+    ? Number(table.numeroComanda || table.numeroMesa || 0)
+    : Number(table.numeroMesa || table.numeroComanda || 0);
+
+  if (explicitNumber > 0) {
+    return explicitNumber;
+  }
+
+  const displayNumber =
+    extractTableDisplayNumber(table.venda?.nomeMesaComanda) ||
+    extractTableDisplayNumber(table.nomeMesaComanda);
+
+  if (displayNumber > 0) {
+    return displayNumber;
+  }
+
+  return Number(isComanda ? table.idComanda || table.idMesa : table.idMesa || table.idComanda || 0) || 0;
+}
+
+export function getTableOrderDisplayLabel(table: TableOrder): string {
+  const name = String(table.nomeMesaComanda || table.venda?.nomeMesaComanda || '').trim();
+  if (name) {
+    return name;
+  }
+
+  const isComanda = table.tipo === 'comanda' || Number(table.idComanda || 0) > 0;
+  return `${isComanda ? 'Comanda' : 'Mesa'} ${getTableOrderDisplayNumber(table) || 0}`.trim();
+}
 
 export type UserProfile = {
   idUsuario: number;
@@ -605,6 +657,7 @@ const nativeHttpModule: NativeHttpModule | undefined =
 
 let activeProductImageDownloads = 0;
 const productImageDownloadQueue: Array<() => void> = [];
+const productImageWebCache = new Map<string, string>();
 
 function runProductImageDownload<T>(task: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -628,6 +681,34 @@ function runProductImageDownload<T>(task: () => Promise<T>): Promise<T> {
 
     productImageDownloadQueue.push(execute);
   });
+}
+
+async function downloadProductImageAsDataUri(imageUrl: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(imageUrl, {
+      headers: authHeader()
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (!bytes.byteLength) {
+      return undefined;
+    }
+
+    const headerMimeType = String(response.headers.get('content-type') || '')
+      .split(';', 1)[0]
+      .trim();
+    const mimeType = /^image\//i.test(headerMimeType)
+      ? headerMimeType
+      : detectImageMimeTypeFromBytes(Array.from(bytes.subarray(0, 16)));
+
+    return buildDataUri(bytesToBase64(Array.from(bytes)), mimeType || 'image/jpeg');
+  } catch {
+    return undefined;
+  }
 }
 
 type GetRequestCacheEntry = {
@@ -825,11 +906,15 @@ export async function cacheProductImageOnDemand(
 ): Promise<string | undefined> {
   const imageUrl = buildProductImageUrl(baseUrl, empresaId, idProduto);
   const imagePath = buildCatalogRemoteImagePath(baseUrl, empresaId, idProduto);
-  if (!imageUrl || !imagePath) {
+  if (!imageUrl || (Platform.OS !== 'web' && !imagePath)) {
     return undefined;
   }
 
   const readCachedPath = async () => {
+    if (!imagePath) {
+      return { path: undefined, fresh: false };
+    }
+
     try {
       const info = await FileSystem.getInfoAsync(imagePath.path);
       if (!info.exists || info.isDirectory || info.size <= 0) {
@@ -852,34 +937,59 @@ export async function cacheProductImageOnDemand(
     return cached.path;
   }
 
+  if (Platform.OS === 'web') {
+    const cachedDataUri = productImageWebCache.get(imageUrl);
+    if (cachedDataUri) {
+      return cachedDataUri;
+    }
+  }
+
   return runProductImageDownload(async () => {
+    if (Platform.OS === 'web') {
+      const queuedCachedDataUri = productImageWebCache.get(imageUrl);
+      if (queuedCachedDataUri) {
+        return queuedCachedDataUri;
+      }
+
+      const downloadedDataUri = await downloadProductImageAsDataUri(imageUrl);
+      if (downloadedDataUri) {
+        productImageWebCache.set(imageUrl, downloadedDataUri);
+      }
+      return downloadedDataUri;
+    }
+
+    const nativeImagePath = imagePath;
+    if (!nativeImagePath) {
+      return undefined;
+    }
+
     const queuedCached = await readCachedPath();
     if (queuedCached.path && queuedCached.fresh) {
       return queuedCached.path;
     }
 
     try {
-      await FileSystem.makeDirectoryAsync(imagePath.directory, { intermediates: true });
-      await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
-      const result = await FileSystem.downloadAsync(imageUrl, imagePath.tempPath, {
+      await FileSystem.makeDirectoryAsync(nativeImagePath.directory, { intermediates: true });
+      await FileSystem.deleteAsync(nativeImagePath.tempPath, { idempotent: true }).catch(() => null);
+      const result = await FileSystem.downloadAsync(imageUrl, nativeImagePath.tempPath, {
         headers: {
           Authorization: getAuthorizationHeaderValue()
         }
       });
 
       if (result.status < 200 || result.status >= 300) {
-        await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
+        await FileSystem.deleteAsync(nativeImagePath.tempPath, { idempotent: true }).catch(() => null);
         return queuedCached.path;
       }
 
-      await FileSystem.deleteAsync(imagePath.path, { idempotent: true }).catch(() => null);
+      await FileSystem.deleteAsync(nativeImagePath.path, { idempotent: true }).catch(() => null);
       await FileSystem.moveAsync({
-        from: imagePath.tempPath,
-        to: imagePath.path
+        from: nativeImagePath.tempPath,
+        to: nativeImagePath.path
       });
-      return imagePath.path;
+      return nativeImagePath.path;
     } catch {
-      await FileSystem.deleteAsync(imagePath.tempPath, { idempotent: true }).catch(() => null);
+      await FileSystem.deleteAsync(nativeImagePath.tempPath, { idempotent: true }).catch(() => null);
       return queuedCached.path;
     }
   });
@@ -1246,14 +1356,8 @@ function extractStoredImagePayload(image?: string): string | undefined {
     return undefined;
   }
 
-  if (/^(https?:\/\/|file:\/\/|content:\/\/)/i.test(trimmed)) {
+  if (/^(https?:\/\/|file:\/\/|content:\/\/|blob:|data:image\/)/i.test(trimmed)) {
     return undefined;
-  }
-
-  const dataUriPrefixMatch = trimmed.match(/^data:image\/[^;]+;base64,/i);
-  if (dataUriPrefixMatch) {
-    const payload = trimmed.slice(dataUriPrefixMatch[0].length).replace(/\s+/g, '');
-    return payload || undefined;
   }
 
   const normalizedPayload = trimmed.replace(/\s+/g, '');
@@ -1266,7 +1370,7 @@ function extractStoredImageLocalPath(image?: string): string | undefined {
     return undefined;
   }
 
-  return /^(file:\/\/|content:\/\/)/i.test(trimmed) ? trimmed : undefined;
+  return /^(file:\/\/|content:\/\/|data:image\/|blob:)/i.test(trimmed) ? trimmed : undefined;
 }
 
 function getImageFileExtensionFromPayload(imagePayload?: string): string {
@@ -1625,8 +1729,13 @@ function mergeProductsWithCachedImages(products: MenuItem[], cachedProducts: Men
       cachedById.set(id, item);
     }
   });
-
   return products.map((item) => mergeProductWithCachedImage(item, cachedById.get(Number(item.idProduto || item.id || 0))));
+}
+
+function hasMissingCatalogImageCache(products: MenuItem[]): boolean {
+  return products.some(
+    (item) => Boolean(item.possuiImagem) && !extractStoredImageLocalPath(item.imagemLocalPath || item.imagem)
+  );
 }
 
 function parseOptional(value: any): ProductOptional {
@@ -2064,6 +2173,8 @@ function parseTable(value: any, source: 'mesa' | 'comanda' = 'mesa'): TableOrder
   );
   const tableId = isComanda ? (idComanda || resolvedMesaId || parseNumber(venda?.numero, 0)) : resolvedMesaId;
   const safeTableId = parseNumber(tableId, 0);
+  const normalizedMesaNumero = mesaNumero || undefined;
+  const normalizedComandaNumero = (isComanda ? (comandaNumero || mesaNumero) : comandaNumero) || undefined;
   const nomeInformado = String(
     value?.nomeMesaComanda ??
     value?.descricao ??
@@ -2075,7 +2186,14 @@ function parseTable(value: any, source: 'mesa' | 'comanda' = 'mesa'): TableOrder
   return {
     idMesa: safeTableId,
     idComanda: idComanda || undefined,
-    nomeMesaComanda: normalizeNomeMesa(resolvedMesaId, isComanda ? 'Comanda' : 'Mesa', comandaNumero || mesaNumero, nomeInformado),
+    numeroMesa: normalizedMesaNumero,
+    numeroComanda: normalizedComandaNumero,
+    nomeMesaComanda: normalizeNomeMesa(
+      resolvedMesaId,
+      isComanda ? 'Comanda' : 'Mesa',
+      normalizedComandaNumero || normalizedMesaNumero || 0,
+      nomeInformado
+    ),
     situacao: sanitizeText(value?.situacao, statusFromBody) || sanitizeText(venda?.situacao, ''),
     statusOriginal: sanitizeText(value?.situacao ?? venda?.situacao, ''),
     statusCode: sanitizeText(value?.statusCode ?? value?.status, ''),
@@ -2227,6 +2345,22 @@ function parseSaleLineOptional(value: any): SaleLineOptional {
   };
 }
 
+function parseSaleLineFraction(value: any): SaleLineFraction {
+  const descricaoTamanho = resolveField(value, ['descricaoTamanho', 'DescricaoTamanho', 'descricao_tamanho']);
+  return {
+    idProduto: parseNumber(resolveField(value, ['idProduto', 'id_produto', 'mat_001']), 0),
+    produtoDescricao: String(resolveField(value, ['produtoDescricao', 'descricao', 'mat_003']) ?? ''),
+    numeroItem: parseNumber(resolveField(value, ['numeroItem', 'ite_001']), 0),
+    quantidade: parseNumber(value?.quantidade, 0),
+    valorUnitario: parseNumber(value?.valorUnitario, 0),
+    valorTotal: parseNumber(value?.valorTotal, 0),
+    acrescimo: parseNumber(value?.acrescimo, 0),
+    observacao: value?.observacao ? String(value.observacao) : undefined,
+    descricaoTamanho: descricaoTamanho ? String(descricaoTamanho) : undefined,
+    opcionais: Array.isArray(value?.opcionais) ? value.opcionais.map(parseSaleLineOptional) : []
+  };
+}
+
 function parseSaleLine(value: any): SaleLine {
   const normalizedSituacao = normalizeStatus(value?.situacao ?? value?.sit_001);
   const rawNomeGarcom = resolveField(value, ['nomeGarcom', 'nome_garcom']);
@@ -2253,7 +2387,8 @@ function parseSaleLine(value: any): SaleLine {
     observacao: value?.observacao ? String(value.observacao) : undefined,
     vendaPorTamanho: parseBoolean(value?.vendaPorTamanho, false),
     idMesaVinculada: parseNumber(value?.idMesaVinculada, 0),
-    opcionais: Array.isArray(value?.opcionais) ? value.opcionais.map(parseSaleLineOptional) : []
+    opcionais: Array.isArray(value?.opcionais) ? value.opcionais.map(parseSaleLineOptional) : [],
+    fracoes: Array.isArray(value?.fracoes) ? value.fracoes.map(parseSaleLineFraction) : []
   };
 }
 
@@ -2403,7 +2538,7 @@ export function resolveImageUri(image?: string): string | undefined {
     return undefined;
   }
 
-  if (/^(data:image\/|https?:\/\/|file:\/\/|content:\/\/)/i.test(trimmed)) {
+  if (/^(data:image\/|https?:\/\/|file:\/\/|content:\/\/|blob:)/i.test(trimmed)) {
     return trimmed;
   }
 
@@ -2735,7 +2870,7 @@ export class ApiClient {
   }
 
   private rememberCatalogSqliteSummaryState(fingerprint: string | null, count: number) {
-    if (!fingerprint || count <= 0) {
+    if (Platform.OS === 'web' || !fingerprint || count <= 0) {
       return;
     }
 
@@ -2745,6 +2880,10 @@ export class ApiClient {
   }
 
   private hasCatalogSqliteSummaryState(fingerprint: string, count: number) {
+    if (Platform.OS === 'web') {
+      return false;
+    }
+
     return (
       this.cachedCatalogSqliteKey === this.getCatalogStoragePrefix() &&
       this.cachedCatalogSqliteFingerprint === fingerprint &&
@@ -2752,13 +2891,18 @@ export class ApiClient {
     );
   }
 
-  private async materializeProductImages(products: MenuItem[], previousProducts: MenuItem[]): Promise<MenuItem[]> {
+  private async materializeProductImages(
+    products: MenuItem[],
+    previousProducts: MenuItem[],
+    options: { prefetchMissingRemote?: boolean } = {}
+  ): Promise<MenuItem[]> {
     if (!products.length) {
       return products;
     }
 
     const imageDirectory = buildCatalogImageDirectory(this.baseUrl, this.idEmpresa);
-    if (!imageDirectory) {
+    const canPersistFileImages = Platform.OS !== 'web' && Boolean(imageDirectory);
+    if (Platform.OS !== 'web' && !canPersistFileImages) {
       return products.map((item) => stripInlineProductImage(item));
     }
 
@@ -2771,9 +2915,9 @@ export class ApiClient {
     });
 
     const hasAnyImagePayload = products.some((item) => Boolean(extractStoredImagePayload(item.imagem_db || item.imagem)));
-    if (hasAnyImagePayload) {
+    if (hasAnyImagePayload && canPersistFileImages) {
       try {
-        await FileSystem.makeDirectoryAsync(imageDirectory, { intermediates: true });
+        await FileSystem.makeDirectoryAsync(imageDirectory as string, { intermediates: true });
       } catch {
         return products.map((item) => stripInlineProductImage(item));
       }
@@ -2800,6 +2944,20 @@ export class ApiClient {
           continue;
         }
 
+        if (options.prefetchMissingRemote && product.possuiImagem !== false && productId > 0) {
+          const remoteImagePath = await cacheProductImageOnDemand(this.baseUrl, this.idEmpresa, productId).catch(() => undefined);
+          if (remoteImagePath) {
+            resolvedProducts.push({
+              ...product,
+              imagem: remoteImagePath,
+              imagem_db: undefined,
+              imagemLocalPath: remoteImagePath,
+              possuiImagem: true
+            });
+            continue;
+          }
+        }
+
         resolvedProducts.push({
           ...product,
           imagem_db: undefined,
@@ -2819,8 +2977,20 @@ export class ApiClient {
         continue;
       }
 
+      if (Platform.OS === 'web') {
+        const inlineImageUri = buildDataUri(imagePayload, detectImageMimeTypeFromBase64(imagePayload));
+        resolvedProducts.push({
+          ...product,
+          imagem: inlineImageUri,
+          imagem_db: undefined,
+          imagemLocalPath: inlineImageUri,
+          possuiImagem: true
+        });
+        continue;
+      }
+
       const imageExtension = getImageFileExtensionFromPayload(imagePayload);
-      const imagePath = `${imageDirectory}${productId || resolvedProducts.length + 1}.${imageExtension}`;
+      const imagePath = `${imageDirectory as string}${productId || resolvedProducts.length + 1}.${imageExtension}`;
 
       try {
         await FileSystem.writeAsStringAsync(imagePath, imagePayload, {
@@ -3130,6 +3300,7 @@ export class ApiClient {
   private async syncCatalogProductCount(): Promise<number> {
     const startedAt = Date.now();
     const productPath = `rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=false`;
+    const cachedProducts = await this.loadCachedProducts();
     const { response, payload, rawText } = await this.request(productPath, {
       preferNativeHttp: Platform.OS === 'android',
       timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
@@ -3151,13 +3322,17 @@ export class ApiClient {
       knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
     }
 
-    if (remoteFingerprint && knownFingerprint === remoteFingerprint) {
+    if (remoteFingerprint && knownFingerprint === remoteFingerprint && !hasMissingCatalogImageCache(cachedProducts)) {
       this.cachedCatalogProductsFingerprint = remoteFingerprint;
       logSyncDiagnostic(`produtos prontos inalterado count=${payload.length} em ${Date.now() - startedAt}ms`);
       return payload.length;
     }
 
-    const products = stripInlineProductImages(payload.map(parseMenuItem));
+    const remoteProducts = payload.map(parseMenuItem);
+    const mergedProducts = mergeProductsWithCachedImages(remoteProducts, cachedProducts);
+    const products = await this.materializeProductImages(mergedProducts, cachedProducts, {
+      prefetchMissingRemote: true
+    });
     await this.saveCachedProducts(products, {
       fingerprint: remoteFingerprint
     });
@@ -3229,6 +3404,7 @@ export class ApiClient {
 
     const normalized = [...uniqueById.values()].sort((a, b) => (a.idProduto || a.id) - (b.idProduto || b.id));
     const nextIds = normalized.map((item) => Number(item.idProduto || item.id || 0)).filter((item) => item > 0);
+    const hasResolvedLocalImages = normalized.some((item) => Boolean(extractStoredImageLocalPath(item.imagemLocalPath || item.imagem)));
     const fingerprint = options.fingerprint || buildCatalogProductsSemanticFingerprint(normalized);
     const verifiedSqliteSummary = this.hasCatalogSqliteSummaryState(fingerprint, normalized.length);
     const sqliteFingerprint = verifiedSqliteSummary
@@ -3246,21 +3422,44 @@ export class ApiClient {
     this.cachedCatalogProducts = normalized;
     this.cachedCatalogProductSummaries = normalized.map(toCatalogListMenuItem);
     if (previousFingerprint === fingerprint) {
+      const shouldRefreshAsyncStorage = Platform.OS === 'web' && hasResolvedLocalImages;
       const sqliteSummaryCount = verifiedSqliteSummary
         ? normalized.length
         : sqliteFingerprint
           ? await countStoredCatalogProductSummaries(this.getCatalogStoragePrefix()).catch(() => 0)
           : 0;
-      if (sqliteFingerprint && sqliteSummaryCount >= normalized.length) {
+      if (!shouldRefreshAsyncStorage && sqliteFingerprint && sqliteSummaryCount >= normalized.length) {
         this.cachedCatalogProductsFingerprint = fingerprint;
         this.rememberCatalogSqliteSummaryState(fingerprint, sqliteSummaryCount);
         logSyncDiagnostic(`cache produtos sem alteracao count=${normalized.length} em ${Date.now() - startedAt}ms`);
         return;
       }
 
+      const previousIds = shouldRefreshAsyncStorage ? await this.readCachedProductIds() : [];
+      const nextIdSet = shouldRefreshAsyncStorage ? new Set(nextIds) : null;
+      const staleKeys =
+        shouldRefreshAsyncStorage && nextIdSet
+          ? previousIds.filter((id) => !nextIdSet.has(id)).map((id) => this.getCatalogProductKey(id))
+          : [];
+      const productJsonList = shouldRefreshAsyncStorage ? normalized.map((item) => JSON.stringify(toStoredMenuItem(item))) : [];
+      const pairs = shouldRefreshAsyncStorage
+        ? normalized.map(
+            (item, index): [string, string] => [
+              this.getCatalogProductKey(Number(item.idProduto || item.id || 0)),
+              productJsonList[index]
+            ]
+          )
+        : [];
       const persistItems = buildCatalogPersistItems(normalized);
-      if (persistItems.length > 0) {
-        await saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint);
+      if (persistItems.length > 0 || pairs.length > 0) {
+        await Promise.all([
+          pairs.length > 0
+            ? this.persistCachedProducts(pairs, nextIds, staleKeys, fingerprint)
+            : Promise.resolve(),
+          persistItems.length > 0
+            ? saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
+            : Promise.resolve()
+        ]);
         this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
       }
       this.cachedCatalogProductsFingerprint = fingerprint;
@@ -4504,5 +4703,3 @@ export class ApiClient {
 }
 
 export const api = new ApiClient(defaultMobileSettings.baseUrl, defaultMobileSettings.empresaId);
-
-

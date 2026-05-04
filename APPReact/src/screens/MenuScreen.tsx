@@ -17,7 +17,7 @@ import { CommonActions, RouteProp, useIsFocused, useNavigation, useRoute } from 
 import { CategoryChip } from '../components/CategoryChip';
 import { MemoFoodCard } from '../components/FoodCard';
 import { useApp } from '../context/AppContext';
-import { api, logSyncDiagnostic, MenuItem, normalizeSaleStatus } from '../services/api';
+import { api, getTableOrderDisplayLabel, logSyncDiagnostic, MenuItem, normalizeSaleStatus } from '../services/api';
 import { RootStackParams, TabParams } from '../navigation/AppNavigator';
 import { Colors, Radius, Shadows, Space } from '../theme';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -28,7 +28,10 @@ type MenuRoute = RouteProp<TabParams, 'Cardapio'>;
 
 type BarcodeScanningResult = {
   data?: string | null;
+  type?: string | null;
 };
+
+const PRODUCT_CAMERA_BARCODE_TYPES = ['ean13', 'ean8'] as const;
 
 const getCameraViewComponent = (): React.ComponentType<any> | null => {
   try {
@@ -50,6 +53,29 @@ const normalizeBarcodeReference = (value: unknown): string => {
   }
 
   return normalized;
+};
+
+const normalizeProductCameraBarcode = (result: BarcodeScanningResult): string => {
+  const rawValue = String(result?.data ?? '').trim();
+  if (!rawValue) {
+    return '';
+  }
+
+  const barcodeType = String(result?.type ?? '').trim().toLowerCase();
+  const normalizedValue = rawValue.replace(/\s+/g, '');
+  if (!normalizedValue) {
+    return '';
+  }
+
+  if (barcodeType && !PRODUCT_CAMERA_BARCODE_TYPES.includes(barcodeType as (typeof PRODUCT_CAMERA_BARCODE_TYPES)[number])) {
+    return '';
+  }
+
+  if (/^\d+$/.test(normalizedValue) && ![8, 13].includes(normalizedValue.length)) {
+    return '';
+  }
+
+  return normalizedValue;
 };
 
 const findProductByBarcodeInList = (items: MenuItem[], rawCode: string) => {
@@ -720,7 +746,7 @@ export const MenuScreen: React.FC = () => {
       return;
     }
 
-    const value = result?.data?.trim();
+    const value = normalizeProductCameraBarcode(result);
     if (!value) {
       return;
     }
@@ -790,9 +816,7 @@ export const MenuScreen: React.FC = () => {
     setProductCameraOpen(true);
   }, [activeTable, canLaunchByStatus, CameraViewComponent, currentStatusLabel, showSweetAlert]);
 
-  const mesaLabel = activeTable
-    ? `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`
-    : 'Mesa --';
+  const mesaLabel = activeTable ? getTableOrderDisplayLabel(activeTable) : 'Mesa --';
   const searchActive = searchQuery.trim().length > 0;
   const activeCategoryLabel = useMemo(() => {
     if (searchActive) {
@@ -891,6 +915,7 @@ export const MenuScreen: React.FC = () => {
               {CameraViewComponent ? (
                 <CameraViewComponent
                   style={styles.cameraView}
+                  barcodeScannerSettings={{ barcodeTypes: [...PRODUCT_CAMERA_BARCODE_TYPES] }}
                   onBarcodeScanned={productCameraLoading ? undefined : onProductScanner}
                 />
               ) : (

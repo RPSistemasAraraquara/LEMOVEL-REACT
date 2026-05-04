@@ -147,7 +147,7 @@ begin
 
       FImpressao := FImpressao + QuebraLinhaItemCupom(LFracao.produtoDescricao + LDescricaoTamanhoFormatado, 17, '',
         AcertaTexto(Format('%.2f', [LFracao.valorUnitario]), 'D', 9) +
-        AcertaTexto(CurrToStr(LFracao.quantidade), 'D', 7) +
+        AcertaTexto(FormatarQuantidadeFracionada(LFracao.quantidade, LFracao.valorUnitario, LFracao.valorTotal), 'D', 7) +
         AcertaTexto(Format('%.2f', [LFracao.valorTotal]), 'D', 9)) + sLineBreak;
     end;
 

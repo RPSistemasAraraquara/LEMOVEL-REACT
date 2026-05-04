@@ -50,7 +50,7 @@ var
   LPercentual: Currency;
 begin
   FreeAndNil(FVenda.itens);
-  FVenda.itens := FDAO.VendaItemDAO.Listar(FVenda.idVenda);
+  FVenda.itens := FDAO.VendaItemDAO.Listar(FVenda.idVenda, siOK);
   LValorVenda := FVenda.TotalItens;
 
   if (not FPatch.CobrarTaxaGarcom) or (FPatch.valorTaxaServico <= 0) then

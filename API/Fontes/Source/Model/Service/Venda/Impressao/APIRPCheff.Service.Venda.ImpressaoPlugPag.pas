@@ -154,7 +154,7 @@ begin
       FImpressao:=FImpressao+sLineBreak+
 
       Format('R$ %.2f', [LFracao.valorUnitario]).PadLeft(12, ' ') +
-      CurrToStr(LFracao.quantidade).PadLeft(6, ' ' ) +
+      FormatarQuantidadeFracionada(LFracao.quantidade, LFracao.valorUnitario, LFracao.valorTotal).PadLeft(6, ' ' ) +
       Format('R$ %.2f', [LFracao.valorTotal]).PadLeft(10 , ' ');
 
       FImpressao := FImpressao +  sLineBreak;
@@ -363,7 +363,7 @@ begin
   LServiceConsulta := TAPIRPCheffServiceVendaConsulta.Create;
   try
     LServiceConsulta.DAO(FDAO);
-    FVenda := LServiceConsulta.Buscar(FIdVenda, False);
+    FVenda := LServiceConsulta.AplicarTaxaServico(False).Buscar(FIdVenda, False);
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FIdVenda]);
 

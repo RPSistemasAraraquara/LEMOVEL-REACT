@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, isTableStatusReserved, normalizeSaleStatus, Sale, TableOrder } from '../services/api';
+import { api, getTableOrderDisplayLabel, isTableStatusReserved, normalizeSaleStatus, Sale, TableOrder } from '../services/api';
 
 type UseLinkedMesaBindingParams = {
   enabled: boolean;
@@ -9,6 +9,7 @@ type UseLinkedMesaBindingParams = {
 
 const buildFallbackMesa = (mesaId: number): TableOrder => ({
   idMesa: mesaId,
+  numeroMesa: mesaId,
   nomeMesaComanda: `Mesa ${mesaId}`,
   situacao: 'Pendente',
   tipo: 'mesa'
@@ -17,7 +18,10 @@ const buildFallbackMesa = (mesaId: number): TableOrder => ({
 const normalizeMesa = (table: TableOrder): TableOrder => ({
   ...table,
   tipo: 'mesa',
-  nomeMesaComanda: String(table.nomeMesaComanda || '').trim() || `Mesa ${Number(table.idMesa || 0)}`
+  nomeMesaComanda: String(table.nomeMesaComanda || '').trim() || getTableOrderDisplayLabel({
+    ...table,
+    tipo: 'mesa'
+  })
 });
 
 const getMesaStatus = (table: TableOrder) =>

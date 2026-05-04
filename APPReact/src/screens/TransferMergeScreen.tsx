@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
-import { api, normalizeSaleStatus } from '../services/api';
+import { api, getTableOrderDisplayLabel, normalizeSaleStatus } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { Colors, Radius, Shadows, Space } from '../theme';
@@ -396,7 +396,7 @@ export const TransferMergeScreen: React.FC = () => {
                   : toggleMergeTarget(saleId)
               }
             >
-              <Text style={styles.optionTitle}>{table.nomeMesaComanda || `Mesa ${table.idMesa}`}</Text>
+              <Text style={styles.optionTitle}>{getTableOrderDisplayLabel(table)}</Text>
               {!isTransferMode ? (
                 <Text style={styles.optionSub}>{`Venda ${saleId}`}</Text>
               ) : null}

@@ -82,7 +82,7 @@ begin
   LServiceConsultaVenda := TAPIRPCheffServiceVendaConsulta.Create;
   try
     LServiceConsultaVenda.DAO(FDAO).AplicarTaxaServico(False);
-    FVenda     := LServiceConsultaVenda.Buscar(FFechamento.idVenda, True);
+    FVenda     := LServiceConsultaVenda.Buscar(FFechamento.idVenda, False);
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FFechamento.idVenda]);
 
@@ -92,9 +92,11 @@ begin
     FreeAndNil(FVendaItens);
 
     FVenda.valorTaxaServico := 0;
-    if FVenda.CobrarTaxaGarcom then
+    if FFechamento.CobrarTaxaGarcom then
       FVenda.valorTaxaServico := FFechamento.valorTaxaServico;
 
+    FreeAndNil(FVenda.itens);
+    FVenda.itens              := FDAO.VendaItemDAO.Listar(FFechamento.idVenda, siOK);
     FVendaItens             := FDAO.VendaItemDAO.ListarVendasAgrupadosProdutos(FFechamento.idVenda);
     ValidarTotalDeItens;
   finally

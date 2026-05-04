@@ -23,6 +23,7 @@ import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import {
   api,
   formatTableStatusLabel,
+  getTableOrderDisplayNumber,
   isTableStatusQuickLaunch,
   isTableStatusReserved,
   logSyncDiagnostic,
@@ -385,7 +386,14 @@ export const InitialScreen: React.FC = () => {
       reservadas: [] as TableOrder[]
     };
 
-    const sorted = [...visibleTables].sort((left, right) => left.idMesa - right.idMesa);
+    const sorted = [...visibleTables].sort((left, right) => {
+      const numberDiff = getTableOrderDisplayNumber(left) - getTableOrderDisplayNumber(right);
+      if (numberDiff !== 0) {
+        return numberDiff;
+      }
+
+      return (left.idComanda || left.idMesa) - (right.idComanda || right.idMesa);
+    });
     for (const table of sorted) {
       const group = resolveGroup(table);
       totals.todas += 1;

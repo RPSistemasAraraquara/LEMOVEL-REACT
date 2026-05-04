@@ -263,11 +263,33 @@ begin
 end;
 
 procedure TAPIRPCheffViewPrincipal.MontarListaImpressoras;
+var
+  LPorta: string;
 begin
   FController.Components.Impressora.ListarModelos(EdtModeloImpressora.Items);
-  FController.Components.Impressora.ListarPortasUSB(EdtPortaImpressora.Items);
-  EdtModeloImpressora.ItemIndex   := 0;
-  EdtPortaImpressora.ItemIndex    := 0;
+
+  LPorta := Trim(APP_RESOURCES.IMPRESSORA_PORTA);
+  EdtPortaImpressora.Items.Clear;
+  if LPorta <> '' then
+    EdtPortaImpressora.Items.Add(LPorta);
+  if EdtPortaImpressora.Items.IndexOf('USB') < 0 then
+    EdtPortaImpressora.Items.Add('USB');
+  if EdtPortaImpressora.Items.IndexOf('NULL') < 0 then
+    EdtPortaImpressora.Items.Add('NULL');
+
+  if EdtModeloImpressora.Items.Count > 0 then
+  begin
+    if (APP_RESOURCES.IMPRESSORA_MODELO >= 0) and
+       (APP_RESOURCES.IMPRESSORA_MODELO < EdtModeloImpressora.Items.Count) then
+      EdtModeloImpressora.ItemIndex := APP_RESOURCES.IMPRESSORA_MODELO
+    else
+      EdtModeloImpressora.ItemIndex := 0;
+  end;
+
+  if LPorta <> '' then
+    EdtPortaImpressora.Text := LPorta
+  else
+    EdtPortaImpressora.ItemIndex := EdtPortaImpressora.Items.IndexOf('USB');
 end;
 
 procedure TAPIRPCheffViewPrincipal.SalvarConfiguracoes;

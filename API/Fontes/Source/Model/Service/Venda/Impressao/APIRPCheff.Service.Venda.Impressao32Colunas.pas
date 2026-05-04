@@ -156,7 +156,7 @@ begin
 
       FImpressao:=FImpressao+sLineBreak+
         AcertaTexto(Format('R$ %.2f', [LFracao.valorUnitario]), 'D', 12) +
-        AcertaTexto(CurrToStr(LFracao.quantidade), 'D', 10) +
+        AcertaTexto(FormatarQuantidadeFracionada(LFracao.quantidade, LFracao.valorUnitario, LFracao.valorTotal), 'D', 10) +
         AcertaTexto(Format('R$ %.2f', [LFracao.valorTotal]), 'D', 10) ;
 
       FImpressao := FImpressao +  sLineBreak;

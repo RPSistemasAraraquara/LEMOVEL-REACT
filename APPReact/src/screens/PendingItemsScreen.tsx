@@ -6,6 +6,7 @@ import { RootStackParams } from '../navigation/AppNavigator';
 import { useApp } from '../context/AppContext';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
+import { getTableOrderDisplayLabel } from '../services/api';
 import { Colors, Radius, Shadows, Space } from '../theme';
 
 type Navigation = NativeStackNavigationProp<RootStackParams>;
@@ -23,9 +24,7 @@ export const PendingItemsScreen: React.FC = () => {
   const navigation = useNavigation<Navigation>();
   const { cart, activeTable, getLineTotal, getCartTotal, removeFromCart } = useApp();
 
-  const tableLabel = activeTable
-    ? `${activeTable.tipo === 'comanda' ? 'Comanda' : 'Mesa'} ${activeTable.idMesa}`
-    : 'Mesa não selecionada';
+  const tableLabel = activeTable ? getTableOrderDisplayLabel(activeTable) : 'Mesa não selecionada';
 
   const summaryLabel = useMemo(
     () => `Itens pendentes: ${cart.length} | Total: R$ ${getCartTotal().toFixed(2)}`,

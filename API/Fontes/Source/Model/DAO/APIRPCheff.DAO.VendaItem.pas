@@ -27,7 +27,9 @@ type
     function UltimoNumeroItemLancado(AIdVenda: Integer): Integer;
     function UltimoItemFracionado(AIdVenda: Integer): Integer;
     function Listar(AIdVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>; overload;
+    function Listar(AIdVenda: Integer; ASituacao: TRPCheffSituacaoItem): TObjectList<TAPIRPCheffEntityVendaItem>; overload;
     function Listar(AIdVenda, ACodProduto: Integer; ASituacao: TRPCheffSituacaoItem = siOK): TObjectList<TAPIRPCheffEntityVendaItem>; overload;
+    procedure GarantirPrecisaoQuantidadeDecimal;
     procedure Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True);
     procedure LiberarImpressao(AIdEmpresa, AIdVenda: Integer);
     procedure Cancelar(ACancelamento: TAPIRPCheffEntityVendaItemCancelamento);
@@ -45,6 +47,42 @@ implementation
 
 uses
   APIRPCheff.DAO.Factory;
+
+var
+  GQuantidadeDecimalPrecisionChecked: Boolean = False;
+
+
+procedure TAPIRPCheffDAOVendaItem.GarantirPrecisaoQuantidadeDecimal;
+var
+  LDataSet: TDataSet;
+  LColumnName: string;
+begin
+  if GQuantidadeDecimalPrecisionChecked then
+    Exit;
+
+  LDataSet := Query.SQL('select column_name')
+    .SQL('from information_schema.columns')
+    .SQL('where table_schema = current_schema()')
+    .SQL('and lower(table_name) = ''vendaitem''')
+    .SQL('and lower(column_name) in (''ite_002'', ''quantidade_impressao'', ''qtd_paga_antec'')')
+    .SQL('and data_type = ''numeric''')
+    .SQL('and coalesce(numeric_scale, 0) < 3')
+    .OpenDataSet;
+  try
+    LDataSet.First;
+    while not LDataSet.Eof do
+    begin
+      LColumnName := LDataSet.FieldByName('column_name').AsString;
+      if SameText(LColumnName, 'ite_002') or SameText(LColumnName, 'quantidade_impressao') or SameText(LColumnName, 'qtd_paga_antec') then
+        Query.SQL('alter table vendaItem alter column %s type numeric(18,3)', [LColumnName]).ExecSQL;
+      LDataSet.Next;
+    end;
+  finally
+    FreeAndNil(LDataSet);
+  end;
+
+  GQuantidadeDecimalPrecisionChecked := True;
+end;
 
 
 procedure TAPIRPCheffDAOVendaItem.Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True);
@@ -380,6 +418,26 @@ begin
   end;
 end;
 
+function TAPIRPCheffDAOVendaItem.Listar(AIdVenda: Integer; ASituacao: TRPCheffSituacaoItem): TObjectList<TAPIRPCheffEntityVendaItem>;
+var
+  LDataSet: TDataSet;
+begin
+  Select;
+  LDataSet := Query.SQL('where vendaItem.emp_001 = :idEmpresa')
+    .SQL('and vendaItem.ven_001 = :idVenda')
+    .SQL('and vendaItem.sit_001 = :situacao')
+    .SQL('order by ite_001')
+    .ParamAsInteger('idEmpresa', FIdEmpresa)
+    .ParamAsInteger('idVenda', AIdVenda)
+    .ParamAsInteger('situacao', ASituacao.DBValue)
+    .OpenDataSet;
+  try
+    Result := DataSetToList(LDataSet);
+  finally
+    FreeAndNil(LDataSet);
+  end;
+end;
+
 function TAPIRPCheffDAOVendaItem.ListarVendasAgrupadosProdutos(AidVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>;
 var
   LDataSet: TDataSet;
@@ -395,7 +453,9 @@ begin
     .SQL('  MAX(vendaitem.id_usuario_cancelamento) AS id_usuario_cancelamento,MAX(vendaitem.data_cancelamento) AS data_cancelamento,         ')
     .SQL('  MAX(vendaitem.justificativa_cancelamento) AS justificativa_cancelamento, (vendaitem.tamanho) AS tamanho,                         ')
     .SQL('  BOOL_OR(vendaitem.b_venda_tamanho) AS b_venda_tamanho, MAX(vendaitem.item_fracionado) AS item_fracionado,                        ')
-    .SQL('  BOOL_OR(vendaitem.b_entregue) AS b_entregue, COUNT(*) AS total_itens, SUM(vendaitem.ite_002) AS ite_002,                         ')
+    .SQL('  BOOL_OR(vendaitem.b_entregue) AS b_entregue, COUNT(*) AS total_itens,                                                            ')
+    .SQL('  SUM(CASE WHEN vendaitem.item_fracionado > 0 AND vendaitem.ite_002 = 0 AND vendaitem.ite_003 <> 0                                 ')
+    .SQL('    THEN vendaitem.ite_005 / vendaitem.ite_003 ELSE vendaitem.ite_002 END) AS ite_002,                                             ')
     .SQL('  MIN(vendaitem.ite_003) AS ite_003, SUM(vendaitem.ite_005) AS ite_005, SUM(vendaitem.desconto) AS desconto,                       ')
     .SQL('  SUM(vendaitem.acrescimo) AS acrescimo, SUM(vendaitem.quantidade_impressao) AS quantidade_impressao,                              ')
     .SQL('  vendaitem.qtd_paga_antec, vendaitem.valor_pago_antec, vendaitem.rateiotaxagarcom,                                                ')
@@ -411,8 +471,10 @@ begin
     .SQL('  materiais.mat_021, materiais.mat_022, materiais.utiliza_combo,materiais.id_setor, materiais.tamanho_p,                           ')
     .SQL('  materiais.tamanho_m, materiais.tamanho_g,                                                                                        ')
     .SQL('  materiais.tamanho_gg, materiais.tamanho_extra, ite_006, produtoimpresso, pendenteimpressao, tamanho,                             ')
-    .SQL('  vendaitem.qtd_paga_antec, vendaitem.valor_pago_antec,vendaitem.rateiotaxagarcom                                                  ')
-    .SQL('  ORDER BY vendaitem.mat_001                                                                                                       ')
+    .SQL('  vendaitem.qtd_paga_antec, vendaitem.valor_pago_antec,vendaitem.rateiotaxagarcom,                                                 ')
+    .SQL('  CASE WHEN vendaitem.item_fracionado > 0 THEN vendaitem.item_fracionado ELSE 0 END,                                               ')
+    .SQL('  CASE WHEN vendaitem.item_fracionado > 0 THEN vendaitem.ite_001 ELSE 0 END                                                        ')
+    .SQL('  ORDER BY MIN(vendaitem.ite_001)                                                                                                  ')
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .ParamAsInteger('idVenda', AidVenda)
     .OpenDataSet;

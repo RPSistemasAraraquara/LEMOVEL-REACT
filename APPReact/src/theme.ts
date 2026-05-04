@@ -1,9 +1,9 @@
 export const Colors = {
-  background: '#f6f8fc',
+  background: '#f4f7fa',
   backgroundDark: '#122033',
-  surface: '#edf3f8',
+  surface: '#eef3f7',
   card: '#fffdf9',
-  cardSoft: '#f7fbff',
+  cardSoft: '#f8fafc',
   overlay: 'rgba(15, 23, 42, 0.06)',
   text: '#23314d',
   textMuted: '#6a7b92',
@@ -20,10 +20,10 @@ export const Colors = {
 };
 
 export const Radius = {
-  sm: 12,
-  md: 18,
-  lg: 24,
-  xl: 30
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 16
 };
 
 export const Space = {
@@ -45,32 +45,32 @@ export const Typography = {
 export const Shadows = {
   card: {
     shadowColor: '#0f172a',
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: {
-      width: 0,
-      height: 10
-    },
-    elevation: 4
-  },
-  soft: {
-    shadowColor: '#0f172a',
     shadowOpacity: 0.05,
-    shadowRadius: 12,
+    shadowRadius: 10,
     shadowOffset: {
       width: 0,
-      height: 6
+      height: 4
     },
     elevation: 2
   },
-  button: {
-    shadowColor: '#1b4f72',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
+  soft: {
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     shadowOffset: {
       width: 0,
-      height: 8
+      height: 3
     },
-    elevation: 4
+    elevation: 1
+  },
+  button: {
+    shadowColor: '#1b4f72',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4
+    },
+    elevation: 2
   }
 };

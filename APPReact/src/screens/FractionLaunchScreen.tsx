@@ -3,7 +3,7 @@ import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput,
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
-import { formatTableStatusLabel, getMenuItemLaunchUnitPrice, MenuItem, ProductOptional, TableOrder } from '../services/api';
+import { formatTableStatusLabel, getMenuItemLaunchUnitPrice, getTableOrderDisplayLabel, MenuItem, ProductOptional, TableOrder } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { useApp } from '../context/AppContext';
 import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
@@ -41,15 +41,21 @@ const getSizeOptions = (
     }];
   }
 
-  const items: SizeOption[] = [
-    { code: 'P', label: product.tamanhoP || 'P', value: getPriceBySize(product, 'P') },
-    { code: 'M', label: product.tamanhoM || 'M', value: getPriceBySize(product, 'M') },
-    { code: 'G', label: product.tamanhoG || 'G', value: getPriceBySize(product, 'G') },
-    { code: 'GG', label: product.tamanhoGG || 'GG', value: getPriceBySize(product, 'GG') },
-    { code: 'E', label: product.tamanhoExtra || 'E', value: getPriceBySize(product, 'E') }
+  const items = [
+    { code: 'P', label: String(product.tamanhoP || '').trim(), rawValue: product.valorTamanhoP },
+    { code: 'M', label: String(product.tamanhoM || '').trim(), rawValue: product.valorTamanhoM },
+    { code: 'G', label: String(product.tamanhoG || '').trim(), rawValue: product.valorTamanhoG },
+    { code: 'GG', label: String(product.tamanhoGG || '').trim(), rawValue: product.valorTamanhoGG },
+    { code: 'E', label: String(product.tamanhoExtra || '').trim(), rawValue: product.valorTamanhoExtra }
   ];
 
-  const filtered = items.filter((item) => item.value > 0 || item.label.trim().length > 0);
+  const filtered = items
+    .filter((item) => item.label.length > 0 && normalizeSizeValue(item.rawValue) > 0)
+    .map((item) => ({
+      code: item.code,
+      label: item.label,
+      value: getPriceBySize(product, item.code)
+    }));
   if (filtered.length > 0) {
     return filtered;
   }
@@ -282,7 +288,16 @@ export const FractionLaunchScreen: React.FC = () => {
   }, [pauseAutoRefresh, resumeAutoRefresh]);
 
   const sizeOptions = useMemo(() => getSizeOptions(product, getPriceBySize), [getPriceBySize, product]);
-  const shouldShowSize = sizeOptions.length > 1 || product?.vendaPorTamanho;
+  const shouldShowSize = product?.vendaPorTamanho && sizeOptions.some((item) => {
+    const sizeValues: Record<string, unknown> = {
+      P: product.valorTamanhoP,
+      M: product.valorTamanhoM,
+      G: product.valorTamanhoG,
+      GG: product.valorTamanhoGG,
+      E: product.valorTamanhoExtra
+    };
+    return String(item.label || '').trim().length > 0 && normalizeSizeValue(sizeValues[item.code]) > 0;
+  });
   const selectedSizeLabel = useMemo(
     () => sizeOptions.find((item) => item.code === selectedSize)?.label || selectedSize,
     [selectedSize, sizeOptions]
@@ -674,7 +689,7 @@ export const FractionLaunchScreen: React.FC = () => {
           <Text style={styles.tableTitle}>Mesa vinculada aos itens</Text>
           <Text style={styles.tableValue}>
             {linkedMesa
-              ? `${linkedMesa.nomeMesaComanda || `Mesa ${linkedMesa.idMesa}`}${formatTableStatusLabel(linkedMesa.situacao) ? ` | ${formatTableStatusLabel(linkedMesa.situacao)}` : ''}`
+              ? `${getTableOrderDisplayLabel(linkedMesa)}${formatTableStatusLabel(linkedMesa.situacao) ? ` | ${formatTableStatusLabel(linkedMesa.situacao)}` : ''}`
               : 'Nenhuma mesa selecionada para esta comanda.'}
           </Text>
           <Text style={styles.tableHint}>

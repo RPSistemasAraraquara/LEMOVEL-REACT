@@ -9,7 +9,7 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { formatTableStatusLabel, normalizeSaleStatus, TableOrder } from '../services/api';
+import { formatTableStatusLabel, getTableOrderDisplayLabel, normalizeSaleStatus, TableOrder } from '../services/api';
 import { Colors, Radius, Shadows, Space } from '../theme';
 
 type LinkedMesaPickerModalProps = {
@@ -25,11 +25,7 @@ type LinkedMesaPickerModalProps = {
 };
 
 const getTableLabel = (table: TableOrder) => {
-  const customName = String(table.nomeMesaComanda || '').trim();
-  if (customName) {
-    return customName;
-  }
-  return `Mesa ${Number(table.idMesa || 0)}`;
+  return getTableOrderDisplayLabel(table);
 };
 
 type MesaVisualState = 'free' | 'open';

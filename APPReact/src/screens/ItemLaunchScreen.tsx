@@ -8,6 +8,7 @@ import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
 import {
   api,
   formatTableStatusLabel,
+  getTableOrderDisplayLabel,
   getMenuItemLaunchUnitPrice,
   hasMenuItemHappyHourMetadata,
   MenuItem,
@@ -37,6 +38,32 @@ const EMPTY_MENU_ITEM: MenuItem = {
 };
 
 const roundTo2 = (value: number) => Number(Number(value || 0).toFixed(2));
+
+const normalizeSizeValue = (value: unknown): number => {
+  const asNumber = Number(String(value || 0).replace(',', '.'));
+  return Number.isFinite(asNumber) ? asNumber : 0;
+};
+
+const getConfiguredSizeOptions = (
+  product: MenuItem,
+  getPriceBySize: (item: MenuItem, sizeCode: string) => number
+): SizeOption[] => {
+  const items = [
+    { code: 'P', label: String(product.tamanhoP || '').trim(), rawValue: product.valorTamanhoP },
+    { code: 'M', label: String(product.tamanhoM || '').trim(), rawValue: product.valorTamanhoM },
+    { code: 'G', label: String(product.tamanhoG || '').trim(), rawValue: product.valorTamanhoG },
+    { code: 'GG', label: String(product.tamanhoGG || '').trim(), rawValue: product.valorTamanhoGG },
+    { code: 'E', label: String(product.tamanhoExtra || '').trim(), rawValue: product.valorTamanhoExtra }
+  ];
+
+  return items
+    .filter((item) => item.label.length > 0 && normalizeSizeValue(item.rawValue) > 0)
+    .map((item) => ({
+      code: item.code,
+      label: item.label,
+      value: getPriceBySize(product, item.code)
+    }));
+};
 
 function sanitizeQuantity(value: string): number {
   const normalized = value.replace(/[^0-9.,-]/g, '').replace(',', '.');
@@ -534,15 +561,7 @@ export const ItemLaunchScreen: React.FC = () => {
       }];
     }
 
-    const items: SizeOption[] = [
-      { code: 'P', label: String(resolvedProduct.tamanhoP || '').trim(), value: getPriceBySize(resolvedProduct, 'P') },
-      { code: 'M', label: String(resolvedProduct.tamanhoM || '').trim(), value: getPriceBySize(resolvedProduct, 'M') },
-      { code: 'G', label: String(resolvedProduct.tamanhoG || '').trim(), value: getPriceBySize(resolvedProduct, 'G') },
-      { code: 'GG', label: String(resolvedProduct.tamanhoGG || '').trim(), value: getPriceBySize(resolvedProduct, 'GG') },
-      { code: 'E', label: String(resolvedProduct.tamanhoExtra || '').trim(), value: getPriceBySize(resolvedProduct, 'E') }
-    ];
-
-    const filtered = items.filter((item) => item.label.length > 0 && item.value > 0);
+    const filtered = getConfiguredSizeOptions(resolvedProduct, getPriceBySize);
     if (filtered.length > 0) {
       return filtered;
     }
@@ -555,15 +574,7 @@ export const ItemLaunchScreen: React.FC = () => {
       return false;
     }
 
-    const items = [
-      { label: String(resolvedProduct.tamanhoP || '').trim(), value: getPriceBySize(resolvedProduct, 'P') },
-      { label: String(resolvedProduct.tamanhoM || '').trim(), value: getPriceBySize(resolvedProduct, 'M') },
-      { label: String(resolvedProduct.tamanhoG || '').trim(), value: getPriceBySize(resolvedProduct, 'G') },
-      { label: String(resolvedProduct.tamanhoGG || '').trim(), value: getPriceBySize(resolvedProduct, 'GG') },
-      { label: String(resolvedProduct.tamanhoExtra || '').trim(), value: getPriceBySize(resolvedProduct, 'E') }
-    ];
-
-    return items.some((item) => item.label.length > 0 && item.value > 0);
+    return getConfiguredSizeOptions(resolvedProduct, getPriceBySize).length > 0;
   }, [getPriceBySize, resolvedProduct]);
 
   const defaultSelectedSize = useMemo(() => {
@@ -1152,7 +1163,7 @@ export const ItemLaunchScreen: React.FC = () => {
           <Text style={styles.tableTitle}>Mesa vinculada aos itens</Text>
           <Text style={styles.tableValue}>
             {linkedMesa
-              ? `${linkedMesa.nomeMesaComanda || `Mesa ${linkedMesa.idMesa}`}${formatTableStatusLabel(linkedMesa.situacao) ? ` | ${formatTableStatusLabel(linkedMesa.situacao)}` : ''}`
+              ? `${getTableOrderDisplayLabel(linkedMesa)}${formatTableStatusLabel(linkedMesa.situacao) ? ` | ${formatTableStatusLabel(linkedMesa.situacao)}` : ''}`
               : 'Nenhuma mesa selecionada para esta comanda.'}
           </Text>
           <Text style={styles.tableHint}>

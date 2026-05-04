@@ -31,7 +31,7 @@ export const CartScreen: React.FC = () => {
     if (sending) return;
     setSending(true);
     const parent = navigation.getParent<NativeStackNavigationProp<RootStackParams>>();
-    Alert.alert('Atenção', 'O envio é feito apenas na tela Inicial (botão Atualizar).');
+    Alert.alert('Enviar pedido', 'Vamos abrir a tela Inicial para concluir o envio.');
     if (parent) {
       parent.navigate('Inicial' as never);
       setSending(false);
@@ -64,25 +64,25 @@ export const CartScreen: React.FC = () => {
           <Text style={styles.backButtonLabel}>Voltar</Text>
         </Pressable>
       </View>
-      <SectionHeader title="Seu pedido" subtitle="Itens prontos para lançar" />
+      <SectionHeader title="Pedido" subtitle="Revise os itens antes de enviar" />
 
       {!activeTable && (
         <View style={styles.alertCard}>
-          <Text style={styles.alertTitle}>Fluxo inválido</Text>
+          <Text style={styles.alertTitle}>Mesa não aberta</Text>
           <Text style={styles.alertText}>Selecione uma mesa e abra a venda em Mesas antes de enviar itens.</Text>
         </View>
       )}
 
       {activeTable && !activeTable.idVenda && (
         <View style={styles.alertCard}>
-          <Text style={styles.alertTitle}>Fluxo inválido</Text>
+          <Text style={styles.alertTitle}>Mesa não aberta</Text>
           <Text style={styles.alertText}>Selecione uma mesa e abra a venda em Mesas antes de enviar itens.</Text>
         </View>
       )}
 
       {!hasOpenSale && (
         <View style={styles.flowCard}>
-          <Text style={styles.flowTitle}>Fluxo não iniciado</Text>
+          <Text style={styles.flowTitle}>Mesa não aberta</Text>
           <Text style={styles.flowText}>Abra uma mesa em Mesas para carregar o pedido antes de enviar o carrinho.</Text>
           <Pressable style={styles.primaryBtn} onPress={goToMesas}>
             <Text style={styles.primaryBtnText}>Ir para Mesas</Text>
@@ -118,7 +118,7 @@ export const CartScreen: React.FC = () => {
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.price}>R$ {getLineTotal(item).toFixed(2)}</Text>
                 <Pressable style={styles.removeBtn} onPress={() => removeFromCart(item.lineId)}>
-                  <Text style={styles.remove}>Remover item</Text>
+                  <Text style={styles.remove}>Remover</Text>
                 </Pressable>
               </View>
             </View>
@@ -131,7 +131,7 @@ export const CartScreen: React.FC = () => {
 
           <Pressable style={styles.primaryBtn} onPress={sendOrder} disabled={sending || !activeTable?.idVenda}>
             <Text style={styles.btnText}>
-              {sending ? 'Abrindo início...' : 'Enviar no início'}
+              {sending ? 'Abrindo...' : 'Enviar pedido'}
             </Text>
           </Pressable>
 
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     padding: Space.md,
-    borderRadius: 22,
+    borderRadius: Radius.lg,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.warning,
     backgroundColor: Colors.accentSoft,
-    borderRadius: 22,
+    borderRadius: Radius.lg,
     padding: Space.md,
     marginBottom: Space.md,
     ...Shadows.soft
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.warning,
     backgroundColor: Colors.accentSoft,
-    borderRadius: 22,
+    borderRadius: Radius.lg,
     padding: 12,
     marginBottom: Space.md,
     ...Shadows.soft
@@ -223,12 +223,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderColor: Colors.border,
     borderWidth: 1,
-    borderRadius: 22,
+    borderRadius: Radius.lg,
     padding: Space.md,
     marginBottom: Space.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     ...Shadows.card
   },
   name: { fontWeight: '700', color: Colors.text },
@@ -239,13 +239,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700'
   },
-  price: { color: Colors.primary, fontWeight: '700' },
+  price: { color: Colors.primary, fontWeight: '800', fontSize: 16 },
   removeBtn: { marginTop: 10 },
   remove: { color: Colors.danger, fontWeight: '700', fontSize: 12 },
   totalCard: {
     marginTop: Space.md,
     backgroundColor: Colors.card,
-    borderRadius: 22,
+    borderRadius: Radius.lg,
     borderColor: Colors.border,
     borderWidth: 1,
     padding: Space.md,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   totalValue: { color: Colors.text, fontWeight: '800', fontSize: 20 },
   primaryBtn: {
     marginTop: 12,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     padding: 14,
     alignItems: 'center',
     backgroundColor: Colors.primary,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     marginTop: 8,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     padding: 14,
     alignItems: 'center',
     backgroundColor: Colors.cardSoft,

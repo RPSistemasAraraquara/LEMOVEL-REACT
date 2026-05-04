@@ -220,7 +220,7 @@ begin
 
       AddText(LDescricao, 'left', 'medium', 'bold');
       AddText(
-        Format('%.0f', [LFracao.quantidade]) + ' x ' +
+        FormatarQuantidadeFracionada(LFracao.quantidade, LFracao.valorUnitario, LFracao.valorTotal) + ' x ' +
         Format('R$ %.2f', [LFracao.valorUnitario]) + ' = ' +
         Format('R$ %.2f', [LFracao.valorTotal]),
         'left', 'medium');
@@ -422,7 +422,7 @@ begin
   LServiceConsulta := TAPIRPCheffServiceVendaConsulta.Create;
   try
     LServiceConsulta.DAO(FDAO);
-    FVenda := LServiceConsulta.Buscar(FIdVenda, False);
+    FVenda := LServiceConsulta.AplicarTaxaServico(False).Buscar(FIdVenda, False);
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FIdVenda]);
 
