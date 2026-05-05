@@ -132,8 +132,8 @@ android {
         applicationId resolveApplicationId()
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 105810
-        versionName "52.0.3"
+        versionCode 105812
+        versionName "54.0.0"
         manifestPlaceholders = [
             appScheme: resolveAppDeepLinkScheme()
         ]
@@ -149,7 +149,7 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('C:/Users/Rafael/Desktop/Developer/Fast FOOD/LEMOVEL-REACT/Key Google/LEMOVEL.keystore')
+            storeFile file("${rootDir}/../../Key Google/LEMOVEL.keystore")
             storePassword '18021950'
             keyAlias 'lemovel'
             keyPassword '18021950'

@@ -64,6 +64,7 @@ export const SalePaymentScreen: React.FC = () => {
 
   const activePaymentTokenRef = useRef<string | null>(null);
   const paymentSelectionBusyRef = useRef(false);
+  const registerInFlightRef = useRef(false);
   const draftsRef = useRef<PaymentDraft[]>([{ codigo: 0, valor: '0' }]);
   const methodsRef = useRef<PaymentMethod[]>([]);
   const pagamentosRef = useRef<SalePayment[]>([]);
@@ -73,11 +74,9 @@ export const SalePaymentScreen: React.FC = () => {
   const isMachinePaymentRunning = paymentProcessingVisible || Boolean(activePaymentTokenRef.current);
 
   const updateDrafts = (updater: (previous: PaymentDraft[]) => PaymentDraft[]) => {
-    setDrafts((previous) => {
-      const next = updater(previous);
-      draftsRef.current = next;
-      return next;
-    });
+    const next = updater(draftsRef.current);
+    draftsRef.current = next;
+    setDrafts(next);
   };
 
   const showStatusNotice = (
@@ -238,7 +237,7 @@ export const SalePaymentScreen: React.FC = () => {
   };
 
   const addDraft = () => {
-    if (isMachinePaymentRunning || saving) return;
+    if (isMachinePaymentRunning || saving || registerInFlightRef.current) return;
     const firstMethod = methods[0];
     updateDrafts((prev) => [
       ...prev,
@@ -248,7 +247,7 @@ export const SalePaymentScreen: React.FC = () => {
 
   const removeDraft = (index: number) => {
     updateDrafts((prev) => {
-      if (!prev[index] || prev[index].processed) return prev;
+      if (!prev[index] || prev[index].processed || prev[index].registered) return prev;
       return prev.filter((_, idx) => idx !== index);
     });
   };
@@ -370,6 +369,16 @@ export const SalePaymentScreen: React.FC = () => {
           idUsuario: user?.idUsuario
         });
         registeredSuccessfully = true;
+        updateDrafts((prev) => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            ...approvedLine,
+            registered: true
+          };
+          return next;
+        });
         logSyncDiagnostic(
           `fluxo pagamento parcial registrar terminal ok idVenda=${idVenda} forma=${result.method.codigo} em ${Date.now() - registerStartedAt}ms`
         );
@@ -386,6 +395,16 @@ export const SalePaymentScreen: React.FC = () => {
           2
         );
         if (registeredSuccessfully) {
+          updateDrafts((prev) => {
+            if (!prev[index]) return prev;
+            const next = [...prev];
+            next[index] = {
+              ...next[index],
+              ...approvedLine,
+              registered: true
+            };
+            return next;
+          });
           removeDraftAndEnsureBlankLine(index);
           await load().catch(() => null);
           await refreshDashboard(undefined, { force: true }).catch(() => null);
@@ -442,139 +461,177 @@ export const SalePaymentScreen: React.FC = () => {
   };
 
   const onSelectDraftMethod = async (index: number, methodId: number) => {
-    if (paymentSelectionBusyRef.current || isMachinePaymentRunning) return;
+    if (registerInFlightRef.current || paymentSelectionBusyRef.current || isMachinePaymentRunning) return;
     await processDraftMachinePayment(index, methodId, { updateSelection: true });
   };
 
   const register = async () => {
     if (!idVenda) return;
-    if (saving || loading) return;
 
-    if (!user?.permitePagamentoParcial) {
-      showStatusNotice('Atenção', 'Sem permissão para pagamento parcial.', 'warning');
-      return;
-    }
-    if (!String(saleStatusRef.current || saleStatus).toLowerCase().includes('pendente')) {
-      Alert.alert('Atenção', 'Somente vendas pendentes permitem pagamento parcial.');
-      return;
-    }
-
-    const hasZeroOrInvalidValue = draftsRef.current.some((item) => {
-      const hasMethod = Number(item.codigo || 0) > 0;
-      const value = normalize(item.valor || '0');
-      return hasMethod && (!Number.isFinite(value) || value <= 0);
-    });
-    if (hasZeroOrInvalidValue) {
-      Alert.alert('Atenção', 'Não é permitido inserir pagamento com valor zero.');
+    if (
+      registerInFlightRef.current ||
+      paymentSelectionBusyRef.current ||
+      activePaymentTokenRef.current ||
+      saving ||
+      loading
+    ) {
       return;
     }
 
-    let autoProcessedMachinePayment = false;
-    while (true) {
-      const pendingTerminalIndex = draftsRef.current.findIndex((item) => {
-        if (!item.processed && Number(item.codigo || 0) > 0) {
-          const method = methodsRef.current.find((m) => m.codigo === item.codigo);
-          if (method) {
-            return resolvePaymentProviderForMethod(appSettings, method) !== 'manual';
-          }
-        }
-        return false;
-      });
-
-      if (pendingTerminalIndex < 0) {
-        break;
-      }
-
-      const pendingTerminal = draftsRef.current[pendingTerminalIndex];
-      const handled = await processDraftMachinePayment(pendingTerminalIndex, pendingTerminal.codigo, {
-        updateSelection: false,
-        showRegisterRetryNotice: false
-      });
-
-      if (!handled) {
-        return;
-      }
-
-      autoProcessedMachinePayment = true;
-    }
-
-    const currentTotalPago = pagamentosRef.current.reduce((acc, item) => acc + (item.valor || 0), 0);
-    const currentValorPendente = Math.max(0, saleTotalRef.current - currentTotalPago);
-    const currentTotalDigitado = draftsRef.current.reduce((acc, item) => {
-      const valor = normalize(item.valor);
-      return acc + (Number.isFinite(valor) && valor > 0 ? valor : 0);
-    }, 0);
-
-    const lines = draftsRef.current
-      .map((item, index) => ({
-        index,
-        codigo: Number(item.codigo || 0),
-        valor: normalize(item.valor),
-        registered: Boolean(item.registered)
-      }))
-      .filter((item) => item.codigo > 0 && item.valor > 0 && !item.registered);
-
-    if (lines.length === 0) {
-      if (autoProcessedMachinePayment) {
-        return;
-      }
-      Alert.alert('Atenção', 'Informe ao menos um pagamento com valor maior que zero.');
-      return;
-    }
-
-    if (currentTotalDigitado > currentValorPendente + 0.0001) {
-      Alert.alert('Atenção', 'O valor pago não pode ser superior ao valor pendente da venda.');
-      return;
-    }
-
-    setSaving(true);
-    const startedAt = Date.now();
-    logSyncDiagnostic(
-      `fluxo pagamento parcial registrar inicio idVenda=${idVenda} linhas=${lines.length} total=${lines.reduce((acc, item) => acc + item.valor, 0).toFixed(2)}`
-    );
+    registerInFlightRef.current = true;
     try {
-      let registeredSomePayment = false;
-      for (const line of lines) {
-        const method = methodsRef.current.find((item) => item.codigo === line.codigo);
-        if (!method) {
-          throw new Error('Forma de pagamento não encontrada.');
-        }
-
-        logSyncDiagnostic(
-          `fluxo pagamento parcial registrar linha idVenda=${idVenda} forma=${method.codigo} valor=${line.valor.toFixed(2)}`
-        );
-        await api.registerPartialPayment({
-          idVenda,
-          idFormaPagamento: method.codigo,
-          valor: line.valor,
-          idUsuario: user?.idUsuario
-        });
-        registeredSomePayment = true;
-      }
-
-      try {
-        await Promise.all([
-          load(),
-          refreshDashboard(undefined, { force: true })
-        ]);
-      } catch (refreshError: any) {
-        resetDrafts(methods);
-        showStatusNotice(
-          'Concluído',
-          refreshError?.message || 'Pagamento registrado, mas a tela não atualizou por completo. Confira a venda novamente.',
-          registeredSomePayment ? 'warning' : 'success'
-        );
+      if (!user?.permitePagamentoParcial) {
+        showStatusNotice('Atenção', 'Sem permissão para pagamento parcial.', 'warning');
         return;
       }
 
-      resetDrafts(methods);
-      logSyncDiagnostic(`fluxo pagamento parcial registrar fim ok idVenda=${idVenda} em ${Date.now() - startedAt}ms`);
-      showStatusNotice('Concluído', 'Pagamento parcial registrado com sucesso.', 'success');
-    } catch (error: any) {
-      logSyncDiagnostic(`fluxo pagamento parcial registrar erro idVenda=${idVenda}: ${error?.message || 'erro desconhecido'}`, 2);
-      Alert.alert('Erro', error?.message || 'Não foi possível registrar pagamento.');
+      if (!String(saleStatusRef.current || saleStatus).toLowerCase().includes('pendente')) {
+        Alert.alert('Atenção', 'Somente vendas pendentes permitem pagamento parcial.');
+        return;
+      }
+
+      const hasZeroOrInvalidValue = draftsRef.current.some((item) => {
+        const hasMethod = Number(item.codigo || 0) > 0;
+        const value = normalize(item.valor || '0');
+        return hasMethod && (!Number.isFinite(value) || value <= 0);
+      });
+
+      if (hasZeroOrInvalidValue) {
+        Alert.alert('Atenção', 'Não é permitido inserir pagamento com valor zero.');
+        return;
+      }
+
+      const retryableProcessedDrafts = new Set(
+        draftsRef.current.filter((item) => item.processed && !item.registered)
+      );
+      let autoProcessedMachinePayment = false;
+      while (true) {
+        const pendingTerminalIndex = draftsRef.current.findIndex((item) => {
+          if (!item.processed && Number(item.codigo || 0) > 0) {
+            const method = methodsRef.current.find((m) => m.codigo === item.codigo);
+            if (method) {
+              return resolvePaymentProviderForMethod(appSettings, method) !== 'manual';
+            }
+          }
+
+          return false;
+        });
+
+        if (pendingTerminalIndex < 0) {
+          break;
+        }
+
+        const pendingTerminal = draftsRef.current[pendingTerminalIndex];
+        const handled = await processDraftMachinePayment(pendingTerminalIndex, pendingTerminal.codigo, {
+          updateSelection: false,
+          showRegisterRetryNotice: true
+        });
+
+        if (!handled) {
+          return;
+        }
+
+        autoProcessedMachinePayment = true;
+      }
+
+      const currentTotalPago = pagamentosRef.current.reduce((acc, item) => acc + (item.valor || 0), 0);
+      const currentValorPendente = Math.max(0, saleTotalRef.current - currentTotalPago);
+      const currentTotalDigitado = draftsRef.current.reduce((acc, item) => {
+        const valor = normalize(item.valor);
+        return acc + (Number.isFinite(valor) && valor > 0 ? valor : 0);
+      }, 0);
+
+      const lines = draftsRef.current
+        .map((item, index) => ({
+          index,
+          codigo: Number(item.codigo || 0),
+          valor: normalize(item.valor),
+          registered: Boolean(item.registered),
+          processed: Boolean(item.processed),
+          retryableProcessed: retryableProcessedDrafts.has(item)
+        }))
+        .filter(
+          (item) =>
+            item.codigo > 0 &&
+            item.valor > 0 &&
+            !item.registered &&
+            (!item.processed || item.retryableProcessed)
+        );
+
+      if (lines.length === 0) {
+        if (autoProcessedMachinePayment) {
+          return;
+        }
+
+        Alert.alert('Atenção', 'Informe ao menos um pagamento com valor maior que zero.');
+        return;
+      }
+
+      if (currentTotalDigitado > currentValorPendente + 0.0001) {
+        Alert.alert('Atenção', 'O valor pago não pode ser superior ao valor pendente da venda.');
+        return;
+      }
+
+      setSaving(true);
+      const startedAt = Date.now();
+      logSyncDiagnostic(
+        `fluxo pagamento parcial registrar inicio idVenda=${idVenda} linhas=${lines.length} total=${lines.reduce((acc, item) => acc + item.valor, 0).toFixed(2)}`
+      );
+      try {
+        let registeredSomePayment = false;
+        for (const line of lines) {
+          const method = methodsRef.current.find((item) => item.codigo === line.codigo);
+          if (!method) {
+            throw new Error('Forma de pagamento não encontrada.');
+          }
+
+          logSyncDiagnostic(
+            `fluxo pagamento parcial registrar linha idVenda=${idVenda} forma=${method.codigo} valor=${line.valor.toFixed(2)}`
+          );
+          await api.registerPartialPayment({
+            idVenda,
+            idFormaPagamento: method.codigo,
+            valor: line.valor,
+            idUsuario: user?.idUsuario
+          });
+          registeredSomePayment = true;
+          updateDrafts((prev) => {
+            if (!prev[line.index]) return prev;
+            const next = [...prev];
+            next[line.index] = {
+              ...next[line.index],
+              registered: true
+            };
+            return next;
+          });
+        }
+
+        try {
+          await Promise.all([
+            load(),
+            refreshDashboard(undefined, { force: true })
+          ]);
+        } catch (refreshError: any) {
+          resetDrafts(methods);
+          showStatusNotice(
+            'Concluído',
+            refreshError?.message || 'Pagamento registrado, mas a tela não atualizou por completo. Confira a venda novamente.',
+            registeredSomePayment ? 'warning' : 'success'
+          );
+          return;
+        }
+
+        resetDrafts(methods);
+        logSyncDiagnostic(`fluxo pagamento parcial registrar fim ok idVenda=${idVenda} em ${Date.now() - startedAt}ms`);
+        showStatusNotice('Concluído', 'Pagamento parcial registrado com sucesso.', 'success');
+      } catch (error: any) {
+        logSyncDiagnostic(`fluxo pagamento parcial registrar erro idVenda=${idVenda}: ${error?.message || 'erro desconhecido'}`, 2);
+        Alert.alert('Erro', error?.message || 'Não foi possível registrar pagamento.');
+      } finally {
+        setSaving(false);
+      }
     } finally {
-      setSaving(false);
+      registerInFlightRef.current = false;
     }
   };
 
@@ -625,7 +682,7 @@ export const SalePaymentScreen: React.FC = () => {
               <Text style={styles.label}>Adicionar pagamentos</Text>
               {drafts.map((line, index) => {
                 const selectedMethod = methods.find((method) => method.codigo === line.codigo) || methods[0];
-                const isLocked = Boolean(line.processed);
+                const isLocked = Boolean(line.processed || line.registered);
                 return (
                   <View key={`draft-${index}`} style={[styles.paymentLine, isLocked ? styles.paymentLineLocked : null]}>
                     <Text style={styles.payLabel}>Método</Text>

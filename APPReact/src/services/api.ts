@@ -558,8 +558,8 @@ export const defaultMobileSettings: MobileAppSettings = {
   sincronizarAposLogin: true,
   modoExibicao: 'mesa',
   utilizaMaquininhaStone: true,
-  tipoIntegracao: 'pagbank',
-  modeloMaquininha: 'PagBank',
+  tipoIntegracao: 'cielo',
+  modeloMaquininha: 'Cielo',
   usuario: '1',
   senha: '1'
 };
@@ -2154,11 +2154,18 @@ function parseTable(value: any, source: 'mesa' | 'comanda' = 'mesa'): TableOrder
   const isComanda = source === 'comanda' || idComanda > 0;
   const statusFromBody = normalizeStatus(value?.situacao ?? venda?.situacao);
   const tableNumero = parseNumber(
-    value?.numero,
-    parseNumber(value?.idMesa, parseNumber(value?.id, parseNumber(value?.idTabela, 0)))
+    resolveField(value, ['numero', source === 'comanda' ? 'com_003' : 'mes_003']),
+    parseNumber(resolveField(value, ['idMesa', 'id_mesa', 'id', 'idTabela']), 0)
   );
   const mesaNumero = tableNumero || parseNumber(venda?.numero, 0);
-  const comandaNumero = parseNumber(value?.numeroComanda, parseNumber(venda?.numeroComanda, idComanda));
+  const vendaComandaNumero = parseNumber(
+    resolveField((venda ?? {}) as Record<string, unknown>, ['numeroComanda', 'numero_comanda', 'ven_026']),
+    0
+  );
+  const comandaNumero = parseNumber(
+    resolveField(value, ['numeroComanda', 'numero_comanda', 'com_003']),
+    isComanda ? tableNumero || vendaComandaNumero || idComanda : vendaComandaNumero || idComanda
+  );
   const resolvedMesaId = parseNumber(
     resolveField(value, ['idMesa', 'id_mesa', 'id', 'idTabela']),
     mesaNumero || parseNumber(venda?.idMesa, 0)

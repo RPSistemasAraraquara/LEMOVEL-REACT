@@ -357,6 +357,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [
       table.idMesa || 0,
       table.idComanda || 0,
+      table.numeroMesa || 0,
+      table.numeroComanda || 0,
       table.tipo || '',
       table.nomeMesaComanda || '',
       table.situacao || '',
@@ -856,6 +858,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           prev.statusOriginal === updated.statusOriginal &&
           prev.idVenda === updated.idVenda &&
           prev.valorTotal === updated.valorTotal &&
+          prev.numeroMesa === updated.numeroMesa &&
+          prev.numeroComanda === updated.numeroComanda &&
           prev.nomeMesaComanda === updated.nomeMesaComanda &&
           prev.venda?.idVenda === updated.venda?.idVenda &&
           prev.venda?.situacao === updated.venda?.situacao &&
@@ -887,6 +891,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               prev.statusOriginal === updated.statusOriginal &&
               prev.idVenda === updated.idVenda &&
               prev.valorTotal === updated.valorTotal &&
+              prev.numeroMesa === updated.numeroMesa &&
+              prev.numeroComanda === updated.numeroComanda &&
               prev.nomeMesaComanda === updated.nomeMesaComanda &&
               prev.venda?.idVenda === updated.venda?.idVenda &&
               prev.venda?.situacao === updated.venda?.situacao &&

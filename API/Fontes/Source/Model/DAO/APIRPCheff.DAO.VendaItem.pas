@@ -103,7 +103,7 @@ begin
       .ParamAsInteger ('ven_001', AVendaItem.idVenda)
       .ParamAsInteger ('ite_001', AVendaItem.numeroItem)
       .ParamAsInteger ('mat_001', AVendaItem.idProduto)
-      .ParamAsCurrency('ite_002', AVendaItem.quantidade)
+      .ParamAsFloat('ite_002', AVendaItem.quantidade)
       .ParamAsCurrency('ite_003', AVendaItem.valorUnitario)
       .ParamAsDateTime('data_hora_lancamento', AVendaItem.dataLancamento)
       .ParamAsCurrency('ite_005', AVendaItem.valorTotal)
@@ -121,7 +121,7 @@ begin
       .ParamAsInteger ('mesa_vinc', AVendaItem.idMesaVinculada)
       .ParamAsBoolean ('b_gratis', AVendaItem.gratis)
       .ParamAsInteger ('item_fracionado', AVendaItem.itemFracionado, True)
-      .ParamAsCurrency('quantidade_impressao', AVendaItem.quantidade, True)
+      .ParamAsFloat('quantidade_impressao', AVendaItem.quantidade, True)
       .ParamAsString  ('terminal_impressao', AVendaItem.TerminalImpressao)
       .ExecSQL;
     Commit;
@@ -163,7 +163,7 @@ begin
     .SQL('   and ven_001 = :idVenda                                 ')
     .SQL('   and ite_001 =:ite_001                                  ')
     .ParamAsCurrency('valor_pago_antec', AValorPago)
-    .ParamAsCurrency('qtd_paga_antec', AQuantidadePaga)
+    .ParamAsFloat('qtd_paga_antec', AQuantidadePaga)
     .ParamAsInteger('idEmpresa', FIdEmpresa)
     .ParamAsInteger('idVenda', AIdVenda)
      .ParamAsInteger('ite_001', AidNumeroItem)

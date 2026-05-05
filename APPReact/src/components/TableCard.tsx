@@ -140,7 +140,7 @@ const TableCardComponent: React.FC<TableCardProps> = ({
   const palette = resolvePalette(table, paletteMode);
   const isComanda = displayMode === 'comanda' || table.tipo === 'comanda';
   const numero = getTableOrderDisplayNumber(table) || '';
-  const title = `${isComanda ? 'COMANDA' : 'MESA'} ${numero}`.trim();
+  const titlePrefix = isComanda ? 'COMANDA' : 'MESA';
   const rawDisplayName = String(table.venda?.nomeMesaComanda || table.nomeMesaComanda || '').trim();
   const displayPrefix = `${isComanda ? 'Comanda' : 'Mesa'} ${numero}`.trim();
   const secondaryName = React.useMemo(() => {
@@ -183,9 +183,26 @@ const TableCardComponent: React.FC<TableCardProps> = ({
             <View style={[styles.iconWrap, { backgroundColor: '#FFFFFF', borderColor: palette.border }]}>
               <SafeMaterialCommunityIcons name={iconName} size={18} color={palette.accent} />
             </View>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.tableTitle, { color: palette.title }]}>
-              {title}
-            </Text>
+            <View style={styles.titleWrap}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="clip"
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+                style={[styles.tableTitlePrefix, { color: palette.title }]}
+              >
+                {titlePrefix}
+              </Text>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="clip"
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+                style={[styles.tableTitleNumber, { color: palette.title }]}
+              >
+                {numero}
+              </Text>
+            </View>
           </View>
           <Text
             numberOfLines={1}
@@ -219,6 +236,8 @@ const areEqual = (prev: Readonly<TableCardProps>, next: Readonly<TableCardProps>
     prev.paletteMode === next.paletteMode &&
     prev.table.idMesa === next.table.idMesa &&
     prev.table.idComanda === next.table.idComanda &&
+    prev.table.numeroMesa === next.table.numeroMesa &&
+    prev.table.numeroComanda === next.table.numeroComanda &&
     prev.table.nomeMesaComanda === next.table.nomeMesaComanda &&
     prev.table.situacao === next.table.situacao &&
     prev.table.statusCode === next.table.statusCode &&
@@ -249,7 +268,7 @@ const styles = StyleSheet.create({
     width: '100%'
   },
   contentWrap: {
-    padding: 12,
+    padding: 10,
     gap: 8,
     flex: 1,
     justifyContent: 'space-between'
@@ -262,12 +281,12 @@ const styles = StyleSheet.create({
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    minHeight: 32
+    gap: 6,
+    minHeight: 30
   },
   iconWrap: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: Radius.sm,
     backgroundColor: '#E8E0D8',
     borderWidth: 1,
@@ -292,10 +311,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'center'
   },
-  tableTitle: {
+  titleWrap: {
     flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4
+  },
+  tableTitlePrefix: {
+    flexShrink: 1,
+    minWidth: 0,
     fontWeight: '900',
-    fontSize: 16
+    fontSize: 15,
+    lineHeight: 18
+  },
+  tableTitleNumber: {
+    flexShrink: 0,
+    fontWeight: '900',
+    fontSize: 15,
+    lineHeight: 18
   },
   tableSubtitle: {
     color: Colors.textMuted,
