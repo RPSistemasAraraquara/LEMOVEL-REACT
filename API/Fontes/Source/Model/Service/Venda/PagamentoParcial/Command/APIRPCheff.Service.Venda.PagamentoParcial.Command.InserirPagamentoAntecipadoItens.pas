@@ -10,12 +10,6 @@ uses
 
 type
   TAPIRPCheffServiceVendaPagamentoParcialCommandInserirPagamentoAntecipadoItens = class(TAPIRPCheffServiceVendaPagamentoParcialCommand)
-  private
-    FValorRestante     : Currency;
-    FValorRestanteItem : Currency;
-    FValorPagoItem     : Currency;
-
-    function QuantidadeRestante(const AItem: TAPIRPCheffEntityVendaItem): Currency;
   public
     procedure Execute(const AContext: PAPIRPCheffContextVendaPagamentoParcial); override;
   end;
@@ -27,45 +21,33 @@ uses
 
 { TAPIRPCheffServiceVendaPagamentoParcialCommandInserirPagamentoAntecipadoItens }
 
-function TAPIRPCheffServiceVendaPagamentoParcialCommandInserirPagamentoAntecipadoItens.QuantidadeRestante(const AItem: TAPIRPCheffEntityVendaItem): Currency;
-begin
-  Result := AItem.Quantidade - AItem.QuantidadePagaAntecipado;
-  if Result < 0 then
-    Result := 0;
-end;
-
 procedure TAPIRPCheffServiceVendaPagamentoParcialCommandInserirPagamentoAntecipadoItens.Execute(const AContext: PAPIRPCheffContextVendaPagamentoParcial);
 var
   LPagamentoItem               : TAPIRPCheffEntityVendaPagamentoAntecipadoItens;
   LValorRestante               : Currency;
-  LValorProdutoPag             : Currency;
-  LValorProdutoItem            : Currency;
+  LValorTotalItem              : Currency;
+  LValorPagoItem               : Currency;
   LQtdPagaItem                 : Currency;
   LItem                        : TAPIRPCheffEntityVendaItem;
-  LProporcaoVenda              : Currency;
   LIdUltimoPagamentoAntecipado :Integer;
 begin
   inherited;
 
   LValorRestante := AContext.PagamentoAntecipado.Valor;
 
-  if AContext.Venda.ValorTotal > 0 then
-    LProporcaoVenda := AContext.Venda.Valor / AContext.Venda.ValorTotal
-  else
-    Exit;
-
-  LValorProdutoPag := LValorRestante * LProporcaoVenda;
-
   for LItem in AContext.Venda.Itens do
   begin
-    if (LValorProdutoPag <= 0) or (LItem.ValorTotal <= LItem.ValorPagoAntecipado) then
+    LValorTotalItem := LItem.ValorTotal + LItem.ValorTaxaServico;
+
+    if (LValorRestante <= 0) or (LValorTotalItem <= LItem.ValorPagoAntecipado) then
       Continue;
 
-    LValorProdutoItem := Min(LItem.ValorTotal - LItem.ValorPagoAntecipado,LValorProdutoPag);
+    // valor_pago deve guardar o valor efetivamente pago, incluindo taxa de servico.
+    LValorPagoItem := Min(LValorTotalItem - LItem.ValorPagoAntecipado, LValorRestante);
 
 
-    if LItem.Quantidade > 0 then    // quantidade proporcional paga
-      LQtdPagaItem := RoundTo(LItem.Quantidade * (LValorProdutoItem / LItem.ValorTotal),-2)
+    if (LItem.Quantidade > 0) and (LValorTotalItem > 0) then    // quantidade proporcional paga
+      LQtdPagaItem := RoundTo(LItem.Quantidade * (LValorPagoItem / LValorTotalItem),-2)
     else
       LQtdPagaItem := 0;
 
@@ -76,7 +58,7 @@ begin
       LPagamentoItem.NumeroItem     := LItem.NumeroItem;
       LPagamentoItem.IdMaterial     := LItem.IdProduto;
       LPagamentoItem.QuantidadePaga := LQtdPagaItem;
-      LPagamentoItem.ValorPago      := LValorProdutoItem;
+      LPagamentoItem.ValorPago      := LValorPagoItem;
       LPagamentoItem.Unitario       := LItem.ValorUnitario;
       LPagamentoItem.Id             :=LIdUltimoPagamentoAntecipado;
 
@@ -86,14 +68,13 @@ begin
       AContext.Venda.IdVenda,
       LItem.NumeroItem,
       LItem.QuantidadePagaAntecipado + LQtdPagaItem,
-      LItem.ValorPagoAntecipado + LValorProdutoItem
+      LItem.ValorPagoAntecipado + LValorPagoItem
       );
 
       // atualiza saldo
-      LValorProdutoPag := LValorProdutoPag - LValorProdutoItem;
-      LValorRestante   := LValorRestante - (LValorProdutoItem / LProporcaoVenda);
+      LValorRestante := LValorRestante - LValorPagoItem;
 
-      if LValorProdutoPag <= 0 then
+      if LValorRestante <= 0 then
         Break;
     finally
       LPagamentoItem.Free;
@@ -103,4 +84,3 @@ end;
 
 
 end.
-

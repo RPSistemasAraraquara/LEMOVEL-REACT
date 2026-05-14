@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "br.com.sistemalechef.rpmobile",
-      "versionCode": 105810,
+      "versionCode": 105815,
       "adaptiveIcon": {
         "foregroundImage": "./assets/Logo.png",
         "backgroundColor": "#FFFFFF"

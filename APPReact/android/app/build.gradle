@@ -132,7 +132,7 @@ android {
         applicationId resolveApplicationId()
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 105812
+        versionCode 105815
         versionName "54.0.0"
         manifestPlaceholders = [
             appScheme: resolveAppDeepLinkScheme()

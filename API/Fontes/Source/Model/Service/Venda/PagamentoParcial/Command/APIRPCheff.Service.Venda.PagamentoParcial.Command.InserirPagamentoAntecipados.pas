@@ -50,8 +50,11 @@ begin
     LPagamentoAntecipado.IdCaixaItem         := AContext.PagamentoAntecipado.IdCaixaItem;
     LPagamentoAntecipado.Observacao          := 'Pagamento Antecipado: ' + ' ' + AContext.Venda.DescricaoMesaComanda;
     LPagamentoAntecipado.TaxaServico         := AContext.PagamentoAntecipado.TaxaServico;
-    LPagamentoAntecipado.ValorProduto        := AContext.PagamentoAntecipado.valor * (AContext.Venda.valor / AContext.Venda.valorTotal);
-    LPagamentoAntecipado.ValorTaxaServico    := AContext.PagamentoAntecipado.valor - LPagamentoAntecipado.ValorProduto;
+    if AContext.Venda.ValorTotal > 0 then
+      LPagamentoAntecipado.ValorProduto      := AContext.PagamentoAntecipado.Valor * (AContext.Venda.Valor / AContext.Venda.ValorTotal)
+    else
+      LPagamentoAntecipado.ValorProduto      := AContext.PagamentoAntecipado.Valor;
+    LPagamentoAntecipado.ValorTaxaServico    := AContext.PagamentoAntecipado.Valor - LPagamentoAntecipado.ValorProduto;
 
     FParent.DAO.VendaPagamentoAntecipadoDAO.Inserir(LPagamentoAntecipado);
   finally

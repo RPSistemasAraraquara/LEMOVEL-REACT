@@ -16,6 +16,7 @@ type
     FidEncerraVenda   : Integer;
     Fclassificacao    : string;
     Fantecipado       : Boolean;
+    Fobservacao       : string;
   public
     property idEmpresa: Integer read FidEmpresa write FidEmpresa;
     property idCaixa: Integer read FidCaixa write FidCaixa;
@@ -28,6 +29,7 @@ type
     property idEncerraVenda: Integer read FidEncerraVenda write FidEncerraVenda;
     property classificacao: string read Fclassificacao write Fclassificacao;
     property antecipado: Boolean read Fantecipado write Fantecipado;
+    property observacao: string read Fobservacao write Fobservacao;
   end;
 
 implementation

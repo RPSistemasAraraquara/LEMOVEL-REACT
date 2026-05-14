@@ -15,6 +15,7 @@ type
 implementation
 
 uses
+  System.SysUtils,
   APIRPCheff.Entity.Classes;
 
 { TAPIRPCheffServiceVendaPagamentoParcialCommandInserirCaixaItem }
@@ -40,6 +41,12 @@ begin
     LCaixaItem.ItemEncerraVenda := 0;
     LCaixaItem.IdEncerraVenda   := 0;
     LCaixaItem.Classificacao    := 'V';
+    LCaixaItem.Valor            := AContext.PagamentoAntecipado.Valor;
+    LCaixaItem.Antecipado       := True;
+    if AContext.Venda.NumeroMesa > 0 then
+      LCaixaItem.Observacao := Format('Pagamento antecipado MESA %d', [AContext.Venda.NumeroMesa])
+    else
+      LCaixaItem.Observacao := 'Pagamento antecipado ' + UpperCase(AContext.Venda.DescricaoMesaComanda);
 
     FParent.DAO.CaixaItemDAO.Inserir(LCaixaItem);
   finally

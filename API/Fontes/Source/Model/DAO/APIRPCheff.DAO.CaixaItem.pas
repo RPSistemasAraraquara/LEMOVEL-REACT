@@ -62,11 +62,11 @@ begin
     FQuery.SQL('insert into caixaItem (')
       .SQL('  id_caixa, id_empresa, item, tipo_movimento, valor,')
       .SQL('  data, hora, id_formaPgto, id_venda, item_encerraVenda,')
-      .SQL('  id_encerraVenda, classificacao, antecipado)')
+      .SQL('  id_encerraVenda, classificacao, antecipado, observacao)')
       .SQL('values (')
       .SQL('  :id_caixa, :id_empresa, :item, :tipo_movimento, :valor,')
       .SQL('  localtimestamp, localtime, :id_formaPgto, :id_venda, :item_encerraVenda,')
-      .SQL('  :id_encerraVenda, :classificacao, :antecipado)')
+      .SQL('  :id_encerraVenda, :classificacao, :antecipado, :observacao)')
       .ParamAsInteger('id_caixa', AValue.idCaixa)
       .ParamAsInteger('id_empresa', AValue.idEmpresa)
       .ParamAsInteger('item', AValue.item)
@@ -78,6 +78,7 @@ begin
       .ParamAsInteger('id_encerraVenda', AValue.idEncerraVenda, true)
       .ParamAsString('classificacao', AValue.classificacao, True)
       .ParamAsBoolean('antecipado', AValue.antecipado)
+      .ParamAsString('observacao', AValue.observacao, True)
       .ExecSQL;
     Commit;
   except
