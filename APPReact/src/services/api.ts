@@ -117,6 +117,8 @@ export type LaunchItemPayload = {
   observacao?: string;
   idMesaVinculada: number;
   idGarcom?: number;
+  terminalImpressao?: string;
+  TerminalImpressao?: string;
   opcionais: LaunchOptionalPayload[];
   fracoes?: LaunchItemFractionPayload[];
 };
@@ -2781,6 +2783,36 @@ export class ApiClient {
     }
   }
 
+  private async withTerminalImpressao(item: LaunchItemPayload): Promise<LaunchItemPayload> {
+    const terminal = (
+      sanitizeText(item.terminalImpressao, '') ||
+      sanitizeText(item.TerminalImpressao, '') ||
+      (await this.resolveTerminalName())
+    ).toUpperCase();
+    return {
+      ...item,
+      terminalImpressao: terminal,
+      TerminalImpressao: terminal
+    };
+  }
+
+  private async withTerminalImpressaoBatch(items: LaunchItemPayload[]): Promise<LaunchItemPayload[]> {
+    const terminal = await this.resolveTerminalName();
+    return items.map((item) => {
+      const itemTerminal = (
+        sanitizeText(item.terminalImpressao, '') ||
+        sanitizeText(item.TerminalImpressao, '') ||
+        terminal
+      ).toUpperCase();
+
+      return {
+        ...item,
+        terminalImpressao: itemTerminal,
+        TerminalImpressao: itemTerminal
+      };
+    });
+  }
+
   private buildUrl(path: string): string {
     return buildAbsoluteUrl(this.baseUrl, path);
   }
@@ -4359,11 +4391,12 @@ export class ApiClient {
   }
 
   async launchItem(idVenda: number, item: LaunchItemPayload): Promise<LaunchItemPayload> {
+    const payloadItem = await this.withTerminalImpressao(item);
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/item`,
       {
         method: 'POST',
-        body: JSON.stringify(item)
+        body: JSON.stringify(payloadItem)
       }
     );
     if (!response.ok) {
@@ -4375,11 +4408,12 @@ export class ApiClient {
   }
 
   async launchItemsBatch(idVenda: number, items: LaunchItemPayload[]): Promise<void> {
+    const payloadItems = await this.withTerminalImpressaoBatch(items);
     const { response } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/item/lote`,
       {
         method: 'POST',
-        body: JSON.stringify(items)
+        body: JSON.stringify(payloadItems)
       }
     );
     if (!response.ok) {

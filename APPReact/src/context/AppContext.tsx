@@ -609,6 +609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     observacao: item.observacao,
     idMesaVinculada: item.idMesaVinculada,
     idGarcom: user?.idUsuario || 0,
+    terminalImpressao: appSettings.terminalImpressao,
     opcionais: item.opcionais.map((optional) => ({
       idOpcional: optional.idOpcional,
       descricao: optional.descricao,

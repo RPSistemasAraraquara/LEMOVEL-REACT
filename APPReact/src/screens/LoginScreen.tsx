@@ -22,14 +22,14 @@ import { api, applyCompanyPolicyToSettings, CompanyInfo } from '../services/api'
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams, 'Login'>>();
   const { appSettings, login, loading, apiConnection, checkApiConnection, saveAppSettings, user: loggedUser } = useApp();
-  const [user, setUser] = useState(appSettings.usuario || '');
-  const [senha, setSenha] = useState(appSettings.senha || '');
+  const [user, setUser] = useState(appSettings.usuario || '1');
+  const [senha, setSenha] = useState(appSettings.senha || '1');
   const [error, setError] = useState('');
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
 
   useEffect(() => {
-    setUser(appSettings.usuario || '');
-    setSenha(appSettings.senha || '');
+    setUser(appSettings.usuario || '1');
+    setSenha(appSettings.senha || '1');
   }, [appSettings.usuario, appSettings.senha]);
 
   useEffect(() => {
@@ -136,6 +136,7 @@ export const LoginScreen: React.FC = () => {
           </View>
           <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>RP MOVEL</Text>
+          <Text style={styles.versionLabel}>Versão 14.0.0</Text>
         </View>
 
         <View style={styles.card}>
@@ -195,7 +196,6 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.configButtonLabel}>Configurar servidor</Text>
           </Pressable>
 
-          <Text style={styles.versionLabel}>Versão 13.0.0</Text>
         </View>
       </ScrollView>
       <Text style={styles.footer}>www.sistemalechef.com.br</Text>
