@@ -52,6 +52,7 @@ begin
   if not Assigned(FController) then
     FController := TAPIRPCheffController.Create;
   Result := FController;
+  Result.IdEmpresa(AIdEmpresa);
   Result.DAO.IdEmpresa(AIdEmpresa);
 end;
 

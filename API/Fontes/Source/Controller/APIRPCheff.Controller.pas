@@ -47,9 +47,9 @@ end;
 
 destructor TAPIRPCheffController.Destroy;
 begin
-  FreeAndNil(FComponents);
-  FreeAndNil(FDAO);
   FreeAndNil(FService);
+  FreeAndNil(FDAO);
+  FreeAndNil(FComponents);
   inherited;
 end;
 

@@ -18,6 +18,7 @@ uses
     function DataSetToEntity(ADataSet: TDataSet): TAPIRPCheffEntityImpressaoProducao; override;
   public
     procedure Inserir(AImpressaoProducao:TAPIRPCheffEntityImpressaoProducao);
+    procedure MarcarPendentesComoImpressos(AIdVenda: Integer);
     function Listar(AIDProduto,AidVenda:Integer):TObjectList<TAPIRPCheffEntityImpressaoProducao>;
   end;
 
@@ -78,6 +79,26 @@ begin
   end;
 end;
 
+procedure TAPIRPCheffDAOImpressaoProducao.MarcarPendentesComoImpressos(
+  AIdVenda: Integer);
+begin
+  StartTransaction;
+  try
+    Query.SQL('update impressaoproducao')
+      .SQL('set produtoimpresso = true, impressorainterna = false')
+      .SQL('where idvenda = :idvenda')
+      .SQL('and idempresa = :idempresa')
+      .SQL('and produtoimpresso = false')
+      .ParamAsInteger('idvenda', AIdVenda)
+      .ParamAsInteger('idempresa', FIdEmpresa)
+      .ExecSQL;
+    Commit;
+  except
+    Rollback;
+    raise;
+  end;
+end;
+
 function TAPIRPCheffDAOImpressaoProducao.Listar(AIDProduto,AidVenda: Integer): TObjectList<TAPIRPCheffEntityImpressaoProducao>;
 var
 LDataset:TDataSet;
@@ -104,5 +125,4 @@ begin
 end;
 
 end.
-
 

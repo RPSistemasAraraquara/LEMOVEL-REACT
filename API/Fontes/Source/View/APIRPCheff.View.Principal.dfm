@@ -6,7 +6,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
   Margins.Right = 6
   Margins.Bottom = 6
   BorderStyle = bsDialog
-  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 14.0.0.0'
+  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 14.0.0.4'
   ClientHeight = 750
   ClientWidth = 1258
   Color = clBtnFace

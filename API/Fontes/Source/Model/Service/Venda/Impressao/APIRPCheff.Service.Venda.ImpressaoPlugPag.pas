@@ -592,9 +592,12 @@ end;
 procedure TAPIRPCheffServiceVendaImpressaoPlugPag.ImprimirFichaIndividualVerificada;
 var
   LItem: TAPIRPCheffEntityVendaItem;
-  LImpressoras: TObjectList<TAPIRPCheffEntityImpressaoProducao>;
+  LQuantidadeFichas: Integer;
 begin
   FichaImpressaoIndividual := '';
+
+  if not FImprimirFichaIndividualProdutos then
+    Exit;
 
   for LItem in FVendaItens do
   begin
@@ -609,32 +612,32 @@ begin
         raise Exception.CreateFmt('Empresa %d n'#227'o encontrada.', [FIdEmpresa]);
     end;
 
-    LImpressoras := FDAO.ImpressaoProducaoDAO.Listar(LItem.idProduto, LItem.idVenda);
-    try
-      for var LImpressora in LImpressoras do
-      begin
-        FichaImpressaoIndividual := FichaImpressaoIndividual + sLineBreak +
-          '=========================' + sLineBreak +
-          FEmpresa.nome.PadRight(32, ' ') + sLineBreak +
-          FEmpresa.endereco.PadRight(22, ' ') + FEmpresa.numero.PadLeft(6, '0') + sLineBreak;
+    LQuantidadeFichas := QuantidadeFichasIndividuais(LItem.quantidade);
+    for var LFicha := 1 to LQuantidadeFichas do
+    begin
+      FichaImpressaoIndividual := FichaImpressaoIndividual + sLineBreak +
+        '=========================' + sLineBreak +
+        FEmpresa.nome.PadRight(32, ' ') + sLineBreak +
+        FEmpresa.endereco.PadRight(22, ' ') + FEmpresa.numero.PadLeft(6, '0') + sLineBreak;
 
-        if FEmpresa.telefonePrincipal = 0 then
-          FichaImpressaoIndividual := FichaImpressaoIndividual + 'Fone:' + FEmpresa.telefone + sLineBreak
-        else
-          FichaImpressaoIndividual := FichaImpressaoIndividual + 'Fone:' + FEmpresa.celular + sLineBreak;
+      if FEmpresa.telefonePrincipal = 0 then
+        FichaImpressaoIndividual := FichaImpressaoIndividual + 'Fone:' + FEmpresa.telefone + sLineBreak
+      else
+        FichaImpressaoIndividual := FichaImpressaoIndividual + 'Fone:' + FEmpresa.celular + sLineBreak;
 
-        FichaImpressaoIndividual := FichaImpressaoIndividual +
-          sLineBreak + '=========================' + sLineBreak + sLineBreak +
-          'Venda: ' + LItem.idVenda.ToString + sLineBreak +
-          'Data: ' + FormatDateTime('dd/mm/yyyy hh:nn', LItem.dataLancamento) + sLineBreak +
-          'Impressora: ' + LImpressora.TipoVenda + sLineBreak +
-          '=========================' + sLineBreak +
-          '====== P A G O ======' + sLineBreak + sLineBreak +
-          LItem.produtoDescricao + LItem.descricaoTamanho.PadLeft(32, ' ') + sLineBreak + sLineBreak +
-          '=========================' + sLineBreak +  sLineBreak;
-      end;
-    finally
-      FreeAndNil(LImpressoras);
+      FichaImpressaoIndividual := FichaImpressaoIndividual +
+        sLineBreak + '=========================' + sLineBreak + sLineBreak +
+        'Venda: ' + LItem.idVenda.ToString + sLineBreak +
+        'Data: ' + FormatDateTime('dd/mm/yyyy hh:nn', LItem.dataLancamento) + sLineBreak;
+
+      if not LItem.TerminalImpressao.Trim.IsEmpty then
+        FichaImpressaoIndividual := FichaImpressaoIndividual + 'Impressora: ' + LItem.TerminalImpressao + sLineBreak;
+
+      FichaImpressaoIndividual := FichaImpressaoIndividual +
+        '=========================' + sLineBreak +
+        '====== P A G O ======' + sLineBreak + sLineBreak +
+        LItem.produtoDescricao + LItem.descricaoTamanho.PadLeft(32, ' ') + sLineBreak + sLineBreak +
+        '=========================' + sLineBreak +  sLineBreak;
     end;
   end;
 

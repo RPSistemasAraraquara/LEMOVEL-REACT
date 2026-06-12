@@ -16,6 +16,7 @@ type
   TAPIRPCheffServiceVendaFechamentoCommandGravarImpressao =
     class(TAPIRPCheffServiceVendaFechamentoCommand)
   private
+    function PermiteImpressoraInterna: Boolean;
     procedure GravarImpressaoProducao(AItem: TAPIRPCheffEntityVendaItem);
   public
     procedure Execute(AFechamento: TAPIRPCheffEntityVendaPostFechamento); override;
@@ -29,9 +30,18 @@ procedure TAPIRPCheffServiceVendaFechamentoCommandGravarImpressao.Execute(AFecha
 var
   LVenda: TAPIRPCheffEntityVenda;
   LEmpresa: TAPIRPCheffEntityEmpresa;
+  LImpressaoProducaoDAO: TAPIRPCheffDAOImpressaoProducao;
 begin
   LVenda := FParent.Venda;
   LEmpresa := FParent.Empresa;
+  if not PermiteImpressoraInterna then
+  begin
+    LImpressaoProducaoDAO := FParent.DAO.ImpressaoProducaoDAO;
+    LImpressaoProducaoDAO.ManagerTransaction(False);
+    LImpressaoProducaoDAO.MarcarPendentesComoImpressos(AFechamento.idVenda);
+    Exit;
+  end;
+
   for var LItem in FParent.VendaItens do
   begin
     if LItem.ImprimirFichaIndividual then
@@ -64,7 +74,7 @@ begin
       LImpressaoProducao.QuantidadeImpressao := 1;
       LImpressaoProducao.IdVenda             := AItem.idVenda;
       LImpressaoProducao.DescricaoProduto    := AItem.produtoDescricao + ' (' + AItem.descricaoTamanho + ')';
-      LImpressaoProducao.ImpressoraInterna   := FParent.Fechamento.impressoraInterna;
+      LImpressaoProducao.ImpressoraInterna   := PermiteImpressoraInterna;
       LImpressaoProducao.NomeGarcom          := Trim(AItem.nomeGarcom);
 
       if (LImpressaoProducao.NomeGarcom = EmptyStr) and (AItem.idGarcom > 0) then
@@ -86,6 +96,25 @@ begin
   finally
     FreeAndNil(LImpressaoProducao);
   end;
+end;
+
+function TAPIRPCheffServiceVendaFechamentoCommandGravarImpressao.PermiteImpressoraInterna: Boolean;
+var
+  LEmpresa: TAPIRPCheffEntityEmpresa;
+begin
+  Result := FParent.Fechamento.impressoraInterna;
+  if not Result then
+    Exit;
+
+  LEmpresa := FParent.Empresa;
+  if not Assigned(LEmpresa) then
+    Exit;
+
+  Result := not (
+    LEmpresa.utilizaIntegracaoStone
+    or LEmpresa.utilizaIntegracaoPagBank
+    or LEmpresa.utilizaIntegracaoCielo
+  );
 end;
 
 end.

@@ -118,11 +118,12 @@ export const loadSalePrintContent = async (input: RPCheffSalePrintInput): Promis
   const suppressInternalWindowsPrint =
     Platform.OS === 'android' &&
     input.usarRotaMaquininha !== false &&
-    (provider === 'stone' || provider === 'cielo' || provider === 'getnet');
+    (provider === 'stone' || provider === 'pagbank' || provider === 'cielo' || provider === 'getnet');
   return api.getSalePrint(input.idVenda, {
     numeroColunas: input.appSettings.impressaoColunas,
     impressaoInterna: suppressInternalWindowsPrint ? false : input.appSettings.utilizaImpressoraInterna,
-    tipoMaquina: machineType
+    tipoMaquina: machineType,
+    imprimirFichaIndividualProdutos: input.appSettings.imprimirFichaIndividualProdutos
   });
 };
 

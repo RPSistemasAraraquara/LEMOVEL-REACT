@@ -26,8 +26,12 @@ type
     FTipoMaquina               : TRPTipoMaquinaPagamento;
     FMensagemCouvert           : string;
     FImprimir                  : Boolean;
+    FImprimirFichaIndividualProdutos: Boolean;
 
     function FormatarQuantidadeFracionada(AQuantidade, AValorUnitario, AValorTotal: Currency): string;
+    function QuantidadeFichasIndividuais(AQuantidade: Currency): Integer;
+    function UsaIntegracaoMaquininha(AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+    function PodeImprimirLocalmente(AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
     procedure Imprimir(AConteudo: string); overload;
     function CriarImpressaoStone: TAPIRPCheffServiceVendaImpressao;
     function CriarImpressaoPlugPag: TAPIRPCheffServiceVendaImpressao;
@@ -40,6 +44,7 @@ type
     function IdEmpresa(AValue: Integer): TAPIRPCheffServiceVendaImpressao;
     function IdVenda(AValue: Integer): TAPIRPCheffServiceVendaImpressao;
     function Imprimir(AValue: Boolean): TAPIRPCheffServiceVendaImpressao; overload;
+    function ImprimirFichaIndividualProdutos(AValue: Boolean): TAPIRPCheffServiceVendaImpressao;
     function NumeroColunas(AValue: Integer): TAPIRPCheffServiceVendaImpressao;
     function TipoMaquina(AValue: TRPTipoMaquinaPagamento): TAPIRPCheffServiceVendaImpressao;
     function Execute: TStream; virtual;
@@ -93,6 +98,7 @@ begin
   FImprimirOpcionais := True;
   FUtilizaControleConsumacao := False;
   FImprimir := False;
+  FImprimirFichaIndividualProdutos := True;
   FMensagemCouvert := 'COUVERT (+)';
 end;
 
@@ -194,9 +200,10 @@ begin
     LStrategy.IdVenda(FIdVenda)
       .IdEmpresa(FIdEmpresa)
       .Components(FComponents)
-      .DAO(FDAO);
+      .DAO(FDAO)
+      .ImprimirFichaIndividualProdutos(FImprimirFichaIndividualProdutos);
     Result := LStrategy.Execute;
-    if FImprimir then
+    if FImprimir and PodeImprimirLocalmente(LEmpresa) then
       Imprimir(TStringStream(Result).DataString);
   finally
     FreeAndNil(LStrategy);
@@ -231,16 +238,51 @@ begin
   end;
 end;
 
+function TAPIRPCheffServiceVendaImpressao.PodeImprimirLocalmente(
+  AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+begin
+  Result := not UsaIntegracaoMaquininha(AEmpresa);
+end;
+
 function TAPIRPCheffServiceVendaImpressao.Imprimir(AValue: Boolean): TAPIRPCheffServiceVendaImpressao;
 begin
   Result := Self;
   FImprimir := AValue;
 end;
 
+function TAPIRPCheffServiceVendaImpressao.ImprimirFichaIndividualProdutos(
+  AValue: Boolean): TAPIRPCheffServiceVendaImpressao;
+begin
+  Result := Self;
+  FImprimirFichaIndividualProdutos := AValue;
+end;
+
 function TAPIRPCheffServiceVendaImpressao.NumeroColunas(AValue: Integer): TAPIRPCheffServiceVendaImpressao;
 begin
   Result := Self;
   FNumeroColunas := AValue;
+end;
+
+function TAPIRPCheffServiceVendaImpressao.QuantidadeFichasIndividuais(
+  AQuantidade: Currency): Integer;
+begin
+  Result := Trunc(AQuantidade);
+  if Result < 1 then
+    Result := 1;
+end;
+
+function TAPIRPCheffServiceVendaImpressao.UsaIntegracaoMaquininha(
+  AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+begin
+  Result := FTipoMaquina in [tmpStone, tmpPlugPag, tmpCielo];
+  if Result then
+    Exit;
+
+  Result := Assigned(AEmpresa) and (
+    AEmpresa.utilizaIntegracaoStone
+    or AEmpresa.utilizaIntegracaoPagBank
+    or AEmpresa.utilizaIntegracaoCielo
+  );
 end;
 
 function TAPIRPCheffServiceVendaImpressao.TipoMaquina(

@@ -470,8 +470,11 @@ end;
 procedure TAPIRPCheffServiceVendaImpressaoCielo.ImprimirFichaIndividualVerificada;
 var
   LItem: TAPIRPCheffEntityVendaItem;
-  LImpressoras: TObjectList<TAPIRPCheffEntityImpressaoProducao>;
+  LQuantidadeFichas: Integer;
 begin
+  if not FImprimirFichaIndividualProdutos then
+    Exit;
+
   for LItem in FVendaItens do
   begin
     if not LItem.ImprimirFichaIndividual then
@@ -485,40 +488,37 @@ begin
         raise Exception.CreateFmt('Empresa %d n'#227'o encontrada.', [FIdEmpresa]);
     end;
 
-    LImpressoras := FDAO.ImpressaoProducaoDAO.Listar(LItem.idProduto, LItem.idVenda);
-    try
-      for var LImpressora in LImpressoras do
-      begin
-        AddSeparator;
-        AddBlankLine;
-        AddText(FEmpresa.nome, 'center', 'big', 'bold');
-        AddBlankLine;
-        AddText(FEmpresa.endereco + ', ' + FEmpresa.numero, 'center', 'medium');
+    LQuantidadeFichas := QuantidadeFichasIndividuais(LItem.quantidade);
+    for var LFicha := 1 to LQuantidadeFichas do
+    begin
+      AddSeparator;
+      AddBlankLine;
+      AddText(FEmpresa.nome, 'center', 'big', 'bold');
+      AddBlankLine;
+      AddText(FEmpresa.endereco + ', ' + FEmpresa.numero, 'center', 'medium');
 
-        if FEmpresa.telefonePrincipal = 0 then
-          AddText('Fone: ' + FEmpresa.telefone, 'center', 'medium')
-        else
-          AddText('Fone: ' + FEmpresa.celular, 'center', 'medium');
+      if FEmpresa.telefonePrincipal = 0 then
+        AddText('Fone: ' + FEmpresa.telefone, 'center', 'medium')
+      else
+        AddText('Fone: ' + FEmpresa.celular, 'center', 'medium');
 
-        AddBlankLine;
-        AddSeparator;
-        AddText('Venda: ' + LItem.idVenda.ToString, 'left', 'medium', 'bold');
-        AddText('Data: ' + FormatDateTime('dd/mm/yyyy hh:nn', LItem.dataLancamento), 'left', 'medium');
-        AddText('Impressora: ' + LImpressora.TipoVenda, 'left', 'medium');
-        AddSeparator;
-        AddBlankLine;
-        AddText('P A G O', 'center', 'big', 'bold');
-        AddBlankLine;
+      AddBlankLine;
+      AddSeparator;
+      AddText('Venda: ' + LItem.idVenda.ToString, 'left', 'medium', 'bold');
+      AddText('Data: ' + FormatDateTime('dd/mm/yyyy hh:nn', LItem.dataLancamento), 'left', 'medium');
+      if not LItem.TerminalImpressao.Trim.IsEmpty then
+        AddText('Impressora: ' + LItem.TerminalImpressao, 'left', 'medium');
+      AddSeparator;
+      AddBlankLine;
+      AddText('P A G O', 'center', 'big', 'bold');
+      AddBlankLine;
 
-        var LDescricao := LItem.produtoDescricao;
-        if LItem.descricaoTamanho <> EmptyStr then
-          LDescricao := LDescricao + ' (' + LItem.descricaoTamanho + ')';
-        AddText(LDescricao, 'center', 'medium', 'bold');
-        AddBlankLine;
-        AddSeparator;
-      end;
-    finally
-      FreeAndNil(LImpressoras);
+      var LDescricao := LItem.produtoDescricao;
+      if LItem.descricaoTamanho <> EmptyStr then
+        LDescricao := LDescricao + ' (' + LItem.descricaoTamanho + ')';
+      AddText(LDescricao, 'center', 'medium', 'bold');
+      AddBlankLine;
+      AddSeparator;
     end;
   end;
 end;

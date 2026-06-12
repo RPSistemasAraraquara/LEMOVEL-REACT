@@ -20,11 +20,16 @@ type
   private
     procedure ConsultarJSON;
     procedure ConsultarTextPlain;
+    function TipoMaquinaPagamentoRequest: TRPTipoMaquinaPagamento;
+    function UsaImpressaoDaMaquininha(AValue: TRPTipoMaquinaPagamento): Boolean;
+    function EmpresaUsaImpressaoDaMaquininha(AIdEmpresa: Integer): Boolean;
+    function BloquearImpressoraWindows(AIdEmpresa: Integer; ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
   public
     [SwagGET('{idVenda}', 'Carregar Venda')]
     [SwagParamPath('idVenda', 'Id da Venda')]
     [SwagParamHeader('listarItens', 'Indica se busca tamb'#233'm os itens da venda')]
     [SwagParamHeader('impressaoInterna', 'Indica se deve imprimir localmente', 'false,true', False)]
+    [SwagParamHeader('imprimirFichaIndividualProdutos', 'Indica se deve imprimir ficha individual dos produtos', 'false,true', False)]
     [SwagProduces('application/json')]
     [SwagProduces('text/plain')]
     [SwagResponse(200, TAPIRPCheffEntityVenda)]
@@ -159,6 +164,7 @@ var
   LImpressao: string;
   LTipoMaquina: TRPTipoMaquinaPagamento;
   LImprimir: Boolean;
+  LImprimirFichaIndividualProdutos: Boolean;
   LStream: TStream;
 begin
   if not FRequest.Params.ContainsKey('idVenda') then
@@ -168,9 +174,12 @@ begin
   LIdEmpresa      := FRequest.Params.Field('idEmpresa').AsInteger;
   LNumeroColunas  := FRequest.Headers.Field('numeroColunas').AsInteger;
   LImprimir       := FRequest.Headers.Field('impressaoInterna').AsBoolean;
-  LTipoMaquina.FromString(FRequest.Headers.Field('tipoMaquina').AsString);
-  if LTipoMaquina = tmpNenhum then
-    LTipoMaquina.FromString(FRequest.Query.Field('tipoMaquina').AsString);
+  LImprimirFichaIndividualProdutos := True;
+  if FRequest.Headers.ContainsKey('imprimirFichaIndividualProdutos') then
+    LImprimirFichaIndividualProdutos := FRequest.Headers.Field('imprimirFichaIndividualProdutos').AsBoolean;
+  LTipoMaquina := TipoMaquinaPagamentoRequest;
+  if BloquearImpressoraWindows(LIdEmpresa, LTipoMaquina) then
+    LImprimir := False;
   if LNumeroColunas <= 0 then
     LNumeroColunas := 48;
   LStream := Controller.IdEmpresa(LIdEmpresa).Service.VendaImpressaoService
@@ -178,6 +187,7 @@ begin
     .IdVenda(LIdVenda)
     .NumeroColunas(LNumeroColunas)
     .Imprimir(LImprimir)
+    .ImprimirFichaIndividualProdutos(LImprimirFichaIndividualProdutos)
     .TipoMaquina(LTipoMaquina)
     .Execute;
   try
@@ -193,13 +203,17 @@ procedure TAPIRPCheffControllerVenda.ExecutarPreFechamento;
 var
   LPreFechamento: TAPIRPCheffEntityVendaPatchPreFechamento;
   LAccept: string;
+  LTipoMaquina: TRPTipoMaquinaPagamento;
 begin
   LAccept := FRequest.RawWebRequest.Accept.ToLower;
+  LTipoMaquina := TipoMaquinaPagamentoRequest;
   LPreFechamento := Controller.Components.JSON
     .FromJSONObject<TAPIRPCheffEntityVendaPatchPreFechamento>(FRequest.Body);
   try
     LPreFechamento.idEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
     LPreFechamento.idVenda := FRequest.Params.Field('idVenda').AsInteger;
+    if BloquearImpressoraWindows(LPreFechamento.idEmpresa, LTipoMaquina) then
+      LPreFechamento.preFechamentoMobileImpressaoInterna := False;
     if (LPreFechamento.numeroPessoas < LPreFechamento.NumeroCouvert) then
       LPreFechamento.numeroPessoas := LPreFechamento.NumeroCouvert;
 
@@ -226,14 +240,18 @@ var
   LIdUsuarioHeader: Integer;
   LFechamento : TAPIRPCheffEntityVendaPostFechamento;
   LAccept    : string;
+  LTipoMaquina: TRPTipoMaquinaPagamento;
 begin
   LAccept     := FRequest.RawWebRequest.Accept.ToLower;
+  LTipoMaquina := TipoMaquinaPagamentoRequest;
   LIdVenda    := FRequest.Params.Field('idVenda').AsInteger;
   LFechamento := Controller.Components.JSON
     .FromJSONObject<TAPIRPCheffEntityVendaPostFechamento>(FRequest.Body);
   try
     LFechamento.idEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
     LFechamento.idVenda := LIdVenda;
+    if BloquearImpressoraWindows(LFechamento.idEmpresa, LTipoMaquina) then
+      LFechamento.impressoraInterna := False;
     LIdUsuarioHeader := Self.IdUsuario;
     if LIdUsuarioHeader > 0 then
       LFechamento.idUsuario := LIdUsuarioHeader;
@@ -323,6 +341,50 @@ begin
   end;
 end;
 
+function TAPIRPCheffControllerVenda.TipoMaquinaPagamentoRequest: TRPTipoMaquinaPagamento;
+begin
+  Result := tmpNenhum;
+  Result.FromString(FRequest.Headers.Field('tipoMaquina').AsString);
+  if Result = tmpNenhum then
+    Result.FromString(FRequest.Query.Field('tipoMaquina').AsString);
+end;
+
+function TAPIRPCheffControllerVenda.BloquearImpressoraWindows(
+  AIdEmpresa: Integer; ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
+begin
+  Result := UsaImpressaoDaMaquininha(ATipoMaquina);
+  if Result then
+    Exit;
+
+  Result := EmpresaUsaImpressaoDaMaquininha(AIdEmpresa);
+end;
+
+function TAPIRPCheffControllerVenda.EmpresaUsaImpressaoDaMaquininha(
+  AIdEmpresa: Integer): Boolean;
+var
+  LEmpresa: TAPIRPCheffEntityEmpresa;
+begin
+  Result := False;
+  Controller.IdEmpresa(AIdEmpresa).DAO.IdEmpresa(AIdEmpresa);
+  Controller.DAO.EmpresaDAO.IdEmpresa(AIdEmpresa);
+  LEmpresa := Controller.DAO.EmpresaDAO.Busca;
+  try
+    if not Assigned(LEmpresa) then
+      Exit;
+
+    Result := LEmpresa.utilizaIntegracaoStone
+      or LEmpresa.utilizaIntegracaoPagBank
+      or LEmpresa.utilizaIntegracaoCielo;
+  finally
+    FreeAndNil(LEmpresa);
+  end;
+end;
+
+function TAPIRPCheffControllerVenda.UsaImpressaoDaMaquininha(
+  AValue: TRPTipoMaquinaPagamento): Boolean;
+begin
+  Result := AValue in [tmpStone, tmpPlugPag, tmpCielo];
+end;
 
 procedure TAPIRPCheffControllerVenda.ReabrirMesaComanda;
 var

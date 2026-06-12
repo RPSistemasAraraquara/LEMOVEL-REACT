@@ -245,6 +245,7 @@ export type SalePrintRequest = {
   numeroColunas?: number;
   impressaoInterna?: boolean;
   tipoMaquina?: MachinePaymentType;
+  imprimirFichaIndividualProdutos?: boolean;
 };
 
 export type SalePartialPaymentPayload = {
@@ -4497,6 +4498,7 @@ export class ApiClient {
       numeroColunas?: number;
       impressaoInterna?: boolean;
       tipoMaquina?: MachinePaymentType;
+      imprimirFichaIndividualProdutos?: boolean;
     } = {}
   ): Promise<string | void> {
     const requestPayload = {
@@ -4517,6 +4519,9 @@ export class ApiClient {
     }
     if (options.tipoMaquina) {
       headers.tipoMaquina = options.tipoMaquina;
+    }
+    if (typeof options.imprimirFichaIndividualProdutos === 'boolean') {
+      headers.imprimirFichaIndividualProdutos = options.imprimirFichaIndividualProdutos ? 'true' : 'false';
     }
 
     const queryMachine = options.tipoMaquina ? `?tipoMaquina=${encodeURIComponent(options.tipoMaquina)}` : '';
@@ -4548,6 +4553,7 @@ export class ApiClient {
       numeroColunas?: number;
       impressaoInterna?: boolean;
       tipoMaquina?: MachinePaymentType;
+      imprimirFichaIndividualProdutos?: boolean;
     } = {}
   ): Promise<string | void> {
     const headers: Record<string, string> = {};
@@ -4567,6 +4573,9 @@ export class ApiClient {
 
     if (options.tipoMaquina) {
       headers.tipoMaquina = options.tipoMaquina;
+    }
+    if (typeof options.imprimirFichaIndividualProdutos === 'boolean') {
+      headers.imprimirFichaIndividualProdutos = options.imprimirFichaIndividualProdutos ? 'true' : 'false';
     }
 
     const queryMachine = options.tipoMaquina ? `?tipoMaquina=${encodeURIComponent(options.tipoMaquina)}` : '';
@@ -4605,6 +4614,9 @@ export class ApiClient {
 
     if (options.tipoMaquina) {
       headers.tipoMaquina = options.tipoMaquina;
+    }
+    if (typeof options.imprimirFichaIndividualProdutos === 'boolean') {
+      headers.imprimirFichaIndividualProdutos = options.imprimirFichaIndividualProdutos ? 'true' : 'false';
     }
 
     const queryMachine = options.tipoMaquina ? `?tipoMaquina=${encodeURIComponent(options.tipoMaquina)}` : '';

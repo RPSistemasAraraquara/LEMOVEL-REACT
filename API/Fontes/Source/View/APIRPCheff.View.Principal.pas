@@ -204,6 +204,12 @@ end;
 
 destructor TAPIRPCheffViewPrincipal.Destroy;
 begin
+  try
+    if ServiceRunning then
+      StopServer;
+  except
+  end;
+
   FreeAndNil(FController);
   inherited;
 end;
