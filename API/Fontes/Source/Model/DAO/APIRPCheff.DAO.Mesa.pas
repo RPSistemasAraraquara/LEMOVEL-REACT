@@ -74,8 +74,7 @@ begin
       begin
         Result.dataReserva      := ADataSet.FieldByName('data_reserva').AsDateTime;
         LHoraReserva            := ADataSet.FieldByName('hora_reserva').AsDateTime;
-        Result.dataReserva      := RecodeTime(Result.dataReserva, HourOf(LHoraReserva),
-          MinuteOf(LHoraReserva), SecondOf(LHoraReserva), MilliSecondOf(LHoraReserva));
+        Result.dataReserva      := RecodeTime(Result.dataReserva, HourOf(LHoraReserva), MinuteOf(LHoraReserva), SecondOf(LHoraReserva), MilliSecondOf(LHoraReserva));
       end;
     except
       Result.Free;

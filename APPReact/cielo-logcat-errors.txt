@@ -1,0 +1,3 @@
+--------- beginning of main
+06-19 10:32:08.522  4190  4190 E lechef.rpmobil: Not starting debugger since process cannot load the jdwp agent.
+06-19 10:32:09.235  4190  4211 E GraphicsEnv: Failed to get gpu service

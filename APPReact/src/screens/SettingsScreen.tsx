@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -24,6 +24,7 @@ import {
   CompanyInfo,
   hasConflictingOpeningSettings,
   MobileAppSettings,
+  normalizeMobileBaseUrl,
   OPENING_SETTINGS_CONFLICT_MESSAGE
 } from '../services/api';
 import { RootStackParams } from '../navigation/AppNavigator';
@@ -98,6 +99,14 @@ const INTEGRACAO_OPTIONS: Array<{ label: string; value: IntegrationValue }> = [
 
 const GETNET_MODEL_OPTIONS: GetNetModelValue[] = ['DX8000', 'P2', 'P3', 'P4', 'N910', 'APOSA8'];
 const STONE_MODEL_OPTIONS: StoneModelValue[] = ['P2', 'L400'];
+const CONNECTION_CHECK_TIMEOUT_MS = 5000;
+const IPV4_ADDRESS_PATTERN = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+type ConnectionCheckSummary = {
+  ok: boolean;
+  status?: number;
+  message: string;
+};
 
 const normalizeStoneModel = (value: unknown, fallback: StoneModelValue = 'P2'): StoneModelValue => {
   const normalized = String(value || '')
@@ -152,6 +161,86 @@ const getMachineModelLabel = (value: IntegrationValue): string => {
 };
 
 const toNumberString = (value: number, fallback: string) => (Number.isFinite(value) ? String(value) : fallback);
+
+const normalizeServerUrl = (value: string) => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return normalizeMobileBaseUrl(trimmed);
+};
+
+const validateServerUrl = (value: string): string | null => {
+  const normalized = normalizeServerUrl(value);
+
+  if (!normalized) {
+    return 'Informe o endereço do servidor. Exemplo: 192.168.15.30 ou https://mobile.rpfood.com.br';
+  }
+
+  const match = normalized.match(/^https?:\/\/([^/:?#]+)(?::(\d+))?(?:[/?#].*)?$/i);
+  if (!match) {
+    return 'Servidor inválido. Informe um IP local ou domínio HTTPS, por exemplo 192.168.15.30 ou https://mobile.rpfood.com.br';
+  }
+
+  const host = String(match[1] || '').trim();
+  const port = match[2] ? Number(match[2]) : 0;
+
+  if (!host) {
+    return 'Servidor inválido. Informe o IP ou domínio da API.';
+  }
+
+  if (IPV4_ADDRESS_PATTERN.test(host)) {
+    const hasInvalidOctet = host
+      .split('.')
+      .some((part) => Number(part) < 0 || Number(part) > 255);
+
+    if (hasInvalidOctet) {
+      return 'IP inválido. Cada parte do IP deve ficar entre 0 e 255.';
+    }
+  } else if (/^\d+(?:\.\d+)*$/.test(host)) {
+    return 'IP inválido. Use quatro partes, por exemplo 192.168.15.30.';
+  }
+
+  if (match[2] && (!Number.isFinite(port) || port < 1 || port > 65535)) {
+    return 'Porta inválida. Informe uma porta entre 1 e 65535.';
+  }
+
+  return null;
+};
+
+const buildConnectionWarning = (status?: number, message?: string) => {
+  const detail = [status ? `Status ${status}` : '', message || 'sem resposta da API']
+    .filter(Boolean)
+    .join(' - ');
+
+  return `Configuração salva no aparelho. Não foi possível conectar na API agora. Verifique o endereço do servidor (IP local ou domínio HTTPS).${detail ? `\n\nRetorno: ${detail}` : ''}`;
+};
+
+const withConnectionCheckTimeout = (
+  checkConnection: (timeoutMs?: number) => Promise<ConnectionCheckSummary>
+): Promise<ConnectionCheckSummary> => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<ConnectionCheckSummary>((resolve) => {
+    timeout = setTimeout(() => {
+      resolve({
+        ok: false,
+        status: 0,
+        message: 'Tempo limite ao testar a conexão com a API.'
+      });
+    }, CONNECTION_CHECK_TIMEOUT_MS);
+  });
+
+  return Promise.race([
+    checkConnection(CONNECTION_CHECK_TIMEOUT_MS),
+    timeoutPromise
+  ]).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  });
+};
 
 const toSettingsState = (settings: MobileAppSettings): SettingsState => ({
   servidor: settings.baseUrl,
@@ -235,7 +324,7 @@ const toMobileAppSettings = (
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParams, 'Configuracoes'>>();
-  const { appSettings, setBaseUrl, setEmpresaId, saveAppSettings } = useApp();
+  const { appSettings, saveAppSettings, checkApiConnection } = useApp();
   const [empresa, setEmpresa] = useState('1');
   const [salvando, setSalvando] = useState(false);
   const [status, setStatus] = useState('');
@@ -251,8 +340,13 @@ export const SettingsScreen: React.FC = () => {
   >(null);
   const [ultimaGetNet, setUltimaGetNet] = useState<StoredGetNetTransaction | null>(null);
   const [ultimoGetNetSubsellers, setUltimoGetNetSubsellers] = useState<StoredGetNetSubsellers | null>(null);
+  const hasLocalChangesRef = useRef(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
+    if (savingRef.current || hasLocalChangesRef.current) {
+      return;
+    }
     setEmpresa(String(appSettings.empresaId || 1));
     setSettings(toSettingsState(appSettings));
   }, [appSettings]);
@@ -293,6 +387,9 @@ export const SettingsScreen: React.FC = () => {
           return;
         }
         setCompanyInfo(company);
+        if (savingRef.current || hasLocalChangesRef.current) {
+          return;
+        }
         setSettings((prev) => {
           const normalized = applyCompanyPolicyToSettings(
             toMobileAppSettings(prev, empresa, appSettings),
@@ -329,6 +426,7 @@ export const SettingsScreen: React.FC = () => {
   );
 
   const setValue = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
+    hasLocalChangesRef.current = true;
     setSettings((prev) => ({
       ...prev,
       [key]: value
@@ -364,10 +462,12 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const setComboValue = (key: keyof SettingsState, value: string) => {
+    hasLocalChangesRef.current = true;
     setSettings((prev) => ({ ...prev, [key]: value } as SettingsState));
   };
 
   const setMaquininhaEnabled = (value: boolean) => {
+    hasLocalChangesRef.current = true;
     setSettings((prev) => ({
       ...prev,
       utilizaMaquininhaStone: value,
@@ -384,6 +484,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const setIntegracao = (value: IntegrationValue) => {
+    hasLocalChangesRef.current = true;
     setSettings((prev) => ({
       ...prev,
       tipoIntegracao: value,
@@ -396,27 +497,54 @@ export const SettingsScreen: React.FC = () => {
     }));
   };
 
+  const setEmpresaValue = (value: string) => {
+    hasLocalChangesRef.current = true;
+    setEmpresa(value);
+  };
+
   const save = async () => {
-    const next = toMobileAppSettings(settingMemo, empresa, appSettings);
+    const next = {
+      ...toMobileAppSettings(settingMemo, empresa, appSettings),
+      baseUrl: normalizeServerUrl(settingMemo.servidor)
+    };
+
+    const serverValidationMessage = validateServerUrl(next.baseUrl);
+    if (serverValidationMessage) {
+      setStatus(serverValidationMessage);
+      Alert.alert('Servidor inválido', serverValidationMessage);
+      return;
+    }
+
     if (hasConflictingOpeningSettings(next)) {
       setStatus(OPENING_SETTINGS_CONFLICT_MESSAGE);
       Alert.alert('Aviso', OPENING_SETTINGS_CONFLICT_MESSAGE);
       return;
     }
 
+    savingRef.current = true;
     setSalvando(true);
     setStatus('Salvando configurações...');
     try {
-      setBaseUrl(next.baseUrl);
-      setEmpresaId(next.empresaId);
       await saveAppSettings(next);
-      setStatus('Configurações salvas com sucesso.');
+      setEmpresa(String(next.empresaId || 1));
+      setSettings(toSettingsState(next));
+      hasLocalChangesRef.current = false;
+      const connection = await withConnectionCheckTimeout(checkApiConnection);
+      if (!connection.ok) {
+        const warning = buildConnectionWarning(connection.status, connection.message);
+        setStatus(warning);
+        Alert.alert('Configuração salva', warning);
+        return;
+      }
+
+      setStatus('Configurações salvas e API conectada com sucesso.');
       openSavedAlert();
     } catch (error: any) {
       const message = error?.message || 'Não foi possível salvar. Tente novamente.';
       setStatus(message);
       Alert.alert('Aviso', message);
     } finally {
+      savingRef.current = false;
       setSalvando(false);
     }
   };
@@ -730,7 +858,12 @@ export const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+    >
       <ScreenRouteLabel />
       <SectionHeader title="Configurações" />
 
@@ -739,7 +872,7 @@ export const SettingsScreen: React.FC = () => {
           label="Servidor (API)"
           value={settingMemo.servidor}
           onChangeText={(text) => setValue('servidor', text)}
-          placeholder="http://104.234.189.194:9000/"
+          placeholder="192.168.15.30 ou https://mobile.rpfood.com.br"
         />
         <FieldInput
           label="Terminal de impressão"
@@ -750,7 +883,7 @@ export const SettingsScreen: React.FC = () => {
         <FieldInput
           label="Empresa"
           value={empresa}
-          onChangeText={setEmpresa}
+          onChangeText={setEmpresaValue}
           placeholder="1"
           keyboardType="numeric"
         />

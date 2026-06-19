@@ -1,0 +1,129 @@
+--------- beginning of main
+06-19 10:34:29.218  4307  4307 E lechef.rpmobil: Not starting debugger since process cannot load the jdwp agent.
+06-19 10:34:29.362  4307  4307 I Perf    : Connecting to perf service.
+06-19 10:34:29.754  4307  4307 W SoLoader: Initializing SoLoader: 0
+06-19 10:34:29.755  4307  4307 W SoLoader: Recording new base apk path: /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk
+06-19 10:34:29.755  4307  4307 W SoLoader: Previously recorded 0 base apk paths.
+06-19 10:34:29.756  4307  4307 I SoLoader: Preparing SO source: DirectorySoSource[root = /system/lib flags = 2]
+06-19 10:34:29.757  4307  4307 I SoLoader: Preparing SO source: DirectorySoSource[root = /vendor/lib flags = 2]
+06-19 10:34:29.757  4307  4307 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk!/lib/armeabi-v7a]]
+06-19 10:34:29.804  4307  4307 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/lib/arm flags = 0]]
+06-19 10:34:29.804  4307  4307 I SoLoader: init finish: 4 SO sources prepared
+06-19 10:34:29.804  4307  4307 W SoLoader: SoLoader initialized: 8
+06-19 10:34:29.872  4307  4307 D jni_lib_merge: Entering merged library JNI_OnLoad.
+06-19 10:34:29.872  4307  4307 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+06-19 10:34:29.872  4307  4307 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7856cd25
+06-19 10:34:29.872  4307  4307 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7860310d
+06-19 10:34:29.872  4307  4307 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x78610e75
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7862ac99
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7869b399
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x786ad015
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x786b19c1
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x786c5ded
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7873a7b1
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7873fbfd
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x78744bbd
+06-19 10:34:29.873  4307  4307 D jni_lib_merge: About to register 11 actual methods.
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Entering merged library JNI_OnLoad.
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7856cd25
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7860310d
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x78610e75
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7862ac99
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7869b399
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x786ad015
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x786b19c1
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x786c5ded
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7873a7b1
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7873fbfd
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x78744bbd
+06-19 10:34:29.892  4307  4307 D jni_lib_merge: About to register 11 actual methods.
+06-19 10:34:29.952  4307  4328 E GraphicsEnv: Failed to get gpu service
+06-19 10:34:30.024  4307  4307 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+06-19 10:34:30.135  4307  4307 W unknown:BridgelessReact: ReactHost{0}.startSurface(surfaceId = 0): Schedule
+06-19 10:34:30.135  4307  4307 W unknown:BridgelessReact: ReactHost{0}.attachSurface(surfaceId = 0)
+06-19 10:34:30.137  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask()
+06-19 10:34:30.137  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Start
+06-19 10:34:30.137  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getJSBundleLoader()
+06-19 10:34:30.140  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactContext(): Creating BridgelessReactContext
+06-19 10:34:30.142  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Creating ReactInstance
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Entering merged library JNI_OnLoad.
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing 4 pre-merged libs (including stub)
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing to register libhermes_executor_so.  onload_func: 0x7881b365
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing to register libhermesinstancejni_so.  onload_func: 0x78820349
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing to register libjsijniprofiler_so.  onload_func: 0x78820909
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: About to register 3 actual methods.
+06-19 10:34:30.200  4307  4307 W unknown:BridgelessReact: ReactHost{0}.onHostResume(activity)
+06-19 10:34:30.200  4307  4307 W unknown:BridgelessReact: ReactContext.onHostResume()
+06-19 10:34:30.206  4307  4332 I boringssl: version 0.0.1
+06-19 10:34:30.221  4307  4307 W unknown:BridgelessReact: ReactHost{0}.onHostPause(activity)
+06-19 10:34:30.221  4307  4307 W unknown:BridgelessReact: ReactContext.onHostPause()
+06-19 10:34:30.223  4307  4307 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+06-19 10:34:30.227  4307  4307 W lechef.rpmobil: Accessing hidden method Landroid/view/WindowInsets$Type;->ime()I (blacklist, linking, denied)
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: QUALCOMM build                   : f8416af, I657c87473d
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Build Date                       : 04/30/20
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: OpenGL ES Shader Compiler Version: EV031.27.05.07
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Local Branch                     : 
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Remote Branch                    : 
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Remote Branch                    : 
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Reconstruct Branch               : 
+06-19 10:34:30.243  4307  4327 I AdrenoGLES: Build Config                     : S L 8.0.12 AArch32
+06-19 10:34:30.259  4307  4327 I AdrenoGLES: PFP: 0x00c60400, ME: 0x003ff041
+06-19 10:34:30.348  4307  4327 W Gralloc3: mapper 3.x is not supported
+06-19 10:34:30.410  4307  4332 I ExpoModulesCore: ✅ AppContext was initialized
+06-19 10:34:30.500  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Loading JS Bundle
+06-19 10:34:30.501  4307  4332 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Calling DevSupportManagerBase.onNewReactContextCreated(reactContext)
+06-19 10:34:30.502  4307  4332 W unknown:BridgelessReact: ReactHost{0}.startSurface(surfaceId = 0): Execute
+06-19 10:34:30.502  4307  4307 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Executing ReactInstanceEventListeners
+06-19 10:34:30.552  4307  4334 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+06-19 10:34:30.657  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaProviderManager
+06-19 10:34:30.669  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.uimanager.LayoutShadowNode
+06-19 10:34:30.677  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.SearchBarManager
+06-19 10:34:30.683  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.GroupViewManagerWrapper
+06-19 10:34:30.690  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenFooterManager
+06-19 10:34:30.694  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.TabScreenViewManager
+06-19 10:34:30.699  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContainerViewManager
+06-19 10:34:30.703  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.TabsHostViewManager
+06-19 10:34:30.709  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ModalScreenViewManager
+06-19 10:34:30.715  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderConfigViewManager
+06-19 10:34:30.719  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContentWrapperManager
+06-19 10:34:30.722  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewManager
+06-19 10:34:30.728  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewShadowNode
+06-19 10:34:30.732  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenViewManager
+06-19 10:34:30.740  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.SimpleViewManagerWrapper
+06-19 10:34:30.744  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderSubviewManager
+06-19 10:34:30.750  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackViewManager
+06-19 10:34:30.862  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerButtonViewManager
+06-19 10:34:30.872  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.safeareaview.ReactSafeAreaViewManager
+06-19 10:34:30.873  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.safeareaview.ReactSafeAreaViewShadowNode
+06-19 10:34:30.879  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ReactModalHostManager
+06-19 10:34:30.889  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageViewManager
+06-19 10:34:30.889  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageShadowNode
+06-19 10:34:30.897  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ReactProgressBarViewManager
+06-19 10:34:30.900  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ProgressBarShadowNode
+06-19 10:34:30.907  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollViewManager
+06-19 10:34:30.920  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.image.ReactImageManager
+06-19 10:34:30.931  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextViewManager
+06-19 10:34:30.935  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextShadowNode
+06-19 10:34:30.945  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollContainerViewManager
+06-19 10:34:30.951  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.unimplementedview.ReactUnimplementedViewManager
+06-19 10:34:30.959  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactScrollViewManager
+06-19 10:34:30.979  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.view.ReactViewManager
+06-19 10:34:30.986  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.drawer.ReactDrawerLayoutManager
+06-19 10:34:30.996  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager
+06-19 10:34:30.999  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchShadowNode
+06-19 10:34:31.006  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextViewManager
+06-19 10:34:31.006  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextShadowNode
+06-19 10:34:31.012  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.swiperefresh.SwipeRefreshLayoutManager
+06-19 10:34:31.022  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextManager
+06-19 10:34:31.022  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextShadowNode
+06-19 10:34:31.026  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputManager
+06-19 10:34:31.033  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputShadowNode
+06-19 10:34:31.041  4307  4333 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerRootViewManager
+06-19 10:34:31.055  4307  4333 W BridgelessReactContext: [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+06-19 10:34:31.073  4307  4333 I ExpoModulesCore: ✅ JSI interop was installed
+06-19 10:34:31.078  4307  4333 I ExpoModulesCore: ✅ Constants were exported
+06-19 10:34:31.102  4307  4333 V AsyncStorageExpoMigration: No scoped database found
+06-19 10:34:31.284  4307  4333 I ReactNativeJS: Running "main"
+06-19 10:34:31.290  4307  4333 W lechef.rpmobil: Accessing hidden method Landroid/view/Window;->getInsetsController()Landroid/view/WindowInsetsController; (blacklist, linking, denied)
+06-19 10:34:36.020  4307  4344 D ProfileInstaller: Skipping profile installation for br.com.sistemalechef.rpmobile

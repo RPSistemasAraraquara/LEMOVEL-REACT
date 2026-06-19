@@ -62,8 +62,10 @@ procedure TAPIRPCheffResourcesConfiguracao.ExtrairDiretoriosNFe;
 var
   LZipFileName: string;
 begin
+{$IFDEF MSWINDOWS}
   LZipFileName := ExtractFilePath(GetModuleName(HInstance)) + 'NFe.zip';
   ExtractResource('NFe', LZipFileName);
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffResourcesConfiguracao.LoadResource(const AResourceName,
@@ -71,12 +73,16 @@ procedure TAPIRPCheffResourcesConfiguracao.LoadResource(const AResourceName,
 var
   LResource: TResourceStream;
 begin
+{$IFDEF MSWINDOWS}
   LResource := TResourceStream.Create(HInstance, AResourceName, RT_RCDATA);
   try
     LResource.SaveToFile(AFileName);
   finally
     LResource.Free;
   end;
+{$ELSE}
+  raise Exception.Create('Recurso embutido indisponivel no build Linux.');
+{$ENDIF}
 end;
 
 initialization

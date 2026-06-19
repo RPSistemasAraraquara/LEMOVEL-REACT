@@ -35,10 +35,15 @@ begin
   try
     Query.SQL('INSERT INTO venda_pag_antecipado( id_venda, id_empresa,                  ')
     .SQL(' id_formapgto, valor, data_hora, id_caixa, id_caixaitem,                      ')
-    .SQL(' observacao, id_usuario, id_situacao, b_taxa, valor_taxa, valor_prod)         ')
+    .SQL(' observacao, id_usuario, id_situacao, b_taxa, valor_taxa, valor_prod,         ')
+    .SQL(' hash_terminal, autorizacao, acquirerdocument)                                ')
     .SQL(' VALUES (:id_venda, :id_empresa, :id_formapgto, :valor, :data_hora,           ')
     .SQL(' :id_caixa, :id_caixaitem, :observacao, :id_usuario, :id_situacao, :b_taxa,   ')
-    .SQL(' :valor_taxa, :valor_prod)                                                    ')
+    .SQL(' :valor_taxa, :valor_prod, :hash_terminal, :autorizacao,                      ')
+    .SQL(' coalesce(nullif(:acquirerdocument, ' + QuotedStr('') + '),                   ')
+    .SQL('   (select formapgto.cnpjCred from formapgto                                  ')
+    .SQL('    where formapgto.emp_001 = :id_empresa and formapgto.for_001 = :id_formapgto), ')
+    .SQL('   ' + QuotedStr('') + '))                                                     ')
 
     .ParamAsInteger ('id_venda', AValue.idVenda)
     .ParamAsInteger ('id_empresa', FIdEmpresa)
@@ -53,6 +58,9 @@ begin
     .ParamAsBoolean('b_taxa', AValue.TaxaServico)
     .ParamAsCurrency ('valor_taxa', AValue.ValorTaxaServico)
     .ParamAsCurrency ('valor_prod', AValue.ValorProduto)
+    .ParamAsString('hash_terminal', AValue.hash_terminal)
+    .ParamAsString('autorizacao', AValue.autorizacao)
+    .ParamAsString('acquirerdocument', AValue.acquirerdocument)
     .ExecSQL;
     Commit;
   except
@@ -97,6 +105,9 @@ begin
       Result.TaxaServico                            := ADataSet.FieldByName('b_taxa').AsBoolean;
       Result.ValorTaxaServico                       := ADataSet.FieldByName('valor_taxa').AsCurrency;
       Result.ValorProduto                           := ADataSet.FieldByName('valor_prod').AsCurrency;
+      Result.hash_terminal                          := ADataSet.FieldByName('hash_terminal').AsString;
+      Result.autorizacao                            := ADataSet.FieldByName('autorizacao').AsString;
+      Result.acquirerdocument                       := ADataSet.FieldByName('acquirerdocument').AsString;
       if ADataSet.FieldByName('exibir_forma_app').AsBoolean then
       begin
         Result.formaPagamento.codigo                         := Result.idFormaPagamento;
@@ -153,7 +164,8 @@ begin
     .SQL('  formapgto.juros, formapgto.emite_fiscal, formapgto.exibir_forma_app,                                         ')
     .SQL('  venda_pag_antecipado.id_caixa, venda_pag_antecipado.id_caixaitem, venda_pag_antecipado.observacao,          ')
     .SQL('  venda_pag_antecipado.id_usuario,  venda_pag_antecipado.b_taxa, venda_pag_antecipado.valor_taxa,             ')
-    .SQL('  venda_pag_antecipado.valor_prod                                                                             ')
+    .SQL('  venda_pag_antecipado.valor_prod, venda_pag_antecipado.hash_terminal,                                        ')
+    .SQL('  venda_pag_antecipado.autorizacao, venda_pag_antecipado.acquirerdocument                                     ')
     .SQL('  from venda_pag_antecipado                                                                                   ')
     .SQL('  join formapgto on venda_pag_antecipado.id_formapgto = formapgto.for_001')
     .SQL('  and venda_pag_antecipado.id_empresa = formapgto.emp_001');

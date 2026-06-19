@@ -8,8 +8,10 @@ uses
   REST.Json,
   System.Classes,
   System.JSON,
-  System.SysUtils,
-  Winapi.Windows;
+  System.SysUtils
+{$IFDEF MSWINDOWS},
+  Winapi.Windows
+{$ENDIF};
 
 type
   TAPIRPCheffResources = class
@@ -82,7 +84,7 @@ begin
   FIMPRESSORA_ESPACOS := 0;
   FIMPRESSORA_COLUNAS := 32;
   FIMPRESSORA_LINHAS_PULO := 1;
-  FNFE_XML_CONFIGURACAO := ExtractFilePath(GetModuleName(HInstance)) + 'CONFIGURACAO.XML';
+  FNFE_XML_CONFIGURACAO := ExtractFilePath(ParamStr(0)) + 'CONFIGURACAO.XML';
   LoadConfig;
 end;
 
@@ -108,7 +110,7 @@ end;
 
 function TAPIRPCheffResources.ResourceFile: string;
 begin
-  Result := ChangeFileExt(GetModuleName(HInstance), '.json');
+  Result := ChangeFileExt(ParamStr(0), '.json');
   if not FileExists(Result) then
     SaveConfig(Result);
 end;
@@ -131,6 +133,7 @@ begin
 end;
 
 function TAPIRPCheffResources.VersaoSistema: string;
+{$IFDEF MSWINDOWS}
 const
   c_StringInfo = 'StringFileInfo\040904E4\FileVersion';
 var
@@ -160,6 +163,14 @@ begin
 
   Result := FVersaoSistema;
 end;
+{$ELSE}
+begin
+  if FVersaoSistema = EmptyStr then
+    FVersaoSistema := 'Linux';
+
+  Result := FVersaoSistema;
+end;
+{$ENDIF}
 
 initialization
   APP_RESOURCES := TAPIRPCheffResources.Create;

@@ -69,8 +69,10 @@ uses
   APIRPCheff.Service.Venda.Fechamento.Command.InserirMovimentoEstoqueOpcional,
   APIRPCheff.Service.Venda.Fechamento.Command.AtualizarSetorEstoque,
   APIRPCheff.Service.Venda.Fechamento.Command.MovimentaComposicao,
-  APIRPCheff.Service.Venda.Fechamento.Command.FinalizarVenda,
-  APIRPCheff.Service.Venda.Fechamento.Command.EmitirNota;
+  APIRPCheff.Service.Venda.Fechamento.Command.FinalizarVenda
+{$IFNDEF LINUX},
+  APIRPCheff.Service.Venda.Fechamento.Command.EmitirNota
+{$ENDIF};
 
 { TAPIRPCheffServiceVendaFechamento }
 

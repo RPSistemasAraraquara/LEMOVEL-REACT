@@ -1,0 +1,83 @@
+
+06-19 10:13:01.983   908  3268 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x60274c60 in tid 3268 (pcid-loc-api), pid 908 (xtra-daemon)
+06-19 10:31:23.511   800   800 I fam.Cache: dataGet - got data type 0x3 from cache: size 0x0, error 0x80015062.
+06-19 10:31:23.578   786  1597 D installd: hmac file, filePath:/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk
+06-19 10:31:24.673   786  1597 V installd: DexInv: --- BEGIN '/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk' ---
+06-19 10:31:24.916  4067  4067 I dex2oat : /apex/com.android.runtime/bin/dex2oat --input-vdex-fd=-1 --output-vdex-fd=10 --resolve-startup-const-strings=true --max-image-block-size=524288 --compiler-filter=speed-profile --classpath-dir=/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg== --class-loader-context=PCL[] --generate-mini-debug-info --compact-dex-level=none --compilation-reason=install
+06-19 10:31:43.894   786  1597 V installd: DexInv: --- END '/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk' (success) ---
+06-19 10:31:43.928   786  1597 D installd: hmac file, filePath:/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/oat/arm/base.art
+06-19 10:31:43.970   786  1597 D installd: hmac file, filePath:/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/oat/arm/base.odex
+06-19 10:31:44.003   786  1597 D installd: hmac file, filePath:/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/oat/arm/base.vdex
+06-19 10:31:44.810  2011  2011 D ImsResolver: maybeAddedImsService, packageName: br.com.sistemalechef.rpmobile
+06-19 10:31:45.273  4073  4131 E BackupHelper: java.io.FileNotFoundException: /data/user_de/0/com.android.permissioncontroller/files/delayed_restore_permissions.xml: open failed: ENOENT (No such file or directory)
+06-19 10:31:45.273  4073  4131 E BackupHelper: Caused by: android.system.ErrnoException: open failed: ENOENT (No such file or directory)
+06-19 10:32:00.197   622   622 E QTI PowerHAL: Error opening /sys/kernel/hbtp/display_pwr: No such file or directory
+06-19 10:32:07.175  4172  4172 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-19 10:32:07.232  4172  4172 I AndroidRuntime: Using default boot image
+06-19 10:32:07.232  4172  4172 I AndroidRuntime: Leaving lock profiling enabled
+06-19 10:32:08.119  4172  4172 D AndroidRuntime: Calling main entry com.android.commands.monkey.Monkey
+06-19 10:32:08.128  4172  4172 W Monkey  : args: [-p, br.com.sistemalechef.rpmobile, -c, android.intent.category.LAUNCHER, 1]
+06-19 10:32:08.131  4172  4172 W Monkey  :  arg: "br.com.sistemalechef.rpmobile"
+06-19 10:32:08.133  4172  4172 W Monkey  : data="br.com.sistemalechef.rpmobile"
+06-19 10:32:08.479  4172  4172 I AndroidRuntime: VM exiting with result code 0.
+06-19 10:32:09.050  4190  4190 W SoLoader: Recording new base apk path: /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk
+06-19 10:32:09.052  4190  4190 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk!/lib/armeabi-v7a]]
+06-19 10:32:09.096  4190  4190 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/lib/arm flags = 0]]
+06-19 10:32:09.445  4190  4215 D jni_lib_merge: Preparing to register libhermes_executor_so.  onload_func: 0x78818365
+06-19 10:32:09.445  4190  4215 D jni_lib_merge: Preparing to register libhermesinstancejni_so.  onload_func: 0x7881d349
+06-19 10:32:09.515  3283  3304 D MC HELPER: pid: 4190 pkgName: br.com.sistemalechef.rpmobile  Label: RPMOVEL
+06-19 10:32:10.611  4190  4216 I ReactNativeJS: Running "main"
+06-19 10:32:14.637  4190  4228 D ProfileInstaller: Installing profile for br.com.sistemalechef.rpmobile
+06-19 10:32:36.741  4229  4229 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-19 10:32:36.750  4229  4229 I AndroidRuntime: Using default boot image
+06-19 10:32:36.750  4229  4229 I AndroidRuntime: Leaving lock profiling enabled
+06-19 10:32:37.468  4229  4229 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-19 10:32:39.074  4229  4229 D AndroidRuntime: Shutting down VM
+06-19 10:33:10.128  4252  4252 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-19 10:33:10.150  4252  4252 I AndroidRuntime: Using default boot image
+06-19 10:33:10.151  4252  4252 I AndroidRuntime: Leaving lock profiling enabled
+06-19 10:33:10.702  4252  4252 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-19 10:33:12.053  4252  4252 D AndroidRuntime: Shutting down VM
+06-19 10:34:28.491  4290  4290 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-19 10:34:28.500  4290  4290 I AndroidRuntime: Using default boot image
+06-19 10:34:28.500  4290  4290 I AndroidRuntime: Leaving lock profiling enabled
+06-19 10:34:28.865  4290  4290 D AndroidRuntime: Calling main entry com.android.commands.monkey.Monkey
+06-19 10:34:28.867  4290  4290 W Monkey  : args: [-p, br.com.sistemalechef.rpmobile, -c, android.intent.category.LAUNCHER, 1]
+06-19 10:34:28.869  4290  4290 W Monkey  :  arg: "br.com.sistemalechef.rpmobile"
+06-19 10:34:28.872  4290  4290 W Monkey  : data="br.com.sistemalechef.rpmobile"
+06-19 10:34:29.155  4290  4290 I AndroidRuntime: VM exiting with result code 0.
+06-19 10:34:29.755  4307  4307 W SoLoader: Recording new base apk path: /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk
+06-19 10:34:29.757  4307  4307 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/base.apk!/lib/armeabi-v7a]]
+06-19 10:34:29.804  4307  4307 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/br.com.sistemalechef.rpmobile-fMOkTQelkN47DMU8L5oDeg==/lib/arm flags = 0]]
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing to register libhermes_executor_so.  onload_func: 0x7881b365
+06-19 10:34:30.172  4307  4332 D jni_lib_merge: Preparing to register libhermesinstancejni_so.  onload_func: 0x78820349
+06-19 10:34:30.211  3283  3304 D MC HELPER: pid: 4307 pkgName: br.com.sistemalechef.rpmobile  Label: RPMOVEL
+06-19 10:34:31.284  4307  4333 I ReactNativeJS: Running "main"
+06-19 10:34:36.020  4307  4344 D ProfileInstaller: Skipping profile installation for br.com.sistemalechef.rpmobile
+06-19 10:34:39.352   541  1047 E Netd    : Error deleting route 2804:7f0:6540:20ca::/64 -> fe80::860b:bbff:fe91:2770 wlan0 to table 1028: No such process
+06-19 10:34:39.355   541  1047 I netd    : networkRemoveRoute(102, "wlan0", "2804:7f0:6540:20ca::/64", "fe80::860b:bbff:fe91:2770") -> ServiceSpecificException(3, "No such process") <0.70ms>
+06-19 10:34:43.085  2217  2217 E wpa_supplicant: nl80211: Set scan default IEs failed: ret=-524 (Unknown error 524)
+06-19 10:34:43.531   625   625 E WifiHAL : wifi_get_packet_filter_capabilities: requestResponse() error: -3
+06-19 10:34:43.587   541  1052 I netd    : networkAddInterface(103, "wlan0") -> ServiceSpecificException(64, "Machine is not on the network") <0.11ms>
+06-19 10:34:43.588   541  1052 I netd    : networkAddRoute(103, "wlan0", "fe80::/64", "") -> ServiceSpecificException(64, "Machine is not on the network") <0.07ms>
+06-19 10:34:43.896   541  1047 I netd    : networkAddRoute(103, "wlan0", "::/0", "fe80::860b:bbff:fe8f:b4e8") -> ServiceSpecificException(64, "Machine is not on the network") <0.10ms>
+06-19 10:34:43.897   541  1047 I netd    : networkAddRoute(103, "wlan0", "2804:7f0:6540:1bb1::/64", "fe80::860b:bbff:fe8f:b4e8") -> ServiceSpecificException(64, "Machine is not on the network") <0.09ms>
+06-19 10:34:43.972   541  1047 I netd    : networkAddRoute(103, "wlan0", "2804:7f0:6540:1bb1::/64", "") -> ServiceSpecificException(64, "Machine is not on the network") <0.31ms>
+06-19 10:34:44.056   541  1047 I netd    : setResolverConfiguration() -> ServiceSpecificException(64, "Machine is not on the network") <0.29ms>
+06-19 10:34:44.201   541  1047 E Netd    : Error adding route 2804:7f0:6540:1bb1::/64 -> (null) wlan0 to table 1028: File exists
+06-19 10:34:44.202   541  1047 E Netd    : Error adding route ::/0 -> fe80::860b:bbff:fe8f:b4e8 wlan0 to table 1028: File exists
+06-19 10:34:44.204   541  1047 E Netd    : Error adding route 2804:7f0:6540:1bb1::/64 -> fe80::860b:bbff:fe8f:b4e8 wlan0 to table 1028: File exists
+06-19 10:34:44.482   541  4392 W DnsTlsSocket: SSL_connect error 5, errno=111
+06-19 10:34:45.535   541  4415 W DnsTlsSocket: SSL_connect error 5, errno=111
+06-19 10:35:00.596  4449  4449 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-19 10:35:00.662  4449  4449 I AndroidRuntime: Using default boot image
+06-19 10:35:00.662  4449  4449 I AndroidRuntime: Leaving lock profiling enabled
+06-19 10:35:01.542  4449  4449 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-19 10:35:03.134  4449  4449 D AndroidRuntime: Shutting down VM
+06-19 10:35:10.183  1885  4381 E ComBTService: CheckConnectdSsidIsDockerThread_DX8  Exception e, cnt:12
+06-19 10:35:10.183  1885  4381 W System.err: java.io.FileNotFoundException: http://192.168.15.1/wifibase/getParam
+06-19 10:35:12.232  1885  4381 E ComBTService: CheckConnectdSsidIsDockerThread_DX8  Exception e, cnt:13
+06-19 10:35:12.232  1885  4381 W System.err: java.io.FileNotFoundException: http://192.168.15.1/wifibase/getParam
+06-19 10:35:14.283  1885  4381 E ComBTService: CheckConnectdSsidIsDockerThread_DX8  Exception e, cnt:14
+06-19 10:35:14.283  1885  4381 W System.err: java.io.FileNotFoundException: http://192.168.15.1/wifibase/getParam
+

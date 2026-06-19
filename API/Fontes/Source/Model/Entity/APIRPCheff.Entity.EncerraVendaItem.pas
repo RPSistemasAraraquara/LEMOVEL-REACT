@@ -17,6 +17,9 @@ type
     FtrocoDinheiro  : Currency;
     FnovaVenda      : Boolean;
     FformaPagamento : TAPIRPCheffEntityFormaPagamento;
+    FHashTerminal   : string;
+    FAutorizacao    : string;
+    FAcquirerDocument: string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -31,6 +34,9 @@ type
     property trocoDinheiro  : Currency                             read FtrocoDinheiro  write FtrocoDinheiro;
     property novaVenda      : Boolean                              read FnovaVenda           write FnovaVenda;
     property formaPagamento : TAPIRPCheffEntityFormaPagamento      read FformaPagamento;
+    property hash_terminal  : string                               read FHashTerminal   write FHashTerminal;
+    property autorizacao    : string                               read FAutorizacao    write FAutorizacao;
+    property acquirerdocument: string                              read FAcquirerDocument write FAcquirerDocument;
   end;
 
 implementation

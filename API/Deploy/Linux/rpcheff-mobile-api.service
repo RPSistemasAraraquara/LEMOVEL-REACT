@@ -1,0 +1,15 @@
+[Unit]
+Description=RPCheff Mobile API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rpcheff-mobile-api
+ExecStart=/opt/rpcheff-mobile-api/RPCheffGarcomAPILinux
+Restart=always
+RestartSec=5
+User=rpcheff
+Group=rpcheff
+
+[Install]
+WantedBy=multi-user.target

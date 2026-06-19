@@ -66,8 +66,8 @@ begin
       Result.idEmpresa := ADataSet.FieldByName('emp_001').AsInteger;
       Result.idComanda := ADataSet.FieldByName('com_001').AsInteger;
       Result.descricao := ADataSet.FieldByName('com_002').AsString;
-      Result.numero := ADataSet.FieldByName('com_003').AsString;
-      Result.idVenda := ADataSet.FieldByName('ven_001').AsInteger;
+      Result.numero    := ADataSet.FieldByName('com_003').AsString;
+      Result.idVenda   := ADataSet.FieldByName('ven_001').AsInteger;
     except
       Result.Free;
       raise;

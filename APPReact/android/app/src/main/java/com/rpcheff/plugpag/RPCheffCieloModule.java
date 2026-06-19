@@ -2,6 +2,7 @@ package com.rpcheff.plugpag;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -24,6 +25,7 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 
 import org.json.JSONArray;
@@ -42,6 +44,8 @@ import java.util.Locale;
 public class RPCheffCieloModule extends ReactContextBaseJavaModule implements ActivityEventListener {
   private static final String ORDERPAY_CALLBACK = "orderpay://response";
   private static final String PRINT_CALLBACK = "print://response";
+  private static final String CIELO_PRODUCTS_URI = "content://cielo.products.consult.provider/productInfo";
+  private static final String CIELO_PRODUCTS_COLUMN = "PRODUCTS_DATA";
   private static final String DEFAULT_ACCESS_TOKEN = "u8JCKBRu0lCQ5Bmf33qll9G3bqMe1PUKEVPIVXrN6j3ASG5Lho";
   private static final String DEFAULT_CLIENT_ID = "gN5rjqQSVx77WLk8Y3lnIh5e1D81Znft2wPoHmfcbSzOtPwgUp";
   private static final String DEFAULT_EMAIL = "rafael@rpsistema.com.br";
@@ -96,6 +100,19 @@ public class RPCheffCieloModule extends ReactContextBaseJavaModule implements Ac
   @Override
   public String getName() {
     return "RPCheffCielo";
+  }
+
+  @ReactMethod
+  public void getEnabledPaymentProducts(Promise promise) {
+    try {
+      promise.resolve(readEnabledPaymentProducts());
+    } catch (Throwable error) {
+      promise.reject(
+        "CIELO_PRODUCTS_ERROR",
+        error.getMessage() == null ? "Falha ao consultar formas habilitadas na Cielo." : error.getMessage(),
+        error
+      );
+    }
   }
 
   @ReactMethod
@@ -308,6 +325,137 @@ public class RPCheffCieloModule extends ReactContextBaseJavaModule implements Ac
     }
 
     return "CIELO-" + System.currentTimeMillis();
+  }
+
+  private WritableArray readEnabledPaymentProducts() throws JSONException {
+    WritableArray result = Arguments.createArray();
+    Uri uri = Uri.parse(CIELO_PRODUCTS_URI);
+
+    try (Cursor cursor = getReactApplicationContext().getContentResolver().query(uri, null, null, null, null)) {
+      if (cursor == null || !cursor.moveToFirst()) {
+        return result;
+      }
+
+      int columnIndex = cursor.getColumnIndex(CIELO_PRODUCTS_COLUMN);
+      if (columnIndex < 0) {
+        return result;
+      }
+
+      String productsData = safe(cursor.getString(columnIndex));
+      if (productsData.isEmpty()) {
+        return result;
+      }
+
+      appendEnabledProducts(result, new JSONArray(productsData));
+    }
+
+    return result;
+  }
+
+  private void appendEnabledProducts(WritableArray result, JSONArray products) throws JSONException {
+    for (int i = 0; i < products.length(); i++) {
+      JSONObject primary = products.optJSONObject(i);
+      if (primary == null) {
+        continue;
+      }
+
+      String primaryCode = safe(primary.optString("code", ""));
+      String primaryName = safe(primary.optString("name", ""));
+      JSONArray secondaryProducts = primary.optJSONArray("secondaryProducts");
+
+      if (secondaryProducts == null || secondaryProducts.length() == 0) {
+        addEnabledProduct(result, primaryCode, "", primaryName, "");
+        continue;
+      }
+
+      for (int j = 0; j < secondaryProducts.length(); j++) {
+        JSONObject secondary = secondaryProducts.optJSONObject(j);
+        if (secondary == null) {
+          continue;
+        }
+
+        addEnabledProduct(
+          result,
+          primaryCode,
+          safe(secondary.optString("code", "")),
+          primaryName,
+          safe(secondary.optString("name", ""))
+        );
+      }
+    }
+  }
+
+  private void addEnabledProduct(
+    WritableArray result,
+    String primaryCode,
+    String secondaryCode,
+    String primaryName,
+    String secondaryName
+  ) {
+    WritableMap item = Arguments.createMap();
+    String paymentCode = mapProductToPaymentCode(primaryCode, secondaryCode, primaryName, secondaryName);
+
+    item.putString("primaryCode", primaryCode);
+    item.putString("secondaryCode", secondaryCode);
+    item.putString("primaryName", primaryName);
+    item.putString("secondaryName", secondaryName);
+    item.putString("label", buildProductLabel(primaryName, secondaryName));
+    if (!paymentCode.isEmpty()) {
+      item.putString("paymentCode", paymentCode);
+    }
+
+    result.pushMap(item);
+  }
+
+  private String buildProductLabel(String primaryName, String secondaryName) {
+    if (primaryName.isEmpty()) return secondaryName;
+    if (secondaryName.isEmpty()) return primaryName;
+    return primaryName + "/" + secondaryName;
+  }
+
+  private String mapProductToPaymentCode(String primaryCode, String secondaryCode, String primaryName, String secondaryName) {
+    String primary = safe(primaryCode);
+    String secondary = safe(secondaryCode);
+
+    if (primary.equals("1000")) {
+      if (secondary.equals("1")) return "CREDITO_AVISTA";
+      if (secondary.equals("2")) return "CREDITO_PARCELADO_LOJA";
+      if (secondary.equals("3")) return "CREDITO_PARCELADO_ADM";
+      if (secondary.equals("5")) return "PRE_AUTORIZACAO";
+      if (secondary.equals("6")) return "CREDITO_PARCELADO_BNCO";
+      if (secondary.equals("7")) return "CREDITO_CREDIARIO_CREDITO";
+    }
+
+    if (primary.equals("2000")) {
+      if (secondary.equals("1")) return "DEBITO_AVISTA";
+      if (secondary.equals("4")) return "DEBITO_PAGTO_FATURA_DEBITO";
+    }
+
+    if (primary.equals("3000")) {
+      if (secondary.equals("1")) return "VOUCHER_REFEICAO";
+      if (secondary.equals("2")) return "VOUCHER_ALIMENTACAO";
+      if (secondary.equals("3")) return "VOUCHER_AUTOMOTIVO";
+      if (secondary.equals("4")) return "VOUCHER_CULTURA";
+      if (secondary.equals("5")) return "VOUCHER_PEDAGIO";
+      if (secondary.equals("6")) return "VOUCHER_BENEFICIOS";
+      if (secondary.equals("7")) return "VOUCHER_AUTO";
+      if (secondary.equals("8")) return "VOUCHER_CONSULTA_SALDO";
+      if (secondary.equals("9")) return "VOUCHER_VALE_PEDAGIO";
+    }
+
+    if (primary.equals("25")) {
+      return "PIX";
+    }
+
+    String normalizedPrimary = safeUpper(primaryName);
+    String normalizedSecondary = safeUpper(secondaryName);
+    if (normalizedPrimary.contains("PIX")) return "PIX";
+    if (normalizedPrimary.contains("DEBITO") && normalizedSecondary.contains("VISTA")) return "DEBITO_AVISTA";
+    if (normalizedPrimary.contains("CREDITO") && normalizedSecondary.contains("VISTA")) return "CREDITO_AVISTA";
+    if (normalizedPrimary.contains("VOUCHER") && normalizedSecondary.contains("REFEICAO")) return "VOUCHER_REFEICAO";
+    if (normalizedPrimary.contains("VOUCHER") && normalizedSecondary.contains("ALIMENTACAO")) return "VOUCHER_ALIMENTACAO";
+
+    return "";
   }
 
   private String resolvePaymentCode(ReadableMap payload) {

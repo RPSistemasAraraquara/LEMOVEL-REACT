@@ -38,6 +38,9 @@ type PaymentLine = {
   sfiCodigo?: number;
   provider?: string;
   nsu?: string;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 type DiscountInputMode = 'value' | 'percent';
 
@@ -540,7 +543,10 @@ export const SaleClosureScreen: React.FC = () => {
         processed: false,
         provider: undefined,
         sfiCodigo: undefined,
-        nsu: undefined
+        nsu: undefined,
+        hash_terminal: undefined,
+        autorizacao: undefined,
+        acquirerdocument: undefined
       };
       return next;
     });
@@ -556,7 +562,10 @@ export const SaleClosureScreen: React.FC = () => {
         processed: false,
         provider: undefined,
         sfiCodigo: undefined,
-        nsu: undefined
+        nsu: undefined,
+        hash_terminal: undefined,
+        autorizacao: undefined,
+        acquirerdocument: undefined
       };
       return next;
     });
@@ -860,7 +869,10 @@ export const SaleClosureScreen: React.FC = () => {
           codigo: Number(item.codigo || 0),
           valor: parseMoney(item.valor),
           processed: Boolean(item.processed),
-          sfiCodigo: item.sfiCodigo
+          sfiCodigo: item.sfiCodigo,
+          hash_terminal: item.hash_terminal,
+          autorizacao: item.autorizacao,
+          acquirerdocument: item.acquirerdocument
         }))
         .filter((item) => item.codigo > 0 && item.valor > 0);
 
@@ -889,7 +901,14 @@ export const SaleClosureScreen: React.FC = () => {
         return;
       }
 
-      const aprovados: Array<{ idFormaPgto: number; valor: number; sfiCodigo?: number }> = [];
+      const aprovados: Array<{
+        idFormaPgto: number;
+        valor: number;
+        sfiCodigo?: number;
+        hash_terminal?: string;
+        autorizacao?: string;
+        acquirerdocument?: string;
+      }> = [];
       for (const linha of linhasBase) {
         const formaSelecionada = methods.find((item) => item.codigo === linha.codigo);
         if (!formaSelecionada) {
@@ -913,7 +932,10 @@ export const SaleClosureScreen: React.FC = () => {
           aprovados.push({
             idFormaPgto: linha.codigo,
             valor: linha.valor,
-            sfiCodigo: linha.sfiCodigo ?? formaSelecionada.sfiCodigo
+            sfiCodigo: linha.sfiCodigo ?? formaSelecionada.sfiCodigo,
+            hash_terminal: linha.hash_terminal,
+            autorizacao: linha.autorizacao,
+            acquirerdocument: linha.acquirerdocument
           });
           continue;
         }
@@ -936,7 +958,10 @@ export const SaleClosureScreen: React.FC = () => {
         aprovados.push({
           idFormaPgto: pagamentoProcessado.method.codigo,
           valor: linha.valor,
-          sfiCodigo: pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo
+          sfiCodigo: pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo,
+          hash_terminal: pagamentoProcessado.hash_terminal,
+          autorizacao: pagamentoProcessado.autorizacao,
+          acquirerdocument: pagamentoProcessado.acquirerdocument
         });
       }
 
@@ -964,15 +989,12 @@ export const SaleClosureScreen: React.FC = () => {
         return;
       }
 
-      const totalPorForma = new Map<number, number>();
-      aprovados.forEach((item) => {
-        const current = totalPorForma.get(item.idFormaPgto) || 0;
-        totalPorForma.set(item.idFormaPgto, current + item.valor);
-      });
-
-      const linhas = Array.from(totalPorForma.entries()).map(([idFormaPgto, valor]) => ({
-        idFormaPgto,
-        valor
+      const linhas = aprovados.map((item) => ({
+        idFormaPgto: item.idFormaPgto,
+        valor: item.valor,
+        hash_terminal: item.hash_terminal,
+        autorizacao: item.autorizacao,
+        acquirerdocument: item.acquirerdocument
       }));
 
       const valorTaxaServico = effectiveTaxaServico;
@@ -1170,7 +1192,10 @@ export const SaleClosureScreen: React.FC = () => {
           processed: false,
           provider: undefined,
           sfiCodigo: undefined,
-          nsu: undefined
+          nsu: undefined,
+          hash_terminal: undefined,
+          autorizacao: undefined,
+          acquirerdocument: undefined
         };
         return next;
       });
@@ -1233,7 +1258,10 @@ export const SaleClosureScreen: React.FC = () => {
           processed: true,
           provider: pagamentoProcessado.provider,
           sfiCodigo: processedSfiCodigo,
-          nsu: pagamentoProcessado.nsu
+          nsu: pagamentoProcessado.nsu,
+          hash_terminal: pagamentoProcessado.hash_terminal,
+          autorizacao: pagamentoProcessado.autorizacao,
+          acquirerdocument: pagamentoProcessado.acquirerdocument
         };
         const duplicateProcessedIndex = next.findIndex(
           (item, idx) =>

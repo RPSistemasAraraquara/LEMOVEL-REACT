@@ -44,16 +44,16 @@ begin
   begin
     Result := TAPIRPCheffEntityConfiguracaoComanda.Create;
     try
-      Result.idEmpresa := ADataSet.FieldByName('emp_001').AsInteger;
-      Result.tempoConsumo := ADataSet.FieldByName('tempo_consumo_comanda').AsInteger;
-      Result.utilizaTaxaServico := ADataSet.FieldByName('taxa_adicional_comanda').AsBoolean;
-      Result.percentualTaxaServico := ADataSet.FieldByName('taxa_servico_comanda').AsCurrency;
-      Result.utilizaCouvert := ADataSet.FieldByName('couvert_comanda').AsBoolean;
-      Result.couvertObrigatorio := ADataSet.FieldByName('couvert_obrig_comanda').AsBoolean;
-      Result.valorCouvertMasculino := ADataSet.FieldByName('valor_couvert_masc_comanda').AsCurrency;
-      Result.valorCouvertFeminino := ADataSet.FieldByName('valor_couvert_fem_comanda').AsCurrency;
-      Result.utilizaConsumacaoMinima := ADataSet.FieldByName('consumacao_comanda').AsBoolean;
-      Result.consumacaoMinima := ADataSet.FieldByName('consumacao_minima_comanda').AsCurrency;
+      Result.idEmpresa                 := ADataSet.FieldByName('emp_001').AsInteger;
+      Result.tempoConsumo              := ADataSet.FieldByName('tempo_consumo_comanda').AsInteger;
+      Result.utilizaTaxaServico        := ADataSet.FieldByName('taxa_adicional_comanda').AsBoolean;
+      Result.percentualTaxaServico     := ADataSet.FieldByName('taxa_servico_comanda').AsCurrency;
+      Result.utilizaCouvert            := ADataSet.FieldByName('couvert_comanda').AsBoolean;
+      Result.couvertObrigatorio        := ADataSet.FieldByName('couvert_obrig_comanda').AsBoolean;
+      Result.valorCouvertMasculino     := ADataSet.FieldByName('valor_couvert_masc_comanda').AsCurrency;
+      Result.valorCouvertFeminino      := ADataSet.FieldByName('valor_couvert_fem_comanda').AsCurrency;
+      Result.utilizaConsumacaoMinima   := ADataSet.FieldByName('consumacao_comanda').AsBoolean;
+      Result.consumacaoMinima          := ADataSet.FieldByName('consumacao_minima_comanda').AsCurrency;
       Result.permiteTrocoTodasAsFormas := ADataSet.FieldByName('b_permite_troco_todas_formas').AsBoolean;
     except
       Result.Free;

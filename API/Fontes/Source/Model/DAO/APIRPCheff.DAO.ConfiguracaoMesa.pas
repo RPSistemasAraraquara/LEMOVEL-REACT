@@ -44,16 +44,16 @@ begin
   begin
     Result := TAPIRPCheffEntityConfiguracaoMesa.Create;
     try
-      Result.idEmpresa := ADataSet.FieldByName('emp_001').AsInteger;
-      Result.tempoConsumo := ADataSet.FieldByName('tempo_consumo_mesa').AsInteger;
-      Result.utilizaTaxaServico := ADataSet.FieldByName('taxa_adicional_mesa').AsBoolean;
-      Result.percentualTaxaServico := ADataSet.FieldByName('taxa_servico_mesa').AsCurrency;
-      Result.utilizaCouvert := ADataSet.FieldByName('couvert_mesa').AsBoolean;
-      Result.couvertObrigatorio := ADataSet.FieldByName('couvert_obrig_mesa').AsBoolean;
-      Result.valorCouvertMasculino := ADataSet.FieldByName('valor_couvert_masc_mesa').AsCurrency;
-      Result.valorCouvertFeminino := ADataSet.FieldByName('valor_couvert_fem_mesa').AsCurrency;
-      Result.utilizaConsumacaoMinima := ADataSet.FieldByName('consumacao_mesa').AsBoolean;
-      Result.consumacaoMinima := ADataSet.FieldByName('consumacao_minima_mesa').AsCurrency;
+      Result.idEmpresa                 := ADataSet.FieldByName('emp_001').AsInteger;
+      Result.tempoConsumo              := ADataSet.FieldByName('tempo_consumo_mesa').AsInteger;
+      Result.utilizaTaxaServico        := ADataSet.FieldByName('taxa_adicional_mesa').AsBoolean;
+      Result.percentualTaxaServico     := ADataSet.FieldByName('taxa_servico_mesa').AsCurrency;
+      Result.utilizaCouvert            := ADataSet.FieldByName('couvert_mesa').AsBoolean;
+      Result.couvertObrigatorio        := ADataSet.FieldByName('couvert_obrig_mesa').AsBoolean;
+      Result.valorCouvertMasculino     := ADataSet.FieldByName('valor_couvert_masc_mesa').AsCurrency;
+      Result.valorCouvertFeminino      := ADataSet.FieldByName('valor_couvert_fem_mesa').AsCurrency;
+      Result.utilizaConsumacaoMinima   := ADataSet.FieldByName('consumacao_mesa').AsBoolean;
+      Result.consumacaoMinima          := ADataSet.FieldByName('consumacao_minima_mesa').AsCurrency;
       Result.permiteTrocoTodasAsFormas := ADataSet.FieldByName('b_permite_troco_todas_formas').AsBoolean;
     except
       Result.Free;

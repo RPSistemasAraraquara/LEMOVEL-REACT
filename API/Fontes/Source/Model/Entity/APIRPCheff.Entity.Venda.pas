@@ -44,8 +44,8 @@ type
     FtotalPrePago            : Currency;
     Fitens                   : TObjectList<TAPIRPCheffEntityVendaItem>;
     FidUsuarioPreFechamento  : Integer;
-    FCobrarTaxaGarcom        :Boolean;
-    FchaveEletronica: string;
+    FCobrarTaxaGarcom        : Boolean;
+    FchaveEletronica         : string;
     function GetValorTotal   : Currency;
     function GetTotalCredito : Currency;
   public
@@ -90,9 +90,8 @@ type
     property totalCredito           : Currency read GetTotalCredito;
     property cliente                : TAPIRPCheffEntityCliente read Fcliente write Fcliente;
     property itens                  : TObjectList<TAPIRPCheffEntityVendaItem> read Fitens write Fitens;
-    property CobrarTaxaGarcom       : boolean read FCobrarTaxaGarcom write FCobrarTaxaGarcom;
-    property chaveEletronica: string read FchaveEletronica write FchaveEletronica;
-
+    property CobrarTaxaGarcom       : boolean  read FCobrarTaxaGarcom write FCobrarTaxaGarcom;
+    property chaveEletronica        : string   read FchaveEletronica write FchaveEletronica;
   end;
 
   TAPIRPCheffEntityVendaPatchCouvert = class
@@ -167,12 +166,18 @@ type
     FidFormaPgto: Integer;
     Fvalor: Currency;
     FformaPagamento: TAPIRPCheffEntityFormaPagamento;
+    FHashTerminal: string;
+    FAutorizacao: string;
+    FAcquirerDocument: string;
   public
     constructor Create;
     destructor Destroy; override;
 
     property idFormaPgto: Integer read FidFormaPgto write FidFormaPgto;
     property valor: Currency read Fvalor write Fvalor;
+    property hash_terminal: string read FHashTerminal write FHashTerminal;
+    property autorizacao: string read FAutorizacao write FAutorizacao;
+    property acquirerdocument: string read FAcquirerDocument write FAcquirerDocument;
 
     [SwagIgnore]
     property formaPagamento: TAPIRPCheffEntityFormaPagamento read FformaPagamento;

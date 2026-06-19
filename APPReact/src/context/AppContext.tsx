@@ -13,6 +13,7 @@ import {
   logSyncDiagnostic,
   MobileAppSettings,
   MenuItem,
+  normalizeMobileBaseUrl,
   OPENING_SETTINGS_CONFLICT_MESSAGE,
   saveMobileSettings,
   TableOrder,
@@ -176,12 +177,7 @@ const normalizeAndroidLocalhost = (baseUrl: string) => {
 };
 
 const normalizeBaseUrl = (value: string) => {
-  const trimmed = value.trim().replace(/\/+$/, '');
-  if (!trimmed) return defaultMobileSettings.baseUrl;
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-  return `http://${trimmed}`;
+  return normalizeMobileBaseUrl(value);
 };
 const AUTO_REFRESH_INTERVAL_MS = 7000;
 const AUTO_REFRESH_THROTTLE_MS = 1200;

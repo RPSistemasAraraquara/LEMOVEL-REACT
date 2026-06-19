@@ -5,16 +5,20 @@ interface
 uses
   System.SysUtils,
   System.Classes,
-  System.TypInfo,
+  System.TypInfo
+{$IFDEF MSWINDOWS},
   ACBrDevice,
   ACBrWinUSBDevice,
-  ACBrPosPrinter,
+  ACBrPosPrinter
+{$ENDIF},
   APIRPCheff.Resources;
 
 type
   TAPIRPCheffComponentsImpressora = class
   private
+{$IFDEF MSWINDOWS}
     FPrinter: TACBrPosPrinter;
+{$ENDIF}
 
     procedure ValidarImpressora;
 
@@ -41,6 +45,7 @@ implementation
 function TAPIRPCheffComponentsImpressora.Ativar: TAPIRPCheffComponentsImpressora;
 begin
   Result := Self;
+{$IFDEF MSWINDOWS}
   try
     FPrinter.Ativar;
   except
@@ -50,13 +55,20 @@ begin
       raise;
     end;
   end;
+{$ENDIF}
 end;
 
 function TAPIRPCheffComponentsImpressora.Configurar: TAPIRPCheffComponentsImpressora;
+{$IFDEF MSWINDOWS}
 var
   PaginaCodigo: TACBrPosPaginaCodigo;
+{$ENDIF}
 begin
   Result := Self;
+{$IFNDEF MSWINDOWS}
+  Exit;
+{$ENDIF}
+{$IFDEF MSWINDOWS}
   Desativar;
 
   FPrinter.Porta := APP_RESOURCES.IMPRESSORA_PORTA;
@@ -92,26 +104,36 @@ begin
     on E: Exception do
       raise Exception.Create('Erro ao ativar impressora: ' + E.Message);
   end;
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ListarCodigosPagina(AList: TStrings);
+{$IFDEF MSWINDOWS}
 var
   LCodigo: TACBrPosPaginaCodigo;
+{$ENDIF}
 begin
   AList.Clear;
+{$IFDEF MSWINDOWS}
   for LCodigo := Low(TACBrPosPaginaCodigo) to High(TACBrPosPaginaCodigo) do
     AList.Add(GetEnumName(TypeInfo(TACBrPosPaginaCodigo), Integer(LCodigo)));
+{$ELSE}
+  AList.Add('pc850');
+{$ENDIF}
 end;
 
 constructor TAPIRPCheffComponentsImpressora.Create;
 begin
+{$IFDEF MSWINDOWS}
   FPrinter := TACBrPosPrinter.Create(nil);
+{$ENDIF}
 end;
 
 function TAPIRPCheffComponentsImpressora.Desativar: TAPIRPCheffComponentsImpressora;
 begin
+  Result := Self;
+{$IFDEF MSWINDOWS}
   try
-    Result := Self;
     if FPrinter.Ativo then
       FPrinter.Desativar;
   except
@@ -121,16 +143,23 @@ begin
       raise;
     end;
   end;
+{$ENDIF}
 end;
 
 destructor TAPIRPCheffComponentsImpressora.Destroy;
 begin
+{$IFDEF MSWINDOWS}
   FreeAndNil(FPrinter);
+{$ENDIF}
   inherited;
 end;
 
 procedure TAPIRPCheffComponentsImpressora.Imprimir(AConteudo: string);
 begin
+{$IFNDEF MSWINDOWS}
+  raise Exception.Create('Impressao local indisponivel no build Linux da API.');
+{$ENDIF}
+{$IFDEF MSWINDOWS}
   ValidarImpressora;
   if not FPrinter.Ativo then
   begin
@@ -143,6 +172,7 @@ begin
     FPrinter.Buffer.SaveToFile('impressao.txt')
   else
     FPrinter.Imprimir;
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ImprimirTeste;
@@ -190,39 +220,55 @@ end;
 procedure TAPIRPCheffComponentsImpressora.ListarPortasUSB(AList: TStrings);
 begin
   AList.Clear;
+{$IFDEF MSWINDOWS}
   FPrinter.Device.AcharPortasSeriais(AList);
-  {$IfDef MSWINDOWS}
-    FPrinter.Device.AcharPortasUSB(AList);
-  {$EndIf}
+  FPrinter.Device.AcharPortasUSB(AList);
   FPrinter.Device.AcharPortasRAW(AList);
+{$ELSE}
+  AList.Add('NULL');
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ListarBluetooths(AList: TStrings);
 begin
   AList.Clear;
+{$IFDEF MSWINDOWS}
   try
     FPrinter.Device.AcharPortasBlueTooth(AList);
   except
   end;
+{$ENDIF}
   AList.Add('NULL');
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ListarCodigoPagina(AList: TStrings);
+{$IFDEF MSWINDOWS}
 var
   LCodigo: TACBrPosPaginaCodigo;
+{$ENDIF}
 begin
   AList.Clear;
+{$IFDEF MSWINDOWS}
   for LCodigo := Low(TACBrPosPaginaCodigo) to High(TACBrPosPaginaCodigo) do
     AList.Add(GetEnumName(TypeInfo(TACBrPosPaginaCodigo), Integer(LCodigo)));
+{$ELSE}
+  AList.Add('pc850');
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ListarModelos(AList: TStrings);
+{$IFDEF MSWINDOWS}
 var
   LModelo: TACBrPosPrinterModelo;
+{$ENDIF}
 begin
   AList.Clear;
+{$IFDEF MSWINDOWS}
   for LModelo := Low(TACBrPosPrinterModelo) to High(TACBrPosPrinterModelo) do
     AList.Add(GetEnumName(TypeInfo(TACBrPosPrinterModelo), Integer(LModelo)));
+{$ELSE}
+  AList.Add('ppTexto');
+{$ENDIF}
 end;
 
 procedure TAPIRPCheffComponentsImpressora.ValidarImpressora;

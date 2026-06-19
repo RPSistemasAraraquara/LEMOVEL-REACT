@@ -35,11 +35,13 @@ implementation
 uses
   APIRPCheff.DAO.Factory,
   System.Math,
-  System.NetEncoding,
+  System.NetEncoding
+{$IFDEF MSWINDOWS},
   Vcl.Graphics,
   Vcl.Imaging.jpeg,
   Vcl.Imaging.pngimage,
-  Vcl.Imaging.GIFImg;
+  Vcl.Imaging.GIFImg
+{$ENDIF};
 
 
 function TAPIRPCheffDAOProduto.ExibirImagem(AValue: Boolean): TAPIRPCheffDAOProduto;
@@ -49,6 +51,7 @@ begin
 end;
 
 function TAPIRPCheffDAOProduto.CompactarImagemJpeg(const ABytes: TBytes): TMemoryStream;
+{$IFDEF MSWINDOWS}
 const
   MAX_DIMENSION = 220;
   JPEG_QUALITY = 60;
@@ -140,6 +143,55 @@ begin
     LInputStream.Free;
   end;
 end;
+{$ELSE}
+var
+  LOutputStream: TMemoryStream;
+begin
+  Result := nil;
+  if Length(ABytes) = 0 then
+    Exit;
+
+  LOutputStream := TMemoryStream.Create;
+  try
+    LOutputStream.WriteBuffer(ABytes[0], Length(ABytes));
+    LOutputStream.Position := 0;
+    Result := LOutputStream;
+    LOutputStream := nil;
+  finally
+    LOutputStream.Free;
+  end;
+end;
+{$ENDIF}
+
+function DetectarMimeImagem(const ABytes: TBytes): string;
+begin
+  Result := 'application/octet-stream';
+  if Length(ABytes) < 2 then
+    Exit;
+
+  if (Length(ABytes) >= 8) and
+     (ABytes[0] = $89) and
+     (ABytes[1] = $50) and
+     (ABytes[2] = $4E) and
+     (ABytes[3] = $47) then
+    Exit('image/png');
+
+  if (Length(ABytes) >= 3) and
+     (ABytes[0] = $FF) and
+     (ABytes[1] = $D8) and
+     (ABytes[2] = $FF) then
+    Exit('image/jpeg');
+
+  if (Length(ABytes) >= 4) and
+     (ABytes[0] = Ord('G')) and
+     (ABytes[1] = Ord('I')) and
+     (ABytes[2] = Ord('F')) and
+     (ABytes[3] = Ord('8')) then
+    Exit('image/gif');
+
+  if (ABytes[0] = Ord('B')) and (ABytes[1] = Ord('M')) then
+    Exit('image/bmp');
+end;
 
 
 function TAPIRPCheffDAOProduto.CompactarImagemBase64(const ABytes: TBytes): string;
@@ -161,7 +213,11 @@ begin
     if LOutputStream.Size > 0 then
       LOutputStream.ReadBuffer(LEncodedBytes[0], LOutputStream.Size);
 
+{$IFDEF MSWINDOWS}
     Result := 'data:image/jpeg;base64,' + TNetEncoding.Base64.EncodeBytesToString(LEncodedBytes);
+{$ELSE}
+    Result := 'data:' + DetectarMimeImagem(ABytes) + ';base64,' + TNetEncoding.Base64.EncodeBytesToString(LEncodedBytes);
+{$ENDIF}
   finally
     LOutputStream.Free;
   end;

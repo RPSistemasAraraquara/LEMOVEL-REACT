@@ -31,20 +31,19 @@ begin
   begin
     Result := TAPIRPCheffEntityMateriaisComposicao.Create;
     try
-      Result.idEmpresa := ADataSet.FieldByName('id_empresa').AsInteger;
-      Result.idMaterial := ADataSet.FieldByName('id_material').AsInteger;
-      Result.idComposicao := ADataSet.FieldByName('id_composicao').AsInteger;
-      Result.quantidade := ADataSet.FieldByName('quantidade').AsCurrency;
-      Result.composicao.descricao := ADataSet.FieldByName('descricao').AsString;
-      Result.composicao.valorCusto := ADataSet.FieldByName('valor_custo').AsCurrency;
-      Result.composicao.estoqueMinimo := ADataSet.FieldByName('estoque_minimo').AsCurrency;
-      Result.composicao.rendimento := ADataSet.FieldByName('rendimento').AsCurrency;
-      Result.composicao.codigoRef := ADataSet.FieldByName('codigo_ref').AsString;
-      Result.composicao.idSetor := ADataSet.FieldByName('id_setor').AsInteger;
+      Result.idEmpresa                       := ADataSet.FieldByName('id_empresa').AsInteger;
+      Result.idMaterial                      := ADataSet.FieldByName('id_material').AsInteger;
+      Result.idComposicao                    := ADataSet.FieldByName('id_composicao').AsInteger;
+      Result.quantidade                      := ADataSet.FieldByName('quantidade').AsCurrency;
+      Result.composicao.descricao            := ADataSet.FieldByName('descricao').AsString;
+      Result.composicao.valorCusto           := ADataSet.FieldByName('valor_custo').AsCurrency;
+      Result.composicao.estoqueMinimo        := ADataSet.FieldByName('estoque_minimo').AsCurrency;
+      Result.composicao.rendimento           := ADataSet.FieldByName('rendimento').AsCurrency;
+      Result.composicao.codigoRef            := ADataSet.FieldByName('codigo_ref').AsString;
+      Result.composicao.idSetor              := ADataSet.FieldByName('id_setor').AsInteger;
       Result.composicao.baixarSetorPrincipal := ADataSet.FieldByName('b_baixar_setor_princ').AsBoolean;
-
-      Result.composicao.idEmpresa := Result.idEmpresa;
-      Result.composicao.idComposicao := Result.idComposicao;
+      Result.composicao.idEmpresa            := Result.idEmpresa;
+      Result.composicao.idComposicao         := Result.idComposicao;
     except
       Result.Free;
       raise;

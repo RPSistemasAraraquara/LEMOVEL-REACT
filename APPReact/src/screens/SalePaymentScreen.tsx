@@ -27,6 +27,9 @@ type PaymentDraft = {
   sfiCodigo?: number;
   provider?: string;
   nsu?: string;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 type StatusNotice = {
@@ -342,7 +345,10 @@ export const SalePaymentScreen: React.FC = () => {
         registered: false,
         provider: result.provider,
         sfiCodigo: result.sfiCodigo ?? result.method.sfiCodigo,
-        nsu: result.nsu
+        nsu: result.nsu,
+        hash_terminal: result.hash_terminal,
+        autorizacao: result.autorizacao,
+        acquirerdocument: result.acquirerdocument
       };
 
       updateDrafts((prev) => {
@@ -366,7 +372,10 @@ export const SalePaymentScreen: React.FC = () => {
           idVenda,
           idFormaPagamento: result.method.codigo,
           valor: valorSelecionado,
-          idUsuario: user?.idUsuario
+          idUsuario: user?.idUsuario,
+          hash_terminal: result.hash_terminal,
+          autorizacao: result.autorizacao,
+          acquirerdocument: result.acquirerdocument
         });
         registeredSuccessfully = true;
         updateDrafts((prev) => {

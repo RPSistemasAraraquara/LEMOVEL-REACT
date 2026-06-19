@@ -30,10 +30,10 @@ begin
   begin
     Result := TAPIRPCheffEntityCategoria.Create;
     try
-      Result.idCategoria := ADataSet.FieldByName('cat_001').AsInteger;
-      Result.idEmpresa := ADataSet.FieldByName('emp_001').AsInteger;
-      Result.descricao := ADataSet.FieldByName('cat_002').AsString;
-      Result.PermiteVendaAPP:= ADataSet.FieldByName('b_exibir_mobile').AsBoolean;
+      Result.idCategoria     := ADataSet.FieldByName('cat_001').AsInteger;
+      Result.idEmpresa       := ADataSet.FieldByName('emp_001').AsInteger;
+      Result.descricao       := ADataSet.FieldByName('cat_002').AsString;
+      Result.PermiteVendaAPP := ADataSet.FieldByName('b_exibir_mobile').AsBoolean;
     except
       Result.Free;
       raise;

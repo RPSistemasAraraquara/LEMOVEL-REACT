@@ -35,6 +35,7 @@ type
     procedure Cancelar(ACancelamento: TAPIRPCheffEntityVendaItemCancelamento);
     function ListarVendasAgrupadosProdutos(AidVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>;
     function ListarProdutosSomenteTaxaGarcom(AIdVenda: Integer): Currency;
+    procedure TotalizarItensVenda(AIdVenda: Integer; out ATotalItens, ADesconto: Currency);
     procedure AplicarDescontoProporcional(AidVenda: Integer;ADesconto: Currency);
     procedure RatearTaxaGarcomPorItens(AidVenda: Integer);
     procedure CalcularMargemLucro(AidVenda: Integer);
@@ -54,8 +55,8 @@ var
 
 procedure TAPIRPCheffDAOVendaItem.GarantirPrecisaoQuantidadeDecimal;
 var
-  LDataSet: TDataSet;
-  LColumnName: string;
+  LDataSet    : TDataSet;
+  LColumnName : string;
 begin
   if GQuantidadeDecimalPrecisionChecked then
     Exit;
@@ -93,12 +94,12 @@ begin
       .SQL('  emp_001, ven_001, ite_001, mat_001, ite_002, ite_003, data_hora_lancamento,')
       .SQL('  ite_005, ite_006, sit_001, produtoimpresso, pendenteimpressao, ite_013, ite_014, gar_001,')
       .SQL('  desconto, acrescimo, tamanho, b_venda_tamanho, mesa_vinc,')
-      .SQL('  b_gratis, item_fracionado, quantidade_impressao, terminal_impressao)')
+      .SQL('  b_gratis, item_fracionado, quantidade_impressao, terminal_impressao, lancamento_mobile)')
       .SQL('VALUES (')
       .SQL('  :emp_001, :ven_001, :ite_001, :mat_001, :ite_002, :ite_003, :data_hora_lancamento,')
       .SQL('  :ite_005, :ite_006, :sit_001, :produtoimpresso, :pendenteimpressao, :ite_013, :ite_014, :gar_001,')
       .SQL('  :desconto, :acrescimo, :tamanho, :b_venda_tamanho, :mesa_vinc,')
-      .SQL('  :b_gratis, :item_fracionado, :quantidade_impressao, :terminal_impressao)')
+      .SQL('  :b_gratis, :item_fracionado, :quantidade_impressao, :terminal_impressao, :lancamento_mobile)')
       .ParamAsInteger ('emp_001', AVendaItem.idEmpresa)
       .ParamAsInteger ('ven_001', AVendaItem.idVenda)
       .ParamAsInteger ('ite_001', AVendaItem.numeroItem)
@@ -123,6 +124,7 @@ begin
       .ParamAsInteger ('item_fracionado', AVendaItem.itemFracionado, True)
       .ParamAsFloat('quantidade_impressao', AVendaItem.quantidade, True)
       .ParamAsString  ('terminal_impressao', AVendaItem.TerminalImpressao)
+      .ParamAsBoolean ('lancamento_mobile', True)
       .ExecSQL;
     Commit;
   except
@@ -264,7 +266,7 @@ begin
       Result.QuantidadePagaAntecipado       := ADataSet.FieldByName('qtd_paga_antec').AsCurrency;
       Result.ValorPagoAntecipado            := ADataSet.FieldByName('valor_pago_antec').AsCurrency;
       Result.ValorTaxaServico               := ADataSet.FieldByName('rateiotaxagarcom').AsCurrency;
-      Result.nomeGarcom                       := ADataSet.FieldByName('nomeGarcom').AsString;
+      Result.nomeGarcom                     := ADataSet.FieldByName('nomeGarcom').AsString;
 
       if Result.vendaPorTamanho then
       begin
@@ -288,15 +290,15 @@ end;
 
 procedure TAPIRPCheffDAOVendaItem.CarregarOpcionaisEmLote(AItens: TObjectList<TAPIRPCheffEntityVendaItem>);
 var
-  I: Integer;
-  LIdVenda: Integer;
-  LIdEmpresa: Integer;
-  LMesmoContexto: Boolean;
-  LItem: TAPIRPCheffEntityVendaItem;
-  LItensPorNumero: TDictionary<Integer, TAPIRPCheffEntityVendaItem>;
-  LOpcional: TAPIRPCheffEntityVendaItemOpcional;
-  LOpcionais: TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
-  LCopia: TAPIRPCheffEntityVendaItemOpcional;
+  I               : Integer;
+  LIdVenda        : Integer;
+  LIdEmpresa      : Integer;
+  LMesmoContexto  : Boolean;
+  LItem           : TAPIRPCheffEntityVendaItem;
+  LItensPorNumero : TDictionary<Integer, TAPIRPCheffEntityVendaItem>;
+  LOpcional       : TAPIRPCheffEntityVendaItemOpcional;
+  LOpcionais      : TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
+  LCopia          : TAPIRPCheffEntityVendaItemOpcional;
 begin
   if (not Assigned(AItens)) or (AItens.Count = 0) then
     Exit;
@@ -398,6 +400,31 @@ begin
     finally
       FreeAndNil(LDataSet);
     end;
+end;
+
+procedure TAPIRPCheffDAOVendaItem.TotalizarItensVenda(AIdVenda: Integer; out ATotalItens,
+  ADesconto: Currency);
+var
+  LDataSet: TDataSet;
+begin
+  ATotalItens := 0;
+  ADesconto := 0;
+
+  LDataSet := Query.SQL('select coalesce(sum(ite_005), 0) as total_itens,')
+    .SQL('       coalesce(sum(desconto), 0) as desconto')
+    .SQL('  from vendaitem')
+    .SQL(' where emp_001 = :idEmpresa')
+    .SQL('   and ven_001 = :idVenda')
+    .SQL('   and sit_001 = 4')
+    .ParamAsInteger('idVenda', AIdVenda)
+    .ParamAsInteger('idEmpresa', FIdEmpresa)
+    .OpenDataSet;
+  try
+    ATotalItens := LDataSet.FieldByName('total_itens').AsCurrency;
+    ADesconto := LDataSet.FieldByName('desconto').AsCurrency;
+  finally
+    FreeAndNil(LDataSet);
+  end;
 end;
 
 function TAPIRPCheffDAOVendaItem.Listar(AIdVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>;

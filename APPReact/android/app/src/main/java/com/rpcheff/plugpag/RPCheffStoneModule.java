@@ -1577,6 +1577,7 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
         WritableMap response = Arguments.createMap();
         response.putBoolean("approved", true);
         response.putString("code", code);
+        response.putMap("raw", buildQueryParameterMap(data));
 
         String transType = safeUpper(firstNonEmpty(
           data.getQueryParameter("type"),
@@ -1599,6 +1600,42 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
         response.putString("authorizationCode", firstNonEmpty(
           data.getQueryParameter("authorization_code"),
           data.getQueryParameter("authorizationcode"),
+          ""
+        ));
+        response.putString("hash_terminal", firstNonEmpty(
+          data.getQueryParameter("hash_terminal"),
+          data.getQueryParameter("terminal"),
+          data.getQueryParameter("terminal_name"),
+          data.getQueryParameter("terminalName"),
+          data.getQueryParameter("stoneid"),
+          data.getQueryParameter("stone_id"),
+          ""
+        ));
+        response.putString("acquirerdocument", firstNonEmpty(
+          data.getQueryParameter("acquirerdocument"),
+          data.getQueryParameter("acquirerDocument"),
+          data.getQueryParameter("acquirer_document"),
+          data.getQueryParameter("acquirerDocumentNumber"),
+          data.getQueryParameter("acquirer_document_number"),
+          data.getQueryParameter("cnpj"),
+          data.getQueryParameter("cnpj_credenciadora"),
+          data.getQueryParameter("cnpjCredenciadora"),
+          data.getQueryParameter("cnpjEC"),
+          data.getQueryParameter("cnpj_ec"),
+          data.getQueryParameter("merchantDocument"),
+          data.getQueryParameter("merchant_document"),
+          data.getQueryParameter("merchantCnpj"),
+          data.getQueryParameter("merchant_cnpj"),
+          data.getQueryParameter("establishmentDocument"),
+          data.getQueryParameter("establishment_document"),
+          data.getQueryParameter("establishmentCnpj"),
+          data.getQueryParameter("establishment_cnpj"),
+          data.getQueryParameter("document"),
+          data.getQueryParameter("documento"),
+          data.getQueryParameter("documentNumber"),
+          data.getQueryParameter("document_number"),
+          data.getQueryParameter("cpfCnpj"),
+          data.getQueryParameter("cpf_cnpj"),
           ""
         ));
         resolveAndClear(response);
@@ -1746,6 +1783,21 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
 
   private String safe(String value) {
     return value == null ? "" : value.trim();
+  }
+
+  private WritableMap buildQueryParameterMap(Uri data) {
+    WritableMap result = Arguments.createMap();
+    if (data == null) return result;
+
+    try {
+      for (String key : data.getQueryParameterNames()) {
+        result.putString(key, safe(data.getQueryParameter(key)));
+      }
+    } catch (UnsupportedOperationException ignored) {
+      return result;
+    }
+
+    return result;
   }
 
   private String safePreserve(String value) {

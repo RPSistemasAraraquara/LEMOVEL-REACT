@@ -32,7 +32,8 @@ type
 
     procedure ProcessaPagamentos;
 
-    procedure InserirEncerraVendaItem(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento);
+    procedure InserirEncerraVendaItem(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento;
+      const AHashTerminal, AAutorizacao, AAcquirerDocument: string);
     procedure GravarCaixaItem(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento;
       AAntecipado: Boolean = False);
     procedure GravarControleCartao(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento);
@@ -201,7 +202,8 @@ begin
 end;
 
 procedure TAPIRPCheffServiceVendaFechamentoCommandSalvarPagamentosVendaPrePaga.InserirEncerraVendaItem(
-  AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento);
+  AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento;
+  const AHashTerminal, AAutorizacao, AAcquirerDocument: string);
 var
   LEncerraVendaItem: TAPIRPCheffEntityEncerraVendaItem;
   LDAO: TAPIRPCheffDAOEncerraVendaItem;
@@ -216,6 +218,9 @@ begin
     LEncerraVendaItem.idFormaPgto := AForma.codigo;
     LEncerraVendaItem.novaVenda := False;
     LEncerraVendaItem.trocoDinheiro := 0;
+    LEncerraVendaItem.hash_terminal := AHashTerminal;
+    LEncerraVendaItem.autorizacao := AAutorizacao;
+    LEncerraVendaItem.acquirerdocument := AAcquirerDocument;
 
     if not AForma.cortesia then
       LEncerraVendaItem.valor := AValor;
@@ -248,7 +253,7 @@ begin
       if not Assigned(LForma) then
         raise Exception.CreateFmt('Forma pagamento %d n'#227'o encontrada.',
           [FPrePagamentos[I].IdFormaPagamento]);
-      InserirEncerraVendaItem(LValor, LForma);
+      InserirEncerraVendaItem(LValor, LForma, '', '', '');
       GravarCaixaItem(LValor, LForma, False);
       GravarControleCartao(LValor, LForma);
     finally
@@ -261,7 +266,8 @@ begin
     FNumeroItem := FNumeroItem + 1;
     LValor := FFechamento.pagamentos[I].valor;
     LForma := FFechamento.pagamentos[I].formaPagamento;
-    InserirEncerraVendaItem(LValor, LForma);
+    InserirEncerraVendaItem(LValor, LForma, FFechamento.pagamentos[I].hash_terminal,
+      FFechamento.pagamentos[I].autorizacao, FFechamento.pagamentos[I].acquirerdocument);
     GravarCaixaItem(LValor, LForma, False);
     GravarControleCartao(LValor, LForma);
   end;

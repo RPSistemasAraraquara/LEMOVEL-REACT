@@ -194,6 +194,9 @@ export type SalePayment = {
   dataHora?: string;
   observacao?: string;
   taxaServico?: boolean;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 export type Sale = {
@@ -222,6 +225,9 @@ export type Sale = {
 export type SaleClosureLine = {
   idFormaPgto: number;
   valor: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 export type SaleClosurePayload = {
@@ -253,6 +259,9 @@ export type SalePartialPaymentPayload = {
   idFormaPagamento: number;
   valor: number;
   idUsuario?: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 export type SaleCouvertPayload = {
@@ -533,7 +542,7 @@ const fallbackTables: TableOrder[] = [
 ];
 
 export const defaultMobileSettings: MobileAppSettings = {
-  baseUrl: 'http://104.234.189.194:9000/',
+  baseUrl: 'https://mobile.rpfood.com.br',
   empresaId: 1,
   terminalImpressao: 'PB09217174334',
   salvarLoginSenha: true,
@@ -860,7 +869,27 @@ function buildAbsoluteUrl(baseUrl: string, path: string): string {
   return `${normalized}/${trimmed}`;
 }
 
-function normalizeMobileBaseUrl(value: unknown): string {
+const shouldUseHttpsForHost = (value: string): boolean => {
+  const match = value.match(/^([^/:?#]+)(?::(\d+))?(?:[/?#].*)?$/);
+  const host = String(match?.[1] || '').trim();
+  const hasExplicitPort = Boolean(match?.[2]);
+
+  if (!host || hasExplicitPort) {
+    return false;
+  }
+
+  if (/^(localhost|127\.0\.0\.1|10\.0\.2\.2)$/i.test(host)) {
+    return false;
+  }
+
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+    return false;
+  }
+
+  return host.includes('.');
+};
+
+export function normalizeMobileBaseUrl(value: unknown): string {
   const fallback = defaultMobileSettings.baseUrl;
   const trimmed = String(value ?? '').trim().replace(/\/+$/, '');
   if (!trimmed) {
@@ -869,11 +898,15 @@ function normalizeMobileBaseUrl(value: unknown): string {
 
   let normalized = trimmed;
   if (!/^https?:\/\//i.test(normalized)) {
-    normalized = `http://${normalized}`;
+    normalized = `${shouldUseHttpsForHost(normalized) ? 'https' : 'http'}://${normalized}`;
   }
 
   if (Platform.OS === 'android' && /(^https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?/i.test(normalized)) {
     normalized = normalized.replace(/localhost|127\.0\.0\.1/gi, '10.0.2.2');
+  }
+
+  if (/^https?:\/\/192\.168\.15\.35:9000$/i.test(normalized)) {
+    return fallback;
   }
 
   return normalized;
@@ -1324,17 +1357,30 @@ export const loadMobileSettings = async (): Promise<MobileAppSettings> => {
     });
   }
   try {
-    return normalizeMobileSettings({
-      ...JSON.parse(raw),
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeMobileSettings({
+      ...parsed,
       ...(storedMachineSettings || {})
     });
+
+    if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    }
+
+    return normalized;
   } catch {
-    return storedMachineSettings
+    const normalized = storedMachineSettings
       ? normalizeMobileSettings({
           ...defaultMobileSettings,
           ...storedMachineSettings
         })
       : defaultMobileSettings;
+
+    if (raw) {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    }
+
+    return normalized;
   }
 };
 
@@ -2424,7 +2470,11 @@ function parseSalePayment(value: any): SalePayment {
     observacao: resolveField(value, ['observacao', 'Observacao'])
       ? String(resolveField(value, ['observacao', 'Observacao']))
       : undefined,
-    taxaServico: parseBoolean(resolveField(value, ['TaxaServico', 'taxaServico', 'b_taxa']), false)
+    taxaServico: parseBoolean(resolveField(value, ['TaxaServico', 'taxaServico', 'b_taxa']), false),
+    hash_terminal: sanitizeText(resolveField(value, ['hash_terminal', 'hashTerminal', 'HashTerminal']), '') || undefined,
+    autorizacao: sanitizeText(resolveField(value, ['autorizacao', 'Autorizacao', 'authorizationCode']), '') || undefined,
+    acquirerdocument:
+      sanitizeText(resolveField(value, ['acquirerdocument', 'acquirerDocument', 'AcquirerDocument']), '') || undefined
   };
 }
 
@@ -4701,12 +4751,27 @@ export class ApiClient {
   }
 
   async registerPartialPayment(input: SalePartialPaymentPayload): Promise<void> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       idUsuario: input.idUsuario || 0,
       idEmpresa: this.idEmpresa,
       idFormaPagamento: input.idFormaPagamento,
       valor: Number(input.valor || 0).toFixed(2)
     };
+
+    const hashTerminal = sanitizeText(input.hash_terminal, '');
+    const autorizacao = sanitizeText(input.autorizacao, '');
+    const acquirerDocument = sanitizeText(input.acquirerdocument, '');
+
+    if (hashTerminal) {
+      payload.hash_terminal = hashTerminal;
+    }
+    if (autorizacao) {
+      payload.autorizacao = autorizacao;
+    }
+    if (acquirerDocument) {
+      payload.acquirerdocument = acquirerDocument;
+    }
+
     const { response, payload: responsePayload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${input.idVenda}/pagamento`,
       {

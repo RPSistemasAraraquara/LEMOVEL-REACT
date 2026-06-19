@@ -25,6 +25,9 @@ type
     FTaxaServico                : Boolean;
     FValorTaxaServico           : Currency;
     FValorProduto               : Currency;
+    FHashTerminal               : string;
+    FAutorizacao                : string;
+    FAcquirerDocument           : string;
     procedure SetFormaPagamento(
       const Value: TAPIRPCheffEntityFormaPagamento);
   public
@@ -46,6 +49,9 @@ type
     property TaxaServico                    : Boolean                         read FTaxaServico                   write FTaxaServico;
     property ValorTaxaServico               : Currency                        read FValorTaxaServico              write FValorTaxaServico;
     property ValorProduto                   : Currency                        read FValorProduto                  write FValorProduto;
+    property hash_terminal                  : string                          read FHashTerminal                  write FHashTerminal;
+    property autorizacao                    : string                          read FAutorizacao                   write FAutorizacao;
+    property acquirerdocument               : string                          read FAcquirerDocument              write FAcquirerDocument;
 
   end;
 

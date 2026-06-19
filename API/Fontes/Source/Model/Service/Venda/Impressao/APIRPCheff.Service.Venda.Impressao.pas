@@ -28,6 +28,7 @@ type
     FImprimir                  : Boolean;
     FImprimirFichaIndividualProdutos: Boolean;
 
+    function FormatarMoeda(AValor: Currency): string;
     function FormatarQuantidadeFracionada(AQuantidade, AValorUnitario, AValorTotal: Currency): string;
     function QuantidadeFichasIndividuais(AQuantidade: Currency): Integer;
     function UsaIntegracaoMaquininha(AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
@@ -56,14 +57,25 @@ implementation
 
 uses
   APIRPCheff.Service.Venda.ImpressaoSTONE,
+{$IFNDEF LINUX}
   APIRPCheff.Service.Venda.ImpressaoSTONE.NFCe,
+{$ENDIF}
   APIRPCheff.Service.Venda.ImpressaoPlugPag,
+{$IFNDEF LINUX}
   APIRPCheff.Service.Venda.ImpressaoPlugPag.NFCe,
+{$ENDIF}
   APIRPCheff.Service.Venda.ImpressaoCielo,
+{$IFNDEF LINUX}
   APIRPCheff.Service.Venda.ImpressaoCielo.NFCe,
+{$ENDIF}
   APIRPCheff.Service.Venda.Impressao32Colunas,
   APIRPCheff.Service.Venda.Impressao42Colunas,
   APIRPCheff.Service.Venda.Impressao48Colunas;
+
+function TAPIRPCheffServiceVendaImpressao.FormatarMoeda(AValor: Currency): string;
+begin
+  Result := 'R$ ' + FormatFloat('0.00', AValor);
+end;
 
 function TAPIRPCheffServiceVendaImpressao.FormatarQuantidadeFracionada(
   AQuantidade, AValorUnitario, AValorTotal: Currency): string;
@@ -108,10 +120,14 @@ var
 begin
   LVenda := FDAO.VendaDAO.Buscar(FIdVenda);
   try
+{$IFDEF LINUX}
+    Result := TAPIRPCheffServiceVendaImpressaoCielo.Create;
+{$ELSE}
     if LVenda.chaveEletronica.Trim.IsEmpty then
       Result := TAPIRPCheffServiceVendaImpressaoCielo.Create
     else
       Result := TAPIRPCheffServiceVendaImpressaCieloNFCe.Create;
+{$ENDIF}
   finally
     LVenda.Free;
   end;
@@ -123,10 +139,14 @@ var
 begin
   LVenda := FDAO.VendaDAO.Buscar(FIdVenda);
   try
+{$IFDEF LINUX}
+    Result := TAPIRPCheffServiceVendaImpressaoPlugPag.Create;
+{$ELSE}
     if LVenda.chaveEletronica.Trim.IsEmpty then
       Result := TAPIRPCheffServiceVendaImpressaoPlugPag.Create
     else
       Result := TAPIRPCheffServiceVendaImpressaPlugPagNFCe.Create;
+{$ENDIF}
   finally
     LVenda.Free;
   end;
@@ -138,10 +158,14 @@ var
 begin
   LVenda := FDAO.VendaDAO.Buscar(FIdVenda);
   try
+{$IFDEF LINUX}
+    Result := TAPIRPCheffServiceVendaImpressaoSTONE.Create;
+{$ELSE}
     if LVenda.chaveEletronica.Trim.IsEmpty then
       Result := TAPIRPCheffServiceVendaImpressaoSTONE.Create
     else
       Result := TAPIRPCheffServiceVendaImpressaStoneNFCe.Create;
+{$ENDIF}
   finally
     LVenda.Free;
   end;
@@ -241,6 +265,9 @@ end;
 function TAPIRPCheffServiceVendaImpressao.PodeImprimirLocalmente(
   AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
 begin
+{$IFDEF LINUX}
+  Exit(False);
+{$ENDIF}
   Result := not UsaIntegracaoMaquininha(AEmpresa);
 end;
 

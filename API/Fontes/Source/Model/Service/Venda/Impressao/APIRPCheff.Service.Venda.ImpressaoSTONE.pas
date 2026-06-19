@@ -368,19 +368,13 @@ begin
   LDesconto        := 0;
   LQuantidadeItens := 0;
   for var LItem in FVendaItens do
-  begin
-    if LItem.TotalFracoes > 0 then
-      LTotalItens := LTotalItens + LItem.TotalFracoes
-    else
-      LTotalItens := LTotalItens + LItem.valorTotal;
-
-    LDesconto := LDesconto + LItem.desconto;
     LQuantidadeItens := LQuantidadeItens + 1 + LItem.fracoes.Count;
-  end;
+
+  FDAO.VendaItemDAO.TotalizarItensVenda(FIdVenda, LTotalItens, LDesconto);
 
   AddBlankLine;
   AddDash;
-  AddText('Sub total: ' + Format('R$ %.2f', [LTotalItens + LDesconto]), 'left', 'medium', 'bold');
+  AddText('Sub total: ' + FormatarMoeda(LTotalItens), 'left', 'medium', 'bold');
 
   if LDesconto > 0 then
     AddText('Desc itens: -' + Format('R$ %.2f', [LDesconto]), 'left', 'medium');

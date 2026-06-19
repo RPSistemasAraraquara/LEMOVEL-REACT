@@ -39,6 +39,9 @@ export type RPCheffPaymentResult = {
   sfiCodigo?: number;
   nsu: string;
   message: string;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
   callerId?: string;
   cvNumber?: string;
   brand?: string;
@@ -128,6 +131,9 @@ type RPCheffNativePlugPagResult = {
   nsu: string;
   message: string;
   sfiCodigo?: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 type RPCheffNativePlugPagProgressEvent = {
@@ -160,6 +166,9 @@ type RPCheffNativeStoneResult = {
   nsu: string;
   message: string;
   sfiCodigo?: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 type RPCheffNativeCieloPayload = {
@@ -181,6 +190,16 @@ type RPCheffNativeCieloModule = {
   doPayment?: (payload: RPCheffNativeCieloPayload) => Promise<unknown>;
   pay?: (payload: RPCheffNativeCieloPayload) => Promise<unknown>;
   printReceipt?: (payload: RPCheffNativePlugPagPrintPayload) => Promise<unknown>;
+  getEnabledPaymentProducts?: () => Promise<unknown>;
+};
+
+type RPCheffNativeCieloEnabledProduct = {
+  paymentCode?: string;
+  primaryCode?: string;
+  secondaryCode?: string;
+  primaryName?: string;
+  secondaryName?: string;
+  label?: string;
 };
 
 type RPCheffNativeCieloResult = {
@@ -188,6 +207,9 @@ type RPCheffNativeCieloResult = {
   nsu: string;
   message: string;
   sfiCodigo?: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
 };
 
 type RPCheffGetNetResult = {
@@ -195,6 +217,9 @@ type RPCheffGetNetResult = {
   nsu: string;
   message: string;
   sfiCodigo?: number;
+  hash_terminal?: string;
+  autorizacao?: string;
+  acquirerdocument?: string;
   callerId: string;
   cvNumber?: string;
   brand?: string;
@@ -390,11 +415,26 @@ const summarizeNativePaymentResult = (raw: unknown): string => {
     'descricao',
     'sfiCodigo',
     'typeTransaction',
-    'transactionType'
+    'transactionType',
+    'nsu',
+    'authorizationCode',
+    'authorization_code',
+    'autorizacao',
+    'hash_terminal',
+    'acquirerdocument',
+    'acquirerDocument',
+    'acquirer_document'
   ];
   const pairs = keys
     .filter((key) => value[key] !== undefined && value[key] !== null)
     .map((key) => `${key}=${normalizeDiagnosticText(String(value[key]))}`);
+
+  if (value.raw && typeof value.raw === 'object' && !Array.isArray(value.raw)) {
+    const rawKeys = Object.keys(value.raw as Record<string, unknown>).slice(0, 12);
+    if (rawKeys.length > 0) {
+      pairs.push(`rawKeys=${rawKeys.join(',')}`);
+    }
+  }
 
   if (pairs.length > 0) {
     return pairs.join(' ');
@@ -546,6 +586,146 @@ export const formatPaymentProviderLabel = (provider: RPCheffPaymentProvider): st
   if (provider === 'getnet') return 'GetNet';
   return 'maquininha';
 };
+
+const parseRawJsonObject = (value: unknown): Record<string, unknown> | null => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text || !['{', '['].includes(text[0])) return null;
+
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const collectNativePaymentObjects = (raw: unknown): Array<Record<string, unknown>> => {
+  if (!raw || typeof raw !== 'object') return [];
+  const root = raw as Record<string, unknown>;
+  const result: Array<Record<string, unknown>> = [];
+  const seen = new Set<Record<string, unknown>>();
+  const keys = ['raw', 'payload', 'payment', 'transaction', 'data', 'response', 'merchant', 'terminal', 'acquirer'];
+
+  const append = (source: Record<string, unknown>) => {
+    if (seen.has(source)) return;
+    seen.add(source);
+    result.push(source);
+  };
+
+  append(root);
+  for (let index = 0; index < result.length && index < 20; index += 1) {
+    const source = result[index];
+    keys.forEach((key) => {
+      const value = source[key];
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        append(value as Record<string, unknown>);
+        return;
+      }
+
+      const parsed = parseRawJsonObject(value);
+      if (parsed) {
+        append(parsed);
+      }
+    });
+  }
+
+  return result;
+};
+
+const pickNativeText = (raw: unknown, keys: string[]): string | undefined => {
+  const objects = collectNativePaymentObjects(raw);
+  for (const source of objects) {
+    for (const key of keys) {
+      const value = source[key];
+      if (value !== undefined && value !== null && String(value).trim().length > 0) {
+        return String(value).trim();
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const parseNativeAuthorization = (raw: unknown): string | undefined =>
+  pickNativeText(raw, [
+    'authorizationCode',
+    'authorization_code',
+    'authorizationcode',
+    'autorizacao',
+    'codigoAutorizacao',
+    'codigo_autorizacao',
+    'autoCode',
+    'authCode',
+    'cAut',
+    'autPag',
+    'aut_pag'
+  ]);
+
+const parseNativeAcquirerDocument = (raw: unknown): string | undefined => {
+  const document = pickNativeText(raw, [
+    'acquirerdocument',
+    'acquirerDocument',
+    'acquirer_document',
+    'acquirerDocumentNumber',
+    'acquirer_document_number',
+    'cnpjCredenciadora',
+    'cnpj_credenciadora',
+    'cnpjEC',
+    'cnpj_ec',
+    'cnpj',
+    'merchantDocument',
+    'merchant_document',
+    'merchantCnpj',
+    'merchant_cnpj',
+    'establishmentDocument',
+    'establishment_document',
+    'establishmentCnpj',
+    'establishment_cnpj',
+    'document',
+    'documentNumber',
+    'document_number',
+    'documento',
+    'cpfCnpj',
+    'cpf_cnpj'
+  ]);
+  const digits = String(document || '').replace(/\D/g, '');
+  return digits || undefined;
+};
+
+const parseNativeTerminalName = (raw: unknown): string | undefined =>
+  pickNativeText(raw, [
+    'hash_terminal',
+    'hashTerminal',
+    'terminal',
+    'terminalName',
+    'terminal_name',
+    'nomeTerminal',
+    'nomeEC',
+    'terminalId',
+    'terminal_id',
+    'stoneId',
+    'stoneid',
+    'STONEID',
+    'numLogic',
+    'numlogic',
+    'numSerie',
+    'numserie',
+    'serialNumber',
+    'hardwareSn',
+    'ec'
+  ]);
+
+const resolveTerminalName = (
+  input: RPCheffPaymentInput,
+  provider: RPCheffPaymentProvider,
+  raw?: unknown
+): string | undefined =>
+  parseNativeTerminalName(raw) ||
+  String(input.settings.terminalImpressao || '').trim() ||
+  formatPaymentProviderLabel(provider);
 
 const formatGetNetAmount = (value: number): string => {
   const cents = Math.max(1, Math.round(Number(value || 0) * 100));
@@ -1083,11 +1263,21 @@ const executeGetNetNative = async (
   }
 
   if (response.resultCode === GETNET_RESULT_SUCCESS) {
+    const getNetRaw = {
+      ...response.raw,
+      authorizationCode: transaction.authorizationCode,
+      cvNumber: transaction.cvNumber,
+      brand: transaction.brand
+    };
+
     return {
       approved: true,
       nsu: transaction.nsu || createNsu(),
       message: response.message,
       sfiCodigo: mapGetNetResponseToSfi(response.raw.type, response.raw.inputType, sfiCodigo),
+      hash_terminal: resolveTerminalName(input, 'getnet', getNetRaw),
+      autorizacao: transaction.authorizationCode || parseNativeAuthorization(getNetRaw),
+      acquirerdocument: parseNativeAcquirerDocument(getNetRaw),
       callerId: transaction.callerId,
       cvNumber: transaction.cvNumber,
       brand: transaction.brand,
@@ -1646,7 +1836,10 @@ const executePlugPagNative = async (
     approved: true,
     nsu: parseNativeNsu(rawResult) || createNsu(),
     message: message || 'Pagamento aprovado via PAGBANK.',
-    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo)
+    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo),
+    hash_terminal: resolveTerminalName(input, 'pagbank', rawResult),
+    autorizacao: parseNativeAuthorization(rawResult),
+    acquirerdocument: parseNativeAcquirerDocument(rawResult)
   };
 };
 
@@ -1883,7 +2076,10 @@ const executeStoneNative = async (
     approved: true,
     nsu: parseNativeNsu(rawResult) || createNsu(),
     message: message || 'Pagamento aprovado via STONE.',
-    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo)
+    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo),
+    hash_terminal: resolveTerminalName(input, 'stone', rawResult),
+    autorizacao: parseNativeAuthorization(rawResult),
+    acquirerdocument: parseNativeAcquirerDocument(rawResult)
   };
 };
 
@@ -1892,6 +2088,83 @@ const mapCieloPaymentCode = (transactionType: PaymentTerminalTransactionType): s
   if (transactionType === 'pix') return 'PIX';
   if (transactionType === 'voucher') return 'VOUCHER_REFEICAO';
   return 'CREDITO_AVISTA';
+};
+
+const normalizeCieloPaymentCode = (value?: string): string => String(value || '').trim().toUpperCase();
+
+const parseCieloEnabledProducts = (raw: unknown): RPCheffNativeCieloEnabledProduct[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item))
+    .map((item) => ({
+      paymentCode: typeof item.paymentCode === 'string' ? item.paymentCode.trim() : undefined,
+      primaryCode: typeof item.primaryCode === 'string' ? item.primaryCode.trim() : undefined,
+      secondaryCode: typeof item.secondaryCode === 'string' ? item.secondaryCode.trim() : undefined,
+      primaryName: typeof item.primaryName === 'string' ? item.primaryName.trim() : undefined,
+      secondaryName: typeof item.secondaryName === 'string' ? item.secondaryName.trim() : undefined,
+      label: typeof item.label === 'string' ? item.label.trim() : undefined
+    }))
+    .filter((item) => !!item.paymentCode || !!item.label || !!item.primaryName || !!item.secondaryName);
+};
+
+const formatCieloPaymentCode = (paymentCode: string): string => {
+  const code = normalizeCieloPaymentCode(paymentCode);
+  if (code === 'CREDITO_AVISTA') return 'Credito a vista';
+  if (code === 'DEBITO_AVISTA') return 'Debito a vista';
+  if (code === 'PIX') return 'PIX';
+  if (code === 'VOUCHER_REFEICAO') return 'Voucher refeicao';
+  if (code === 'VOUCHER_ALIMENTACAO') return 'Voucher alimentacao';
+  if (code === 'PRE_AUTORIZACAO') return 'Pre-autorizacao';
+  return code || 'forma solicitada';
+};
+
+const formatCieloEnabledProduct = (item: RPCheffNativeCieloEnabledProduct): string => {
+  if (item.paymentCode) return formatCieloPaymentCode(item.paymentCode);
+  if (item.label) return item.label;
+  return [item.primaryName, item.secondaryName].filter(Boolean).join('/');
+};
+
+const assertCieloPaymentCodeEnabled = async (
+  module: RPCheffNativeCieloModule,
+  paymentCode: string,
+  input: RPCheffPaymentInput
+) => {
+  if (typeof module.getEnabledPaymentProducts !== 'function') return;
+
+  try {
+    const products = parseCieloEnabledProducts(await module.getEnabledPaymentProducts());
+    if (products.length === 0) return;
+
+    const requestedCode = normalizeCieloPaymentCode(paymentCode);
+    const enabledCodes = new Set(
+      products
+        .map((item) => normalizeCieloPaymentCode(item.paymentCode))
+        .filter((item) => item.length > 0)
+    );
+    const enabledLabels = Array.from(new Set(products.map(formatCieloEnabledProduct).filter(Boolean))).join(', ');
+
+    logSyncDiagnostic(
+      `pagamento cielo produtos habilitados idVenda=${input.idVenda || 0} solicitada=${requestedCode} habilitados=${enabledLabels || 'sem-lista'}`
+    );
+
+    if (enabledCodes.size > 0 && !enabledCodes.has(requestedCode)) {
+      throw createMachinePaymentError(
+        `A Cielo desta maquina nao esta habilitada para ${formatCieloPaymentCode(paymentCode)}. ` +
+          `Habilitados na maquina: ${enabledLabels || 'nenhuma forma consultada'}. Nenhum pagamento foi registrado no app.`,
+        'CIELO_PAYMENT_METHOD_DISABLED'
+      );
+    }
+  } catch (error: any) {
+    if (error?.code === 'CIELO_PAYMENT_METHOD_DISABLED') {
+      throw error;
+    }
+
+    logSyncDiagnostic(
+      `pagamento cielo consulta produtos falhou idVenda=${input.idVenda || 0} message=${normalizeDiagnosticText(error?.message || error)}`,
+      2
+    );
+  }
 };
 
 const executeCieloNative = async (
@@ -1911,6 +2184,9 @@ const executeCieloNative = async (
     throw new Error('Forma de pagamento não suportada para Cielo.');
   }
 
+  const paymentCode = mapCieloPaymentCode(transactionType);
+  await assertCieloPaymentCodeEnabled(module, paymentCode, input);
+
   const payload: RPCheffNativeCieloPayload = {
     amount: Math.max(1, Math.round(input.value * 100)),
     value: input.value,
@@ -1919,7 +2195,7 @@ const executeCieloNative = async (
     methodCode: input.method.codigo,
     methodDescription: input.method.descricao,
     installments: 0,
-    paymentCode: mapCieloPaymentCode(transactionType)
+    paymentCode
   };
 
   let rawResult: unknown;
@@ -1939,7 +2215,10 @@ const executeCieloNative = async (
     approved: true,
     nsu: parseNativeNsu(rawResult) || createNsu(),
     message: message || 'Pagamento aprovado via CIELO.',
-    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo)
+    sfiCodigo: parseNativeSfi(rawResult, sfiCodigo),
+    hash_terminal: resolveTerminalName(input, 'cielo', rawResult),
+    autorizacao: parseNativeAuthorization(rawResult),
+    acquirerdocument: parseNativeAcquirerDocument(rawResult)
   };
 };
 
@@ -2009,7 +2288,10 @@ class RPCheffStonePaymentStrategy extends RPCheffPaymentStrategy {
       value: input.value,
       sfiCodigo: detectSfi(method),
       nsu: nativeResult.nsu,
-      message: nativeResult.message
+      message: nativeResult.message,
+      hash_terminal: nativeResult.hash_terminal,
+      autorizacao: nativeResult.autorizacao,
+      acquirerdocument: nativeResult.acquirerdocument
     };
   }
 }
@@ -2038,7 +2320,10 @@ class RPCheffPlugPagPaymentStrategy extends RPCheffPaymentStrategy {
       value: input.value,
       sfiCodigo: detectSfi(method),
       nsu: nativeResult.nsu,
-      message: nativeResult.message
+      message: nativeResult.message,
+      hash_terminal: nativeResult.hash_terminal,
+      autorizacao: nativeResult.autorizacao,
+      acquirerdocument: nativeResult.acquirerdocument
     };
   }
 }
@@ -2069,7 +2354,10 @@ class RPCheffCieloPaymentStrategy extends RPCheffPaymentStrategy {
       value: input.value,
       sfiCodigo: detectSfi(method),
       nsu: nativeResult.nsu,
-      message: nativeResult.message
+      message: nativeResult.message,
+      hash_terminal: nativeResult.hash_terminal,
+      autorizacao: nativeResult.autorizacao,
+      acquirerdocument: nativeResult.acquirerdocument
     };
   }
 }
@@ -2100,6 +2388,9 @@ class RPCheffGetNetPaymentStrategy extends RPCheffPaymentStrategy {
       sfiCodigo: detectSfi(method),
       nsu: nativeResult.nsu,
       message: nativeResult.message,
+      hash_terminal: nativeResult.hash_terminal,
+      autorizacao: nativeResult.autorizacao,
+      acquirerdocument: nativeResult.acquirerdocument,
       callerId: nativeResult.callerId,
       cvNumber: nativeResult.cvNumber,
       brand: nativeResult.brand,
