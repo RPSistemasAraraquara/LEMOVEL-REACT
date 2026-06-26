@@ -26,6 +26,12 @@ import {
 } from '../services/vendaPrint';
 import { Colors, Radius, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
+import {
+  adjustCouvertText,
+  clampCouvertText,
+  normalizeCouvertCount,
+  validateCouvertNotReduced
+} from '../utils/couvertLock';
 
 type Route = RouteProp<RootStackParams, 'Fechamento'>;
 type Navigation = NativeStackNavigationProp<RootStackParams>;
@@ -310,6 +316,10 @@ export const SaleClosureScreen: React.FC = () => {
   const saleTotal = sale?.valorTotal ?? sale?.valor ?? 0;
   const originalMascCount = Number(sale?.numeroCouvertMasculino || 0);
   const originalFemCount = Number(sale?.numeroCouvertFeminino || 0);
+  const minimumCouvert = {
+    masculino: normalizeCouvertCount(originalMascCount),
+    feminino: normalizeCouvertCount(originalFemCount)
+  };
   const originalMascCouvertTotal = Number(sale?.valorCouvertMasculino || 0);
   const originalFemCouvertTotal = Number(sale?.valorCouvertFeminino || 0);
   const originalTaxaServico = Number(sale?.valorTaxaServico || 0);
@@ -435,6 +445,23 @@ export const SaleClosureScreen: React.FC = () => {
       message,
       type
     });
+  };
+
+  const ensureCouvertNotReduced = () => {
+    const nextCouvert = {
+      masculino: normalizeCouvertCount(masc),
+      feminino: normalizeCouvertCount(fem)
+    };
+    const reductionMessage = validateCouvertNotReduced(nextCouvert, minimumCouvert);
+    if (!reductionMessage) {
+      return true;
+    }
+
+    setMasc(String(minimumCouvert.masculino));
+    setFem(String(minimumCouvert.feminino));
+    setActionStatus({ kind: 'error', message: reductionMessage });
+    showSweetAlert('Atenção', reductionMessage, 'warning');
+    return false;
   };
 
   const releaseMachinePaymentFlow = (paymentToken?: string | null) => {
@@ -625,6 +652,9 @@ export const SaleClosureScreen: React.FC = () => {
       Alert.alert('Atenção', 'Não é possível pré-fechar sem produtos lançados.');
       return;
     }
+    if (!ensureCouvertNotReduced()) {
+      return;
+    }
     try {
       setSaving(true);
       setActionStatus({ kind: 'info', message: 'Gerando pré-visualização da impressão...' });
@@ -726,6 +756,9 @@ export const SaleClosureScreen: React.FC = () => {
               : 'Pré-fechamento indisponível para a situação atual da venda.'
           : 'Fechamento só pode ser executado com venda pendente ou em pré-fechamento.'
       );
+      return;
+    }
+    if (!ensureCouvertNotReduced()) {
       return;
     }
 
@@ -951,14 +984,21 @@ export const SaleClosureScreen: React.FC = () => {
           settings: appSettings,
           idVenda
         });
+        const returnedMethodCode = Number(pagamentoProcessado.method.codigo || 0);
+        if (returnedMethodCode > 0 && returnedMethodCode !== Number(formaSelecionada.codigo)) {
+          logSyncDiagnostic(
+            `fluxo fechamento pagamento terminal forma divergente idVenda=${idVenda} selecionada=${formaSelecionada.codigo} retorno=${returnedMethodCode} sfiRetorno=${pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo ?? ''}`,
+            2
+          );
+        }
         logSyncDiagnostic(
-          `fluxo fechamento pagamento terminal ok idVenda=${idVenda} forma=${pagamentoProcessado.method.codigo} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
+          `fluxo fechamento pagamento terminal ok idVenda=${idVenda} forma=${formaSelecionada.codigo} retornoForma=${returnedMethodCode || '-'} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
         );
 
         aprovados.push({
-          idFormaPgto: pagamentoProcessado.method.codigo,
+          idFormaPgto: formaSelecionada.codigo,
           valor: linha.valor,
-          sfiCodigo: pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo,
+          sfiCodigo: formaSelecionada.sfiCodigo ?? linha.sfiCodigo ?? pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo,
           hash_terminal: pagamentoProcessado.hash_terminal,
           autorizacao: pagamentoProcessado.autorizacao,
           acquirerdocument: pagamentoProcessado.acquirerdocument
@@ -1236,15 +1276,23 @@ export const SaleClosureScreen: React.FC = () => {
           setPaymentProcessingMessage(message);
         }
       });
+      const selectedMethodCode = selectedMethod.codigo;
+      const returnedMethodCode = Number(pagamentoProcessado.method.codigo || 0);
+      if (returnedMethodCode > 0 && returnedMethodCode !== Number(selectedMethodCode)) {
+        logSyncDiagnostic(
+          `fluxo fechamento pagamento selecionar forma divergente idVenda=${idVenda} linha=${lineIndex} selecionada=${selectedMethodCode} retorno=${returnedMethodCode} sfiRetorno=${pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo ?? ''}`,
+          2
+        );
+      }
       logSyncDiagnostic(
-        `fluxo fechamento pagamento selecionar ok idVenda=${idVenda} linha=${lineIndex} forma=${pagamentoProcessado.method.codigo} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
+        `fluxo fechamento pagamento selecionar ok idVenda=${idVenda} linha=${lineIndex} forma=${selectedMethodCode} retornoForma=${returnedMethodCode || '-'} provider=${pagamentoProcessado.provider} em ${Date.now() - paymentStartedAt}ms`
       );
 
       if (activePaymentTokenRef.current !== paymentToken) {
         return;
       }
 
-      const processedSfiCodigo = pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo;
+      const processedSfiCodigo = selectedMethod.sfiCodigo ?? pagamentoProcessado.sfiCodigo ?? pagamentoProcessado.method.sfiCodigo;
       releaseMachinePaymentFlow(paymentToken);
 
       setPagamentos((prev) => {
@@ -1253,7 +1301,7 @@ export const SaleClosureScreen: React.FC = () => {
         const next = [...prev];
         next[lineIndex] = {
           ...next[lineIndex],
-          codigo: pagamentoProcessado.method.codigo,
+          codigo: selectedMethodCode,
           valor: valorSelecionado.toFixed(2),
           processed: true,
           provider: pagamentoProcessado.provider,
@@ -1267,7 +1315,7 @@ export const SaleClosureScreen: React.FC = () => {
           (item, idx) =>
             idx !== lineIndex &&
             Boolean(item.processed) &&
-            Number(item.codigo || 0) === Number(pagamentoProcessado.method.codigo) &&
+            Number(item.codigo || 0) === Number(selectedMethodCode) &&
             Number(parseMoney(item.valor || '0').toFixed(2)) === Number(valorSelecionado.toFixed(2)) &&
             (item.nsu || '') === (pagamentoProcessado.nsu || '')
         );
@@ -1394,15 +1442,24 @@ export const SaleClosureScreen: React.FC = () => {
             <Text style={styles.payLabel}>Masculino</Text>
             <View style={styles.counterRow}>
               <Pressable
-                style={styles.counterBtn}
-                onPress={() => changeInteger(setMasc, masc, -1)}
+                style={[
+                  styles.counterBtn,
+                  normalizeCouvertCount(masc) <= minimumCouvert.masculino ? styles.counterBtnDisabled : null
+                ]}
+                disabled={normalizeCouvertCount(masc) <= minimumCouvert.masculino}
+                onPress={() => setMasc(adjustCouvertText(masc, -1, minimumCouvert.masculino))}
               >
                 <Text style={styles.counterText}>-</Text>
               </Pressable>
-              <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={masc} onChangeText={setMasc} />
+              <TextInput
+                style={[styles.input, styles.counterInput]}
+                keyboardType="numeric"
+                value={masc}
+                onChangeText={(value) => setMasc(clampCouvertText(value, minimumCouvert.masculino))}
+              />
               <Pressable
                 style={styles.counterBtn}
-                onPress={() => changeInteger(setMasc, masc, +1)}
+                onPress={() => setMasc(adjustCouvertText(masc, +1, minimumCouvert.masculino))}
               >
                 <Text style={styles.counterText}>+</Text>
               </Pressable>
@@ -1412,15 +1469,24 @@ export const SaleClosureScreen: React.FC = () => {
             <Text style={styles.payLabel}>Feminino</Text>
             <View style={styles.counterRow}>
               <Pressable
-                style={styles.counterBtn}
-                onPress={() => changeInteger(setFem, fem, -1)}
+                style={[
+                  styles.counterBtn,
+                  normalizeCouvertCount(fem) <= minimumCouvert.feminino ? styles.counterBtnDisabled : null
+                ]}
+                disabled={normalizeCouvertCount(fem) <= minimumCouvert.feminino}
+                onPress={() => setFem(adjustCouvertText(fem, -1, minimumCouvert.feminino))}
               >
                 <Text style={styles.counterText}>-</Text>
               </Pressable>
-              <TextInput style={[styles.input, styles.counterInput]} keyboardType="numeric" value={fem} onChangeText={setFem} />
+              <TextInput
+                style={[styles.input, styles.counterInput]}
+                keyboardType="numeric"
+                value={fem}
+                onChangeText={(value) => setFem(clampCouvertText(value, minimumCouvert.feminino))}
+              />
               <Pressable
                 style={styles.counterBtn}
-                onPress={() => changeInteger(setFem, fem, +1)}
+                onPress={() => setFem(adjustCouvertText(fem, +1, minimumCouvert.feminino))}
               >
                 <Text style={styles.counterText}>+</Text>
               </Pressable>
@@ -1975,6 +2041,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2
+  },
+  counterBtnDisabled: {
+    opacity: 0.45
   },
   counterText: {
     color: '#23314d',

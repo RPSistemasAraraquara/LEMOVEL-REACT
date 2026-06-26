@@ -7,10 +7,13 @@ import { useApp } from '../context/AppContext';
 import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
 import {
   api,
+  buildMenuItemRestrictedMessage,
   formatTableStatusLabel,
   getTableOrderDisplayLabel,
   getMenuItemLaunchUnitPrice,
   hasMenuItemHappyHourMetadata,
+  hasMenuItemRestrictionMetadata,
+  isMenuItemRestrictedToday,
   MenuItem,
   ProductOptional,
   TableOrder
@@ -334,8 +337,9 @@ export const ItemLaunchScreen: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    const shouldRefreshHappyHourPricing =
-      !hasMenuItemHappyHourMetadata(syncedRouteProduct || routeProduct || null);
+    const shouldRefreshProductRules =
+      !hasMenuItemHappyHourMetadata(syncedRouteProduct || routeProduct || null) ||
+      !hasMenuItemRestrictionMetadata(syncedRouteProduct || routeProduct || null);
 
     if (!routeProduct?.idProduto) {
       return () => {
@@ -348,7 +352,7 @@ export const ItemLaunchScreen: React.FC = () => {
       (Array.isArray(syncedRouteProduct?.opcionais) && syncedRouteProduct.opcionais.length > 0);
     const routeNeedsFullProduct = Boolean(routeProduct?.catalogCompact || syncedRouteProduct?.catalogCompact);
 
-    if (hasLocalOptionals && !shouldRefreshHappyHourPricing && !routeNeedsFullProduct) {
+    if (hasLocalOptionals && !shouldRefreshProductRules && !routeNeedsFullProduct) {
       return () => {
         active = false;
       };
@@ -439,6 +443,8 @@ export const ItemLaunchScreen: React.FC = () => {
         if (!active) return;
         setActiveTable(opened);
         setActiveVenda(opened);
+      } catch {
+        // A abertura sera tentada novamente ao adicionar o item.
       } finally {
         if (active) {
           setIsOpeningSale(false);
@@ -762,15 +768,16 @@ export const ItemLaunchScreen: React.FC = () => {
 
     const cached = loadedFractionProducts[idProduto];
     const baseProduct = availableById.get(idProduto);
-    const shouldRefreshHappyHourPricing =
-      !hasMenuItemHappyHourMetadata(cached || baseProduct || null);
+    const shouldRefreshProductRules =
+      !hasMenuItemHappyHourMetadata(cached || baseProduct || null) ||
+      !hasMenuItemRestrictionMetadata(cached || baseProduct || null);
 
-    if (cached?.opcionais && cached.opcionais.length > 0 && !shouldRefreshHappyHourPricing && !cached.catalogCompact) {
+    if (cached?.opcionais && cached.opcionais.length > 0 && !shouldRefreshProductRules && !cached.catalogCompact) {
       loadedFractionProductIdsRef.current[idProduto] = true;
       return;
     }
 
-    if (baseProduct?.opcionais && baseProduct.opcionais.length > 0 && !shouldRefreshHappyHourPricing && !baseProduct.catalogCompact) {
+    if (baseProduct?.opcionais && baseProduct.opcionais.length > 0 && !shouldRefreshProductRules && !baseProduct.catalogCompact) {
       loadedFractionProductIdsRef.current[idProduto] = true;
       mergeFractionProductDetails(baseProduct);
       return;
@@ -803,6 +810,17 @@ export const ItemLaunchScreen: React.FC = () => {
     () => fractions.map((value) => (value ? availableById.get(value) : undefined)),
     [availableById, fractions]
   );
+  const findRestrictedLaunchProduct = useCallback(() => {
+    if (isMenuItemRestrictedToday(resolvedProduct)) {
+      return resolvedProduct;
+    }
+
+    if (!fractionMode) {
+      return null;
+    }
+
+    return fractionItems.find((item): item is MenuItem => Boolean(item && isMenuItemRestrictedToday(item))) || null;
+  }, [fractionItems, fractionMode, resolvedProduct]);
   const fractionOptionalItemsByIndex = fractionItems.map((item) => {
     const source = item ? loadedFractionProducts[item.idProduto] || resolveOptionalSource(item) : null;
     return (source?.opcionais || []).filter(
@@ -880,6 +898,12 @@ export const ItemLaunchScreen: React.FC = () => {
 
   const onSelectFractionFlavor = (index: number, idProduto: number) => {
     if (index === 0) {
+      return;
+    }
+
+    const selectedProduct = availableById.get(idProduto);
+    if (selectedProduct && isMenuItemRestrictedToday(selectedProduct)) {
+      Alert.alert('Item restrito', buildMenuItemRestrictedMessage(selectedProduct));
       return;
     }
 
@@ -976,6 +1000,12 @@ export const ItemLaunchScreen: React.FC = () => {
 
   const onAdd = async () => {
     try {
+      const restrictedProduct = findRestrictedLaunchProduct();
+      if (restrictedProduct) {
+        Alert.alert('Item restrito', buildMenuItemRestrictedMessage(restrictedProduct));
+        return;
+      }
+
       const opened = await ensureActiveSale();
       const tableSource = opened || activeVenda || activeTable || routeTable;
       const tableId = getLinkedTableId(tableSource);

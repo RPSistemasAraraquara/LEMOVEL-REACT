@@ -2,7 +2,7 @@
   "expo": {
     "name": "RPMOVEL",
     "slug": "rpcheff-rn",
-    "version": "54.0.1",
+    "version": "54.0.2",
     "icon": "./assets/Logo.png",
     "orientation": "portrait",
     "ios": {
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "br.com.sistemalechef.rpmobile",
-      "versionCode": 105816,
+      "versionCode": 105817,
       "adaptiveIcon": {
         "foregroundImage": "./assets/Logo.png",
         "backgroundColor": "#FFFFFF"

@@ -41,6 +41,7 @@ type
     [SwagParamPath('idComandaDestino', 'identifica'#231#227'o da comanda destino')]
     [SwagResponse(204)]
     [SwagResponse(400)]
+    [SwagResponse(403)]
     procedure Transferir;
   end;
 
@@ -123,6 +124,7 @@ var
 begin
   LIdComandaOrigem := FRequest.Params.Field('idComanda').AsInteger;
   LIdComandaDestino := FRequest.Params.Field('idComandaDestino').AsInteger;
+  ValidarPermissaoTransferenciaMesa;
   Controller.Service.ComandaTransferenciaService
     .IdComandaOrigem(LIdComandaOrigem)
     .IdComandaDestino(LIdComandaDestino)

@@ -24,6 +24,7 @@ type
     function Controller(AIdEmpresa: Integer): TAPIRPCheffController; overload;
     function IdEmpresa: Integer;
     function IdUsuario: Integer;
+    procedure ValidarPermissaoTransferenciaMesa;
     procedure Response(AObject: TObject; ANotFoundMessage: string); overload;
     procedure Response(AObject: TObject; AOwner: Boolean = False); overload;
     procedure Response<T: class, constructor>(AList: TObjectList<T>; AOwner: Boolean = False); overload;
@@ -34,6 +35,9 @@ type
   end;
 
 implementation
+
+uses
+  APIRPCheff.Entity.Classes;
 
 { TAPIRPCheffControllerBase }
 
@@ -88,6 +92,53 @@ begin
   Result := 0;
   if FRequest.Headers.ContainsKey('idUsuario') then
     Result := FRequest.Headers.Field('idUsuario').AsInteger;
+end;
+
+procedure TAPIRPCheffControllerBase.ValidarPermissaoTransferenciaMesa;
+var
+  LIdUsuario: Integer;
+  LUsuario: TAPIRPCheffEntityUsuario;
+  LBody: TJSONObject;
+  LValue: TJSONValue;
+begin
+  LIdUsuario := IdUsuario;
+  if LIdUsuario <= 0 then
+  begin
+    try
+      LBody := FRequest.Body<TJSONObject>;
+      if Assigned(LBody) then
+      begin
+        LValue := LBody.Values['idUsuario'];
+        if Assigned(LValue) then
+          LIdUsuario := StrToIntDef(LValue.Value, 0);
+      end;
+    except
+      LIdUsuario := 0;
+    end;
+  end;
+
+  if LIdUsuario <= 0 then
+  begin
+    FResponse.Status(403);
+    raise Exception.Create('Usu'#225'rio n'#227'o informado para transfer'#234'ncia.');
+  end;
+
+  LUsuario := Controller.DAO.UsuarioDAO.Busca(LIdUsuario);
+  try
+    if not Assigned(LUsuario) then
+    begin
+      FResponse.Status(403);
+      raise Exception.CreateFmt('Usu'#225'rio %d n'#227'o encontrado para transfer'#234'ncia.', [LIdUsuario]);
+    end;
+
+    if not LUsuario.transferenciaMesa then
+    begin
+      FResponse.Status(403);
+      raise Exception.Create('Usu'#225'rio n'#227'o possui permiss'#227'o para transferir mesa/comanda.');
+    end;
+  finally
+    FreeAndNil(LUsuario);
+  end;
 end;
 
 procedure TAPIRPCheffControllerBase.Response(AObject: TObject; AOwner: Boolean);

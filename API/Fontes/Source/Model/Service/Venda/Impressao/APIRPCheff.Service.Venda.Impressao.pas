@@ -31,8 +31,8 @@ type
     function FormatarMoeda(AValor: Currency): string;
     function FormatarQuantidadeFracionada(AQuantidade, AValorUnitario, AValorTotal: Currency): string;
     function QuantidadeFichasIndividuais(AQuantidade: Currency): Integer;
-    function UsaIntegracaoMaquininha(AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
-    function PodeImprimirLocalmente(AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+    function UsaIntegracaoMaquininha: Boolean;
+    function PodeImprimirLocalmente: Boolean;
     procedure Imprimir(AConteudo: string); overload;
     function CriarImpressaoStone: TAPIRPCheffServiceVendaImpressao;
     function CriarImpressaoPlugPag: TAPIRPCheffServiceVendaImpressao;
@@ -227,7 +227,7 @@ begin
       .DAO(FDAO)
       .ImprimirFichaIndividualProdutos(FImprimirFichaIndividualProdutos);
     Result := LStrategy.Execute;
-    if FImprimir and PodeImprimirLocalmente(LEmpresa) then
+    if FImprimir and PodeImprimirLocalmente then
       Imprimir(TStringStream(Result).DataString);
   finally
     FreeAndNil(LStrategy);
@@ -262,13 +262,12 @@ begin
   end;
 end;
 
-function TAPIRPCheffServiceVendaImpressao.PodeImprimirLocalmente(
-  AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+function TAPIRPCheffServiceVendaImpressao.PodeImprimirLocalmente: Boolean;
 begin
 {$IFDEF LINUX}
   Exit(False);
 {$ENDIF}
-  Result := not UsaIntegracaoMaquininha(AEmpresa);
+  Result := not UsaIntegracaoMaquininha;
 end;
 
 function TAPIRPCheffServiceVendaImpressao.Imprimir(AValue: Boolean): TAPIRPCheffServiceVendaImpressao;
@@ -298,18 +297,9 @@ begin
     Result := 1;
 end;
 
-function TAPIRPCheffServiceVendaImpressao.UsaIntegracaoMaquininha(
-  AEmpresa: TAPIRPCheffEntityEmpresa): Boolean;
+function TAPIRPCheffServiceVendaImpressao.UsaIntegracaoMaquininha: Boolean;
 begin
   Result := FTipoMaquina in [tmpStone, tmpPlugPag, tmpCielo];
-  if Result then
-    Exit;
-
-  Result := Assigned(AEmpresa) and (
-    AEmpresa.utilizaIntegracaoStone
-    or AEmpresa.utilizaIntegracaoPagBank
-    or AEmpresa.utilizaIntegracaoCielo
-  );
 end;
 
 function TAPIRPCheffServiceVendaImpressao.TipoMaquina(

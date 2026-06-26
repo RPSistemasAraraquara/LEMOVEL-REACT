@@ -42,6 +42,8 @@ export type MenuItem = {
   permiteFracao?: boolean;
   happyHourAtivar?: boolean;
   happyHour?: ProductHappyHour;
+  restringirVenda?: boolean;
+  restricao?: ProductRestriction;
   opcionais?: ProductOptional[];
   catalogCompact?: boolean;
 };
@@ -59,6 +61,16 @@ export type ProductHappyHour = {
   horaInicial?: string | number;
   horaFinal?: string | number;
   valor?: number;
+};
+
+export type ProductRestriction = {
+  segundaFeira?: boolean;
+  tercaFeira?: boolean;
+  quartaFeira?: boolean;
+  quintaFeira?: boolean;
+  sextaFeira?: boolean;
+  sabado?: boolean;
+  domingo?: boolean;
 };
 
 export type ProductSizeOption = {
@@ -93,6 +105,8 @@ export type LaunchOptionalPayload = {
 };
 
 export type LaunchItemFractionPayload = {
+  mobileLaunchId?: string;
+  MobileLaunchId?: string;
   idProduto: number;
   produtoDescricao: string;
   quantidade: number;
@@ -105,6 +119,8 @@ export type LaunchItemFractionPayload = {
 };
 
 export type LaunchItemPayload = {
+  mobileLaunchId?: string;
+  MobileLaunchId?: string;
   idProduto: number;
   quantidade: number;
   valorUnitario: number;
@@ -374,6 +390,7 @@ export type UserProfile = {
   idUsuario: number;
   nome: string;
   login: string;
+  transferenciaMesa?: boolean;
   permiteCancelarItemMobile?: boolean;
   permitePreFechamentoMesaComanda?: boolean;
   permiteFechamentoMesaComanda?: boolean;
@@ -450,6 +467,7 @@ const fallbackProfile: UserProfile = {
   idUsuario: 1,
   nome: 'Demo Garçom',
   login: 'demo',
+  transferenciaMesa: false,
   permiteCancelarItemMobile: false,
   permitePreFechamentoMesaComanda: false,
   permiteFechamentoMesaComanda: false,
@@ -544,7 +562,7 @@ const fallbackTables: TableOrder[] = [
 export const defaultMobileSettings: MobileAppSettings = {
   baseUrl: 'https://mobile.rpfood.com.br',
   empresaId: 1,
-  terminalImpressao: 'PB09217174334',
+  terminalImpressao: 'PB3S249E76533',
   salvarLoginSenha: true,
   utilizaCatraca: false,
   cobrarMaiorValorFracionado: false,
@@ -570,8 +588,8 @@ export const defaultMobileSettings: MobileAppSettings = {
   sincronizarAposLogin: true,
   modoExibicao: 'mesa',
   utilizaMaquininhaStone: true,
-  tipoIntegracao: 'cielo',
-  modeloMaquininha: 'Cielo',
+  tipoIntegracao: 'pagbank',
+  modeloMaquininha: 'PagBank',
   usuario: '1',
   senha: '1'
 };
@@ -811,55 +829,89 @@ function normalizeRequestHeaders(headers?: HeadersInit): Record<string, string> 
   return normalized;
 }
 
-function isTransientAndroidNetworkError(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-      ? error
-      : error && typeof error === 'object' && 'message' in error
-      ? String((error as { message?: unknown }).message || '')
-      : '';
+function normalizeRequestErrorText(error: unknown): string {
+  const parts: string[] = [];
+  const append = (value: unknown) => {
+    if (typeof value === 'string' && value.trim()) {
+      parts.push(value.trim());
+    }
+  };
+  const appendFromRecord = (value: unknown) => {
+    if (!value || typeof value !== 'object') {
+      return;
+    }
 
-  const normalized = message.toLowerCase();
+    const record = value as Record<string, unknown>;
+    ['name', 'code', 'message', 'mensagem', 'description', 'localizedMessage'].forEach((key) => {
+      append(record[key]);
+    });
+  };
+
+  if (typeof error === 'string') {
+    append(error);
+  } else {
+    appendFromRecord(error);
+    if (error instanceof Error) {
+      append(error.message);
+      append(error.name);
+    }
+  }
+
+  if (error && typeof error === 'object') {
+    appendFromRecord((error as Record<string, unknown>).userInfo);
+  }
+
+  return parts
+    .join(' ')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function hasTransientRequestErrorText(normalized: string): boolean {
   return (
     normalized.includes('unexpected end of stream') ||
+    normalized.includes('end of stream') ||
     normalized.includes('connection abort') ||
     normalized.includes('connection reset') ||
+    normalized.includes('connection refused') ||
     normalized.includes('aborted') ||
     normalized.includes('aborterror') ||
+    normalized.includes('broken pipe') ||
+    normalized.includes('failed to connect') ||
+    normalized.includes('host unreachable') ||
+    normalized.includes('no route to host') ||
+    normalized.includes('read error') ||
+    normalized.includes('read timed out') ||
+    normalized.includes('socket closed') ||
+    normalized.includes('stream was reset') ||
     normalized.includes('timeout') ||
     normalized.includes('timed out') ||
     normalized.includes('tempo limite') ||
+    normalized.includes('erro de comunicacao') ||
+    normalized.includes('falha de comunicacao') ||
+    normalized.includes('erro de recebimento') ||
+    normalized.includes('falha ao receber') ||
+    normalized.includes('recebimento') ||
     normalized.includes('eofexception') ||
     normalized.includes('socketexception')
   );
 }
 
 function isTransientFetchNetworkError(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-      ? error
-      : error && typeof error === 'object' && 'message' in error
-      ? String((error as { message?: unknown }).message || '')
-      : '';
-
-  const normalized = message.toLowerCase();
+  const normalized = normalizeRequestErrorText(error);
   return (
     normalized.includes('network request failed') ||
     normalized.includes('failed to fetch') ||
-    normalized.includes('unexpected end of stream') ||
-    normalized.includes('connection abort') ||
-    normalized.includes('connection reset') ||
-    normalized.includes('aborted') ||
-    normalized.includes('aborterror') ||
-    normalized.includes('timeout') ||
-    normalized.includes('timed out') ||
-    normalized.includes('tempo limite') ||
-    normalized.includes('eofexception') ||
-    normalized.includes('socketexception')
+    hasTransientRequestErrorText(normalized)
+  );
+}
+
+function isTransientAndroidNetworkError(error: unknown): boolean {
+  const normalized = normalizeRequestErrorText(error);
+  return (
+    normalized.includes('rpcheff_http_error') ||
+    hasTransientRequestErrorText(normalized)
   );
 }
 
@@ -905,7 +957,7 @@ export function normalizeMobileBaseUrl(value: unknown): string {
     normalized = normalized.replace(/localhost|127\.0\.0\.1/gi, '10.0.2.2');
   }
 
-  if (/^https?:\/\/192\.168\.15\.35:9000$/i.test(normalized)) {
+  if (/^https?:\/\/192\.168\.15\.30:9000$/i.test(normalized)) {
     return fallback;
   }
 
@@ -1573,6 +1625,14 @@ function buildCatalogProductsSemanticFingerprint(products: MenuItem[]): string {
     append(item.happyHour?.sextaFeira ? 1 : 0);
     append(item.happyHour?.sabado ? 1 : 0);
     append(item.happyHour?.domingo ? 1 : 0);
+    append(item.restringirVenda ? 1 : 0);
+    append(item.restricao?.segundaFeira ? 1 : 0);
+    append(item.restricao?.tercaFeira ? 1 : 0);
+    append(item.restricao?.quartaFeira ? 1 : 0);
+    append(item.restricao?.quintaFeira ? 1 : 0);
+    append(item.restricao?.sextaFeira ? 1 : 0);
+    append(item.restricao?.sabado ? 1 : 0);
+    append(item.restricao?.domingo ? 1 : 0);
 
     const optionals = item.opcionais || [];
     append(optionals.length);
@@ -1654,7 +1714,9 @@ function buildCatalogPersistItems(products: MenuItem[]) {
         possuiImagem: Boolean(localPath || summary.possuiImagem),
         imagemLocalPath: localPath,
         happyHourAtivar: summary.happyHourAtivar,
-        happyHourJson: summary.happyHour ? JSON.stringify(summary.happyHour) : undefined
+        happyHourJson: summary.happyHour ? JSON.stringify(summary.happyHour) : undefined,
+        restringirVenda: summary.restringirVenda,
+        restricaoJson: summary.restricao ? JSON.stringify(summary.restricao) : undefined
       };
     })
     .filter((item) => item.id > 0);
@@ -1681,13 +1743,23 @@ function parseCatalogSummaryItem(row: ProductCatalogSummaryItem): MenuItem {
   const idProduto = Math.trunc(numberFromCatalogSummary(row.idProduto, 0));
   const localPath = extractStoredImageLocalPath(row.imagemLocalPath || undefined);
   const hasHappyHourMetadata = row.happyHourAtivar !== null && row.happyHourAtivar !== undefined || Boolean(row.happyHourJson);
+  const hasRestrictionMetadata = row.restringirVenda !== null && row.restringirVenda !== undefined || Boolean(row.restricaoJson);
   let happyHour: ProductHappyHour | undefined;
+  let restricao: ProductRestriction | undefined;
 
   if (row.happyHourJson) {
     try {
       happyHour = parseHappyHour(JSON.parse(row.happyHourJson));
     } catch {
       happyHour = undefined;
+    }
+  }
+
+  if (row.restricaoJson) {
+    try {
+      restricao = parseRestriction(JSON.parse(row.restricaoJson));
+    } catch {
+      restricao = undefined;
     }
   }
 
@@ -1721,6 +1793,8 @@ function parseCatalogSummaryItem(row: ProductCatalogSummaryItem): MenuItem {
     permiteFracao: flagFromCatalogSummary(row.permiteFracao, false),
     happyHourAtivar: hasHappyHourMetadata ? flagFromCatalogSummary(row.happyHourAtivar, false) : undefined,
     happyHour,
+    restringirVenda: hasRestrictionMetadata ? flagFromCatalogSummary(row.restringirVenda, false) : undefined,
+    restricao,
     opcionais: [],
     catalogCompact: true
   };
@@ -1866,6 +1940,46 @@ function parseHappyHour(value: any): ProductHappyHour {
   };
 }
 
+function hasRestrictionSourceMetadata(value: any): boolean {
+  const nested = resolveField(value, ['restricao', 'restrição', 'restriction']);
+  if (nested && typeof nested === 'object') {
+    return true;
+  }
+
+  const keys = [
+    'restringirVenda',
+    'restringir_venda',
+    'restricaoVenda',
+    'restricao_venda',
+    'b_restricao',
+    'bRestricao',
+    'nao_dia_seg',
+    'nao_dia_ter',
+    'nao_dia_qua',
+    'nao_dia_qui',
+    'nao_dia_sex',
+    'nao_dia_sab',
+    'nao_dia_dom'
+  ];
+
+  return keys.some((key) => resolveField(value, [key]) !== undefined);
+}
+
+function parseRestriction(value: any): ProductRestriction {
+  const nested = resolveField(value, ['restricao', 'restrição', 'restriction']);
+  const source = nested && typeof nested === 'object' ? nested : value;
+
+  return {
+    segundaFeira: parseBoolean(resolveField(source, ['segundaFeira', 'segunda_feira', 'nao_dia_seg', 'naoDiaSeg']), false),
+    tercaFeira: parseBoolean(resolveField(source, ['tercaFeira', 'terçaFeira', 'terca_feira', 'terça_feira', 'nao_dia_ter', 'naoDiaTer']), false),
+    quartaFeira: parseBoolean(resolveField(source, ['quartaFeira', 'quarta_feira', 'nao_dia_qua', 'naoDiaQua']), false),
+    quintaFeira: parseBoolean(resolveField(source, ['quintaFeira', 'quinta_feira', 'nao_dia_qui', 'naoDiaQui']), false),
+    sextaFeira: parseBoolean(resolveField(source, ['sextaFeira', 'sexta_feira', 'nao_dia_sex', 'naoDiaSex']), false),
+    sabado: parseBoolean(resolveField(source, ['sabado', 'sábado', 'nao_dia_sab', 'naoDiaSab']), false),
+    domingo: parseBoolean(resolveField(source, ['domingo', 'nao_dia_dom', 'naoDiaDom']), false)
+  };
+}
+
 function normalizeSizeValue(value: unknown): number {
   const asNumber = Number(String(value || 0).replace(',', '.'));
   return Number.isFinite(asNumber) ? asNumber : 0;
@@ -1994,6 +2108,74 @@ export function isMenuItemHappyHourActive(
   return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
 }
 
+function isRestrictionDayBlocked(item: MenuItem, referenceDate: Date): boolean {
+  const restricao = item.restricao;
+  if (!restricao) {
+    return false;
+  }
+
+  switch (referenceDate.getDay()) {
+    case 0:
+      return Boolean(restricao.domingo);
+    case 1:
+      return Boolean(restricao.segundaFeira);
+    case 2:
+      return Boolean(restricao.tercaFeira);
+    case 3:
+      return Boolean(restricao.quartaFeira);
+    case 4:
+      return Boolean(restricao.quintaFeira);
+    case 5:
+      return Boolean(restricao.sextaFeira);
+    case 6:
+      return Boolean(restricao.sabado);
+    default:
+      return false;
+  }
+}
+
+export function hasMenuItemRestrictionMetadata(item?: MenuItem | null): boolean {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+
+  return item.restringirVenda !== undefined || item.restricao !== undefined;
+}
+
+export function isMenuItemRestrictedToday(item: MenuItem, referenceDate = new Date()): boolean {
+  if (!item.restringirVenda || !item.restricao) {
+    return false;
+  }
+
+  return isRestrictionDayBlocked(item, referenceDate);
+}
+
+export function getMenuItemRestrictionDayLabel(referenceDate = new Date()): string {
+  switch (referenceDate.getDay()) {
+    case 0:
+      return 'domingo';
+    case 1:
+      return 'segunda-feira';
+    case 2:
+      return 'terça-feira';
+    case 3:
+      return 'quarta-feira';
+    case 4:
+      return 'quinta-feira';
+    case 5:
+      return 'sexta-feira';
+    case 6:
+      return 'sábado';
+    default:
+      return 'hoje';
+  }
+}
+
+export function buildMenuItemRestrictedMessage(item: MenuItem, referenceDate = new Date()): string {
+  const descricao = String(item?.descricao || 'Produto').trim() || 'Produto';
+  return `O item "${descricao}" não pode ser lançado hoje (${getMenuItemRestrictionDayLabel(referenceDate)}) por restrição de venda.`;
+}
+
 export function getMenuItemLaunchUnitPrice(
   item: MenuItem,
   sizeCode = '',
@@ -2052,6 +2234,7 @@ function parseMenuItem(value: any): MenuItem {
       ? [rawOptionals]
       : [];
   const hasHappyHourMetadata = hasHappyHourSourceMetadata(value);
+  const hasRestrictionMetadata = hasRestrictionSourceMetadata(value);
   const item: MenuItem = {
     id: parseNumber(resolveField(value, ['idProduto', 'id']), 0),
     idProduto: parseNumber(resolveField(value, ['idProduto', 'id']), 0),
@@ -2126,6 +2309,20 @@ function parseMenuItem(value: any): MenuItem {
       ? parseBoolean(resolveField(value, ['happyHourAtivar', 'happy_hour_ativar', 'hh_ativar']), false)
       : undefined,
     happyHour: hasHappyHourMetadata ? parseHappyHour(value) : undefined,
+    restringirVenda: hasRestrictionMetadata
+      ? parseBoolean(
+          resolveField(value, [
+            'restringirVenda',
+            'restringir_venda',
+            'restricaoVenda',
+            'restricao_venda',
+            'b_restricao',
+            'bRestricao'
+          ]),
+          false
+        )
+      : undefined,
+    restricao: hasRestrictionMetadata ? parseRestriction(value) : undefined,
     permiteFracao: parseBoolean(
       resolveField(value, [
         'permiteFracao',
@@ -2157,6 +2354,10 @@ function parseUserProfile(value: any): UserProfile {
     idUsuario: parseNumber(value?.idUsuario ?? value?.id ?? value?.usu_001, 1),
     nome: sanitizeText(value?.nome ?? value?.name ?? value?.usu_002, fallbackProfile.nome),
     login: sanitizeText(value?.login ?? value?.usuario ?? value?.usu_003, fallbackProfile.login),
+    transferenciaMesa: parseBoolean(
+      value?.transferenciaMesa ?? value?.TransferenciaMesa ?? value?.b_transferencia_mesa,
+      Boolean(fallbackProfile.transferenciaMesa)
+    ),
     permiteCancelarItemMobile: parseBoolean(
       value?.permiteCancelarItemMobile ?? value?.b_permite_canc_item_mobile,
       Boolean(fallbackProfile.permiteCancelarItemMobile)
@@ -4188,7 +4389,9 @@ export class ApiClient {
     const preserveCachedImages = options.preserveCachedImages !== false;
     const shouldLoadCachedProducts = options.preferCache || preserveCachedImages || !options.requireRemote;
     const cachedProducts = shouldLoadCachedProducts ? await this.loadCachedProducts({ compact: options.compact }) : [];
-    if (options.preferCache && !options.forceRemote && cachedProducts.length > 0) {
+    const cachedProductsHaveRestrictionMetadata =
+      cachedProducts.length > 0 && cachedProducts.every(hasMenuItemRestrictionMetadata);
+    if (options.preferCache && !options.forceRemote && cachedProducts.length > 0 && cachedProductsHaveRestrictionMetadata) {
       return cachedProducts;
     }
 
@@ -4505,10 +4708,15 @@ export class ApiClient {
   ): Promise<void> {
     const resource = tipo === 'comanda' ? 'comanda' : 'mesa';
     const terminal = await this.resolveTerminalName();
+    const headers: Record<string, string> = {};
+    if (Number(idUsuario || 0) > 0) {
+      headers.idUsuario = String(Math.trunc(Number(idUsuario)));
+    }
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/${resource}/${idOrigem}/transferencia/${idDestino}`,
       {
         method: 'POST',
+        headers,
         body: JSON.stringify({
           terminal,
           idDestino,
@@ -4585,7 +4793,7 @@ export class ApiClient {
       }
     );
     if (!response.ok) {
-      throw new Error('Falha ao pré-fechar venda');
+      throw new Error(extractApiErrorMessage(responsePayload, 'Falha ao pré-fechar venda'));
     }
     this.clearTablesGetCache();
 
@@ -4698,7 +4906,7 @@ export class ApiClient {
     idVenda: number,
     payload: SaleCouvertPayload
   ): Promise<void> {
-    const { response } = await this.request(
+    const { response, payload: responsePayload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/couvert`,
       {
         method: 'PATCH',
@@ -4706,7 +4914,7 @@ export class ApiClient {
       }
     );
     if (!response.ok) {
-      throw new Error('Falha ao atualizar couvert');
+      throw new Error(extractApiErrorMessage(responsePayload, 'Falha ao atualizar couvert'));
     }
     this.clearTablesGetCache();
   }
@@ -4776,7 +4984,8 @@ export class ApiClient {
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${input.idVenda}/pagamento`,
       {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        timeoutMs: 30000
       }
     );
     if (!response.ok) {

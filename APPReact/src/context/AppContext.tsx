@@ -476,6 +476,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         !sameFlag(current.happyHour?.sextaFeira, item.happyHour?.sextaFeira) ||
         !sameFlag(current.happyHour?.sabado, item.happyHour?.sabado) ||
         !sameFlag(current.happyHour?.domingo, item.happyHour?.domingo) ||
+        !sameFlag(current.restringirVenda, item.restringirVenda) ||
+        !sameFlag(current.restricao?.segundaFeira, item.restricao?.segundaFeira) ||
+        !sameFlag(current.restricao?.tercaFeira, item.restricao?.tercaFeira) ||
+        !sameFlag(current.restricao?.quartaFeira, item.restricao?.quartaFeira) ||
+        !sameFlag(current.restricao?.quintaFeira, item.restricao?.quintaFeira) ||
+        !sameFlag(current.restricao?.sextaFeira, item.restricao?.sextaFeira) ||
+        !sameFlag(current.restricao?.sabado, item.restricao?.sabado) ||
+        !sameFlag(current.restricao?.domingo, item.restricao?.domingo) ||
         !productOptionalsEqual(current.opcionais, item.opcionais)
       ) {
         return false;
@@ -593,6 +601,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getCartTotal = () => roundTo2(cart.reduce((acc, it) => acc + getLineTotal(it), 0));
 
   const asPayload = (item: CartItem): LaunchItemPayload => ({
+    mobileLaunchId: item.lineId,
+    MobileLaunchId: item.lineId,
     idProduto: item.idProduto,
     quantidade: item.quantidade,
     valorUnitario: item.valorUnitario,
@@ -612,22 +622,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       valor: optional.valor,
       gratis: optional.gratis
     })),
-    fracoes: item.fracoes?.map((fraction) => ({
-      idProduto: fraction.idProduto,
-      produtoDescricao: fraction.produtoDescricao,
-      quantidade: fraction.quantidade,
-      valorUnitario: fraction.valorUnitario,
-      valorTotal: fraction.valorTotal,
-      acrescimo: fraction.acrescimo,
-      observacao: fraction.observacao,
-      descricaoTamanho: fraction.descricaoTamanho,
-      opcionais: fraction.opcionais.map((optional) => ({
-        idOpcional: optional.idOpcional,
-        descricao: optional.descricao,
-        valor: optional.valor,
-        gratis: optional.gratis
-      }))
-    }))
+    fracoes: item.fracoes?.map((fraction, index) => {
+      const mobileLaunchId = `${item.lineId}:F${index + 1}`;
+      return {
+        mobileLaunchId,
+        MobileLaunchId: mobileLaunchId,
+        idProduto: fraction.idProduto,
+        produtoDescricao: fraction.produtoDescricao,
+        quantidade: fraction.quantidade,
+        valorUnitario: fraction.valorUnitario,
+        valorTotal: fraction.valorTotal,
+        acrescimo: fraction.acrescimo,
+        observacao: fraction.observacao,
+        descricaoTamanho: fraction.descricaoTamanho,
+        opcionais: fraction.opcionais.map((optional) => ({
+          idOpcional: optional.idOpcional,
+          descricao: optional.descricao,
+          valor: optional.valor,
+          gratis: optional.gratis
+        }))
+      };
+    })
   });
 
   const login = async (loginParam: string, senha: string) => {
@@ -683,6 +698,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Number(prev.idUsuario || 0) === Number(updated.idUsuario || 0) &&
         String(prev.nome || '') === String(updated.nome || '') &&
         String(prev.login || '') === String(updated.login || '') &&
+        Boolean(prev.transferenciaMesa) === Boolean(updated.transferenciaMesa) &&
         Boolean(prev.permiteCancelarItemMobile) === Boolean(updated.permiteCancelarItemMobile) &&
         Boolean(prev.permitePreFechamentoMesaComanda) === Boolean(updated.permitePreFechamentoMesaComanda) &&
         Boolean(prev.permiteFechamentoMesaComanda) === Boolean(updated.permiteFechamentoMesaComanda) &&

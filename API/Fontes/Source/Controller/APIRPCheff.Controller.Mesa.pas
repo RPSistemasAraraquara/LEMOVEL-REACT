@@ -40,6 +40,7 @@ type
     [SwagParamPath('idMesaDestino', 'identifica'#231#227'o da mesa destino')]
     [SwagResponse(204)]
     [SwagResponse(400)]
+    [SwagResponse(403)]
     procedure Transferir;
   end;
 
@@ -113,6 +114,7 @@ var
 begin
   LIdMesaOrigem := FRequest.Params.Field('idMesa').AsInteger;
   LIdMesaDestino := FRequest.Params.Field('idMesaDestino').AsInteger;
+  ValidarPermissaoTransferenciaMesa;
   Controller.Service.MesaTransferenciaService
     .IdMesaOrigem(LIdMesaOrigem)
     .IdMesaDestino(LIdMesaDestino)

@@ -38,6 +38,8 @@ export type ProductCatalogSummaryItem = {
   imagemLocalPath: string | null;
   happyHourAtivar: number | null;
   happyHourJson: string | null;
+  restringirVenda: number | null;
+  restricaoJson: string | null;
 };
 
 type ProductCatalogMetaRow = {
@@ -74,6 +76,8 @@ export type ProductCatalogPersistItem = {
   imagemLocalPath?: string;
   happyHourAtivar?: boolean;
   happyHourJson?: string;
+  restringirVenda?: boolean;
+  restricaoJson?: string;
 };
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
@@ -104,7 +108,9 @@ const PRODUCT_SUMMARY_COLUMNS: Array<[string, string]> = [
   ['possui_imagem', 'INTEGER'],
   ['imagem_local_path', 'TEXT'],
   ['happy_hour_ativar', 'INTEGER'],
-  ['happy_hour_json', 'TEXT']
+  ['happy_hour_json', 'TEXT'],
+  ['restringir_venda', 'INTEGER'],
+  ['restricao_json', 'TEXT']
 ];
 
 const PRODUCT_INSERT_COLUMNS = [
@@ -138,6 +144,8 @@ const PRODUCT_INSERT_COLUMNS = [
   'imagem_local_path',
   'happy_hour_ativar',
   'happy_hour_json',
+  'restringir_venda',
+  'restricao_json',
   'atualizado_em'
 ];
 
@@ -217,6 +225,8 @@ async function ensureSchemaAsync(): Promise<void> {
           imagem_local_path TEXT,
           happy_hour_ativar INTEGER,
           happy_hour_json TEXT,
+          restringir_venda INTEGER,
+          restricao_json TEXT,
           atualizado_em TEXT,
           PRIMARY KEY (catalog_key, id_produto)
         );
@@ -286,7 +296,9 @@ export async function loadStoredCatalogProductSummaries(catalogKey: string): Pro
           possui_imagem AS possuiImagem,
           imagem_local_path AS imagemLocalPath,
           happy_hour_ativar AS happyHourAtivar,
-          happy_hour_json AS happyHourJson
+          happy_hour_json AS happyHourJson,
+          restringir_venda AS restringirVenda,
+          restricao_json AS restricaoJson
         FROM ${PRODUCT_TABLE_NAME}
         WHERE catalog_key = ? AND descricao IS NOT NULL AND descricao <> ''
         ORDER BY sort_order ASC, id_produto ASC
@@ -464,6 +476,8 @@ function buildProductInsertValues(
     normalizeText(item.imagemLocalPath),
     normalizeFlag(item.happyHourAtivar),
     normalizeText(item.happyHourJson),
+    normalizeFlag(item.restringirVenda),
+    normalizeText(item.restricaoJson),
     now
   ];
 }

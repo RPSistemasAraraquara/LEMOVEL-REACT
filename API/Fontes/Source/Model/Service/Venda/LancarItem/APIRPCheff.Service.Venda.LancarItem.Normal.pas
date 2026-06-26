@@ -18,7 +18,7 @@ type
 
     procedure AtribuirDadosDoProduto;
     procedure CalcularPromocao(AProduto: TAPIRPCheffEntityProduto);
-    procedure GravarVendaItem;
+    function GravarVendaItem: Boolean;
     procedure GravarVendaItemOpcional;
     procedure AtualizarValorVenda;
     procedure AtribuirNumeroItem;
@@ -138,7 +138,11 @@ begin
     FDAO.StartTransaction;
     try
       AtribuirNumeroItem;
-      GravarVendaItem;
+      if not GravarVendaItem then
+      begin
+        FDAO.Commit;
+        Exit;
+      end;
       GravarVendaItemOpcional;
       if not FBatchMode then
         AtualizarValorVenda;
@@ -153,7 +157,7 @@ begin
 end;
 
 
-procedure TAPIRPCheffServiceVendaLancarItemNormal.GravarVendaItem;
+function TAPIRPCheffServiceVendaLancarItemNormal.GravarVendaItem: Boolean;
 var
   LVendaItemDAO: TAPIRPCheffDAOVendaItem;
 begin
@@ -164,7 +168,7 @@ begin
     if FItem.dataLancamento = 0 then
       FItem.dataLancamento  := Now;
 
-    LVendaItemDAO.Inserir(FItem, FPendenteImpressao);
+    Result := LVendaItemDAO.Inserir(FItem, FPendenteImpressao);
   except
     on E: Exception do
     begin

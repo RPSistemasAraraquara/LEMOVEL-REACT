@@ -163,12 +163,16 @@ begin
       LItem.acrescimo             := AItem.fracoes[I].acrescimo;
       LItem.tamanho               := AItem.tamanho;
       LItem.observacao            := AItem.fracoes[I].observacao;
+      if AItem.fracoes[I].mobileLaunchId <> EmptyStr then
+        LItem.mobileLaunchId      := AItem.fracoes[I].mobileLaunchId
+      else if AItem.mobileLaunchId <> EmptyStr then
+        LItem.mobileLaunchId      := Format('%s:F%d', [AItem.mobileLaunchId, I + 1]);
 
       CarregarDadosDoProduto(LItem);
       LItem.valorTotal := SimpleRoundTo(LItem.quantidade * LItem.valorUnitario, -3);
 
-      LDAO.Inserir(LItem, FPendenteImpressao);
-      SalvarOpcionais(LItem, AItem.fracoes[I]);
+      if LDAO.Inserir(LItem, FPendenteImpressao) then
+        SalvarOpcionais(LItem, AItem.fracoes[I]);
     finally
       FreeAndNil(LItem);
      end;

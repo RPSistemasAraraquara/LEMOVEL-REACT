@@ -15,6 +15,8 @@ type
   private
     FProduto: TAPIRPCheffEntityProduto;
     procedure CarregarProduto;
+    procedure ValidarRestricaoProduto(AProduto: TAPIRPCheffEntityProduto);
+    procedure ValidarRestricaoVendaProdutos;
   protected
     FDAO  : TAPIRPCheffDAOFactory;
     FItem : TAPIRPCheffEntityVendaItem;
@@ -53,6 +55,46 @@ begin
     raise Exception.CreateFmt('Produto %d n'#227'o encontrado.', [FItem.idProduto]);
 end;
 
+procedure TAPIRPCheffServiceVendaLancarItem.ValidarRestricaoProduto(AProduto: TAPIRPCheffEntityProduto);
+begin
+  if (not Assigned(AProduto)) or (not AProduto.VendaRestritaHoje) then
+    Exit;
+
+  raise EConflictError.CreateFmt(
+    'Produto "%s" nao pode ser lancado hoje (%s) por restricao de venda.',
+    [AProduto.descricao, AProduto.DiaRestricaoAtualDescricao]
+  );
+end;
+
+procedure TAPIRPCheffServiceVendaLancarItem.ValidarRestricaoVendaProdutos;
+var
+  I: Integer;
+  LProdutoFracao: TAPIRPCheffEntityProduto;
+  LIdProdutoFracao: Integer;
+begin
+  ValidarRestricaoProduto(FProduto);
+
+  if (not Assigned(FItem)) or (not Assigned(FItem.fracoes)) then
+    Exit;
+
+  for I := 0 to Pred(FItem.fracoes.Count) do
+  begin
+    LIdProdutoFracao := FItem.fracoes[I].idProduto;
+    if (LIdProdutoFracao <= 0) or (LIdProdutoFracao = FProduto.idProduto) then
+      Continue;
+
+    LProdutoFracao := FDAO.ProdutoDAO.Buscar(LIdProdutoFracao);
+    try
+      if not Assigned(LProdutoFracao) then
+        raise Exception.CreateFmt('Produto %d n'#227'o encontrado.', [LIdProdutoFracao]);
+
+      ValidarRestricaoProduto(LProdutoFracao);
+    finally
+      FreeAndNil(LProdutoFracao);
+    end;
+  end;
+end;
+
 function TAPIRPCheffServiceVendaLancarItem.BatchMode(AValue: Boolean): TAPIRPCheffServiceVendaLancarItem;
 begin
   Result := Self;
@@ -85,6 +127,7 @@ begin
   if not FBatchMode then
     ValidarVenda;
   CarregarProduto;
+  ValidarRestricaoVendaProdutos;
   FDAO.VendaItemDAO.GarantirPrecisaoQuantidadeDecimal;
 
   if FItem.fracoes.Count > 0 then

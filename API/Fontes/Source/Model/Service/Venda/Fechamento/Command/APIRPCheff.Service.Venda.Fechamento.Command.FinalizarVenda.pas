@@ -26,6 +26,7 @@ procedure TAPIRPCheffServiceVendaFechamentoCommandFinalizarVenda.Execute( AFecha
 var
   LDAO: TAPIRPCheffDAOVenda;
   LValorVenda: Currency;
+  LValorPagoAntecipado: Currency;
   LValorTaxa: Currency;
   LPercentualTaxa: Currency;
 begin
@@ -33,7 +34,8 @@ begin
   LDAO.ManagerTransaction(False);
   LDAO.FinalizarVenda(AFechamento);
 
-  LValorVenda := AFechamento.ValorPagamento;
+  LValorPagoAntecipado := LDAO.GetValorPago(FParent.Venda.idVenda);
+  LValorVenda := RoundTo(AFechamento.ValorPagamento + LValorPagoAntecipado, -2);
   LValorTaxa := AFechamento.valorTaxaServico;
 
   if LValorVenda > 0 then

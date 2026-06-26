@@ -10,6 +10,12 @@ import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { SafeMaterialCommunityIcons } from '../components/SafeExpoIcons';
+import {
+  adjustCouvertText,
+  clampCouvertText,
+  normalizeCouvertCount,
+  validateCouvertNotReduced
+} from '../utils/couvertLock';
 
 type StackNav = NativeStackNavigationProp<RootStackParams>;
 type VisibleItemGroup = {
@@ -385,6 +391,10 @@ export const SaleManagerScreen: React.FC = () => {
 
   const idVenda = activeTable?.idVenda;
   const activeTableCode = getLinkedTableId(activeTable);
+  const minimumCouvert = useMemo(() => ({
+    masculino: normalizeCouvertCount(sale?.numeroCouvertMasculino || 0),
+    feminino: normalizeCouvertCount(sale?.numeroCouvertFeminino || 0)
+  }), [sale?.numeroCouvertMasculino, sale?.numeroCouvertFeminino]);
 
   const showSweetAlert = (title: string, message: string, type: SweetAlertType = 'warning') => {
     setSweetAlert({
@@ -513,13 +523,27 @@ export const SaleManagerScreen: React.FC = () => {
 
   const onSaveCouvert = async () => {
     if (!idVenda) return;
+    const nextCouvert = {
+      masculino: normalizeCouvertCount(couvertMasc),
+      feminino: normalizeCouvertCount(couvertFem)
+    };
+    const reductionMessage = validateCouvertNotReduced(nextCouvert, minimumCouvert);
+    if (reductionMessage) {
+      setCouvertMasc(String(minimumCouvert.masculino));
+      setCouvertFem(String(minimumCouvert.feminino));
+      Alert.alert('Atenção', reductionMessage);
+      return;
+    }
+
     setSavingCouvert(true);
     try {
+      const numeroPessoas = Math.max(toNumber(personCount), nextCouvert.masculino + nextCouvert.feminino);
       await api.updateCouvert(idVenda, {
-        numeroPessoas: toNumber(personCount),
-        numeroCouvertMasculino: toNumber(couvertMasc),
-        numeroCouvertFeminino: toNumber(couvertFem)
+        numeroPessoas,
+        numeroCouvertMasculino: nextCouvert.masculino,
+        numeroCouvertFeminino: nextCouvert.feminino
       });
+      setPersonCount(String(numeroPessoas));
       await loadSale();
       Alert.alert('Concluído', 'Dados de couvert atualizados.');
     } catch (error: any) {
@@ -811,6 +835,22 @@ export const SaleManagerScreen: React.FC = () => {
     navigation.navigate('JuntarMesa', { idVendaDestino: idVenda, tableType: activeTable?.tipo });
   };
 
+  const openTransferSale = () => {
+    if (!idVenda) return;
+    if (!user?.transferenciaMesa) {
+      showPermissionDenied('Sem permissão para transferir mesa/comanda.');
+      return;
+    }
+    navigation.navigate('Transferencia', {
+      idMesaOrigem:
+        activeTable?.tipo === 'comanda'
+          ? Number(activeTable?.idComanda || activeTable?.idMesa || 0)
+          : Number(activeTable?.idMesa || 0),
+      idVenda,
+      tableType: activeTable?.tipo
+    });
+  };
+
   const getLineWaiterName = (line: SaleLine): string | null => {
     const waiterName = String(line.nomeGarcom || '').trim();
     if (waiterName) {
@@ -1006,17 +1046,27 @@ export const SaleManagerScreen: React.FC = () => {
                   <View style={styles.halfInputBlock}>
                     <Text style={styles.fieldLabel}>Couvert M</Text>
                     <View style={styles.counterWrap}>
-                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, -1)}>
+                      <Pressable
+                        style={[
+                          styles.counterButton,
+                          normalizeCouvertCount(couvertMasc) <= minimumCouvert.masculino ? styles.counterButtonDisabled : null
+                        ]}
+                        disabled={normalizeCouvertCount(couvertMasc) <= minimumCouvert.masculino}
+                        onPress={() => setCouvertMasc(adjustCouvertText(couvertMasc, -1, minimumCouvert.masculino))}
+                      >
                         <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
                       </Pressable>
                       <TextInput
                         style={styles.counterInput}
                         keyboardType="numeric"
                         value={couvertMasc}
-                        onChangeText={setCouvertMasc}
+                        onChangeText={(value) => setCouvertMasc(clampCouvertText(value, minimumCouvert.masculino))}
                         placeholder="0"
                       />
-                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertMasc, setCouvertMasc, 1)}>
+                      <Pressable
+                        style={styles.counterButton}
+                        onPress={() => setCouvertMasc(adjustCouvertText(couvertMasc, 1, minimumCouvert.masculino))}
+                      >
                         <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
                       </Pressable>
                     </View>
@@ -1024,17 +1074,27 @@ export const SaleManagerScreen: React.FC = () => {
                   <View style={styles.halfInputBlock}>
                     <Text style={styles.fieldLabel}>Couvert F</Text>
                     <View style={styles.counterWrap}>
-                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, -1)}>
+                      <Pressable
+                        style={[
+                          styles.counterButton,
+                          normalizeCouvertCount(couvertFem) <= minimumCouvert.feminino ? styles.counterButtonDisabled : null
+                        ]}
+                        disabled={normalizeCouvertCount(couvertFem) <= minimumCouvert.feminino}
+                        onPress={() => setCouvertFem(adjustCouvertText(couvertFem, -1, minimumCouvert.feminino))}
+                      >
                         <SafeMaterialCommunityIcons name="minus" size={16} color={Colors.text} />
                       </Pressable>
                       <TextInput
                         style={styles.counterInput}
                         keyboardType="numeric"
                         value={couvertFem}
-                        onChangeText={setCouvertFem}
+                        onChangeText={(value) => setCouvertFem(clampCouvertText(value, minimumCouvert.feminino))}
                         placeholder="0"
                       />
-                      <Pressable style={styles.counterButton} onPress={() => adjustCounterValue(couvertFem, setCouvertFem, 1)}>
+                      <Pressable
+                        style={styles.counterButton}
+                        onPress={() => setCouvertFem(adjustCouvertText(couvertFem, 1, minimumCouvert.feminino))}
+                      >
                         <SafeMaterialCommunityIcons name="plus" size={16} color={Colors.text} />
                       </Pressable>
                     </View>
@@ -1085,16 +1145,7 @@ export const SaleManagerScreen: React.FC = () => {
             </Pressable>
             <Pressable
               style={styles.actionCard}
-              onPress={() =>
-                navigation.navigate('Transferencia', {
-                  idMesaOrigem:
-                    activeTable?.tipo === 'comanda'
-                      ? Number(activeTable?.idComanda || activeTable?.idMesa || 0)
-                      : Number(activeTable?.idMesa || 0),
-                  idVenda,
-                  tableType: activeTable?.tipo
-                })
-              }
+              onPress={openTransferSale}
             >
               <Text style={styles.actionTitle}>Transferir</Text>
               <Text style={styles.actionHint}>Mover mesa/carteira para outra mesa</Text>
@@ -1338,6 +1389,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.cardSoft
+  },
+  counterButtonDisabled: {
+    opacity: 0.45
   },
   counterInput: {
     flex: 1,

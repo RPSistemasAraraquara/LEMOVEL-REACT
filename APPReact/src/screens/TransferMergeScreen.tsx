@@ -2,13 +2,36 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
-import { api, getTableOrderDisplayLabel, normalizeSaleStatus } from '../services/api';
+import { api, getTableOrderDisplayNumber, normalizeSaleStatus, TableOrder } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { Colors, Radius, Shadows, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 
 type Route = RouteProp<RootStackParams, 'Transferencia' | 'JuntarMesa'>;
+
+const isDefaultMesaComandaName = (value: string, expectedType: 'mesa' | 'comanda', expectedNumber: number) => {
+  const match = value.trim().toLowerCase().match(/^(mesa|comanda)\s+0*(\d+)$/i);
+  if (!match) return false;
+  return match[1] === expectedType && Number(match[2] || 0) === expectedNumber;
+};
+
+const formatMesaComandaWithNumber = (table: TableOrder | null | undefined, fallback = '') => {
+  if (!table) return fallback;
+
+  const isComanda = table.tipo === 'comanda' || Number(table.idComanda || 0) > 0;
+  const type = isComanda ? 'comanda' : 'mesa';
+  const prefix = isComanda ? 'Comanda' : 'Mesa';
+  const number = getTableOrderDisplayNumber(table);
+  const base = number > 0 ? `${prefix} ${number}` : fallback || prefix;
+  const name = String(table.nomeMesaComanda || table.venda?.nomeMesaComanda || '').trim();
+
+  if (!name || (number > 0 && isDefaultMesaComandaName(name, type, number))) {
+    return base;
+  }
+
+  return number > 0 ? `${base} - ${name}` : name;
+};
 
 export const TransferMergeScreen: React.FC = () => {
   const route = useRoute<Route>();
@@ -152,6 +175,7 @@ export const TransferMergeScreen: React.FC = () => {
     return availableTransferTargets.filter((table) => {
       if (!search) return true;
       return (
+        String(getTableOrderDisplayNumber(table)).includes(search) ||
         String(getTransferId(table)).includes(search) ||
         String(table.nomeMesaComanda || '').toLowerCase().includes(search)
       );
@@ -164,6 +188,7 @@ export const TransferMergeScreen: React.FC = () => {
       if (!search) return true;
       return (
         String(table.idVenda || 0).includes(search) ||
+        String(getTableOrderDisplayNumber(table)).includes(search) ||
         String(table.idMesa || 0).includes(search) ||
         String(table.nomeMesaComanda || '').toLowerCase().includes(search)
       );
@@ -193,7 +218,7 @@ export const TransferMergeScreen: React.FC = () => {
   };
 
   const executeTransfer = async () => {
-    if (!user?.permiteJuntarMesaComanda) {
+    if (!user?.transferenciaMesa) {
       Alert.alert('Atenção', 'Sem permissão para transferir mesa/comanda.');
       return;
     }
@@ -341,7 +366,10 @@ export const TransferMergeScreen: React.FC = () => {
 
   const candidates = isTransferMode ? filteredTransferTargets : filteredMergeTargets;
   const selectedCount = isTransferMode ? selectedTargetIds.length : selectedOriginSaleIds.length;
-  const sourceTitle = currentTable?.nomeMesaComanda || (isTransferMode ? `Mesa ${sourceTableId}` : `Venda ${destinationSaleId}`);
+  const sourceTitle = formatMesaComandaWithNumber(
+    currentTable,
+    isTransferMode ? `Mesa ${sourceTableId}` : `Venda ${destinationSaleId}`
+  );
   const sourceSubtitle = isTransferMode
     ? 'Origem selecionada'
     : `Venda ${destinationSaleId}`;
@@ -396,7 +424,7 @@ export const TransferMergeScreen: React.FC = () => {
                   : toggleMergeTarget(saleId)
               }
             >
-              <Text style={styles.optionTitle}>{getTableOrderDisplayLabel(table)}</Text>
+              <Text style={styles.optionTitle}>{formatMesaComandaWithNumber(table)}</Text>
               {!isTransferMode ? (
                 <Text style={styles.optionSub}>{`Venda ${saleId}`}</Text>
               ) : null}

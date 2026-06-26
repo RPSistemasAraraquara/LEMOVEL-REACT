@@ -337,9 +337,10 @@ export const SalePaymentScreen: React.FC = () => {
       if (activePaymentTokenRef.current !== paymentToken) return false;
 
       releaseMachinePaymentFlow(paymentToken);
+      const selectedMethodCode = selectedMethod.codigo;
 
       const approvedLine: PaymentDraft = {
-        codigo: result.method.codigo,
+        codigo: selectedMethodCode,
         valor: valorSelecionado.toFixed(2),
         processed: true,
         registered: false,
@@ -366,11 +367,11 @@ export const SalePaymentScreen: React.FC = () => {
       try {
         const registerStartedAt = Date.now();
         logSyncDiagnostic(
-          `fluxo pagamento parcial registrar terminal inicio idVenda=${idVenda} forma=${result.method.codigo} valor=${valorSelecionado.toFixed(2)}`
+          `fluxo pagamento parcial registrar terminal inicio idVenda=${idVenda} forma=${selectedMethodCode} valor=${valorSelecionado.toFixed(2)}`
         );
         await api.registerPartialPayment({
           idVenda,
-          idFormaPagamento: result.method.codigo,
+          idFormaPagamento: selectedMethodCode,
           valor: valorSelecionado,
           idUsuario: user?.idUsuario,
           hash_terminal: result.hash_terminal,
@@ -389,7 +390,7 @@ export const SalePaymentScreen: React.FC = () => {
           return next;
         });
         logSyncDiagnostic(
-          `fluxo pagamento parcial registrar terminal ok idVenda=${idVenda} forma=${result.method.codigo} em ${Date.now() - registerStartedAt}ms`
+          `fluxo pagamento parcial registrar terminal ok idVenda=${idVenda} forma=${selectedMethodCode} em ${Date.now() - registerStartedAt}ms`
         );
 
         await Promise.all([

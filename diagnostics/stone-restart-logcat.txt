@@ -1,0 +1,430 @@
+--------- beginning of main
+06-23 09:27:58.769 I/ADB_SERVICES(  348): post waitpid (pid=6067) status=0000
+06-23 09:27:58.794 I/ADB_SERVICES(  348): sunmi A_OPEN name=shell,v2,raw:am force-stop br.com.sistemalechef.rpmobile 
+06-23 09:27:58.794 I/ADB_SERVICES(  348): sunmi A_OPEN prop_value=0 
+06-23 09:27:58.794 I/ADB_SERVICES(  348): service_to_fd shell,v2,raw:am force-stop br.com.sistemalechef.rpmobile
+06-23 09:27:59.237 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.95 dur=1018.57 max=499.74 min=23.14
+06-23 09:27:59.251 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.953119,dur:1015.88,max:503.77,min:11.62
+06-23 09:28:00.000 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:00.000 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:00.207 E/PQ      ( 6069): [PQ][PQWhiteList] libwlparser.so is absent
+06-23 09:28:00.516 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=5.48 dur=1278.31 max=514.39 min=14.27
+06-23 09:28:00.529 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:5.476850,dur:1278.11,max:524.66,min:14.93
+06-23 09:28:00.530 I/Radio-JNI( 6069): register_android_hardware_Radio DONE
+--------- beginning of system
+06-23 09:28:00.566 I/ActivityManager( 1004): Force stopping br.com.sistemalechef.rpmobile appid=10171 user=0: from pid 6069
+06-23 09:28:00.567 I/ActivityManager( 1004): Killing 5697:br.com.sistemalechef.rpmobile/u0a171 (adj 0): stop br.com.sistemalechef.rpmobile
+06-23 09:28:00.568 W/ActivityManager( 1004): Force removing ActivityRecord{eb44906 u0 br.com.sistemalechef.rpmobile/.MainActivity t1816}: app died, no saved state
+06-23 09:28:00.595 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.595 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2ab6b50 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:00.605 I/APP_LOCK( 1004): ===intent has Intent.CATEGORY_HOME, ignore===
+06-23 09:28:00.611 I/perfservd( 1644): 0: set freq: 1495000 -1
+06-23 09:28:00.614 I/WindowManager( 1004): WIN DEATH: Window{2ab6b50 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:00.616 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:51,api:1,p:5697,c:346) disconnect(P): api 1
+06-23 09:28:00.616 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:51,api:1,p:-1,c:346) getReleasedBuffers: returning mask 0xffffffffffffffff
+06-23 09:28:00.616 W/InputDispatcher( 1004): channel '3e7b83e br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity (server)' ~ Consumer closed input channel or an error occurred.  events=0x9
+06-23 09:28:00.616 E/InputDispatcher( 1004): channel '3e7b83e br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity (server)' ~ Channel is unrecoverably broken and will be disposed!
+06-23 09:28:00.618 I/SurfaceFlinger(  346): EventThread Client Pid (5697) disconnected by (346)
+06-23 09:28:00.618 I/SurfaceFlinger(  346): EventThread Client Pid (5697) disconnected by (346)
+06-23 09:28:00.618 I/SurfaceFlinger(  346): EventThread Client Pid (5697) disconnected by (346)
+06-23 09:28:00.621 W/InputDispatcher( 1004): Attempted to unregister already unregistered input channel '3e7b83e br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity (server)'
+06-23 09:28:00.622 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad306c00,id:54,api:1,p:5697,c:346) disconnect(P): api 1
+06-23 09:28:00.622 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad306c00,id:54,api:1,p:-1,c:346) getReleasedBuffers: returning mask 0xffffffffffffffff
+06-23 09:28:00.623 I/libPerfService( 1004): [perfNotifyAppState] foreground:br.com.stone.posandroid.launcherapp, pid:1752
+06-23 09:28:00.628 W/WindowManager( 1004): Failed looking up window
+06-23 09:28:00.628 W/WindowManager( 1004): java.lang.IllegalArgumentException: Requested window android.os.BinderProxy@5d240f9 does not exist
+06-23 09:28:00.628 W/WindowManager( 1004): 	at com.android.server.wm.WindowManagerService.windowForClientLocked(WindowManagerService.java:9856)
+06-23 09:28:00.628 W/WindowManager( 1004): 	at com.android.server.wm.WindowManagerService.windowForClientLocked(WindowManagerService.java:9847)
+06-23 09:28:00.628 W/WindowManager( 1004): 	at com.android.server.wm.WindowState$DeathRecipient.binderDied(WindowState.java:1824)
+06-23 09:28:00.628 W/WindowManager( 1004): 	at android.os.BinderProxy.sendDeathNotice(Binder.java:695)
+06-23 09:28:00.628 I/WindowManager( 1004): WIN DEATH: null
+06-23 09:28:00.629 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad306c00,id:54,api:1,p:-1,c:-1) disconnect(C)
+06-23 09:28:00.629 I/SurfaceFlinger(  346): [SF client] DEL(0xadb7cb80) for (1004:system_server)
+06-23 09:28:00.629 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:51,api:1,p:-1,c:-1) disconnect(C)
+06-23 09:28:00.643 I/NotificationService( 1004): action=android.intent.action.PACKAGE_RESTARTED removing=false
+06-23 09:28:00.643 I/BufferQueue(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:51,api:1,p:-1,c:-1) ~BufferQueueCore
+06-23 09:28:00.644 I/BufferQueue(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad306c00,id:54,api:1,p:-1,c:-1) ~BufferQueueCore
+06-23 09:28:00.704 I/ADB_SERVICES(  348): post waitpid (pid=6069) status=0000
+06-23 09:28:00.708 I/RemoteTerminalSettingsDataSource( 5333): Binder:5333_1 get(key = HIGHLIGHT_APPS_ANDROID,value = null)
+06-23 09:28:00.708 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_1 get(key = HIGHLIGHT_APPS_ANDROID,value = br.com.stone.posandroid.settingsapp;br.com.stone.posandroid.ravapp;br.com.stone.posandroid.pixapp;br.com.sistemalechef.rpmobile)
+06-23 09:28:00.711 I/BufferQueue(  346): [unnamed-346-55](this:0xae14a400,id:55,api:0,p:-1,c:-1) BufferQueue core=(346:/system/bin/surfaceflinger)
+06-23 09:28:00.712 I/BufferQueueConsumer(  346): [unnamed-346-55](this:0xae14a400,id:55,api:0,p:-1,c:346) connect(C): consumer=(346:/system/bin/surfaceflinger) controlledByApp=false
+06-23 09:28:00.712 I/BufferQueueConsumer(  346): [unnamed-346-55](this:0xae14a400,id:55,api:0,p:-1,c:346) setConsumerName: unnamed-346-55
+06-23 09:28:00.712 I/BufferQueueConsumer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:0,p:-1,c:346) setConsumerName: br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity
+06-23 09:28:00.712 I/BufferQueueConsumer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:0,p:-1,c:346) setDefaultBufferSize: width=720 height=1440
+06-23 09:28:00.714 I/RemoteTerminalSettingsDataSource( 5333): Binder:5333_2 get(key = SHOW_HIGHLIGHT_APPS_OPTION,value = null)
+06-23 09:28:00.714 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_2 get(key = SHOW_HIGHLIGHT_APPS_OPTION,value = null)
+06-23 09:28:00.718 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_3 get(key = LAUNCHER_INITIAL_APP,value = br.com.sistemalechef.rpmobile)
+06-23 09:28:00.726 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.726 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:null
+06-23 09:28:00.726 I/RemoteTerminalSettingsDataSource( 5333): Binder:5333_3 get(key = SHOW_HIGHLIGHT_ENABLED,value = null)
+06-23 09:28:00.727 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_3 get(key = SHOW_HIGHLIGHT_ENABLED,value = true)
+06-23 09:28:00.728 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.728 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:null
+06-23 09:28:00.729 I/ADB_SERVICES(  348): sunmi A_OPEN name=shell,v2,raw:monkey -p br.com.sistemalechef.rpmobile -c android.intent.category.LAUNCHER 1 
+06-23 09:28:00.729 I/ADB_SERVICES(  348): sunmi A_OPEN prop_value=0 
+06-23 09:28:00.729 I/ADB_SERVICES(  348): service_to_fd shell,v2,raw:monkey -p br.com.sistemalechef.rpmobile -c android.intent.category.LAUNCHER 1
+06-23 09:28:00.743 I/BufferQueueProducer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:1,p:1752,c:346) connect(P): api=1 producer=(1752:br.com.stone.posandroid.launcherapp) producerControlledByApp=true
+06-23 09:28:00.744 W/libEGL  ( 1752): [ANDROID_RECORDABLE] format: 1
+06-23 09:28:00.814 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.814 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:null
+06-23 09:28:00.838 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.838 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:00.843 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:00.843 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:00.927 W/ResourceType( 6005): No package identifier when getting value for resource number 0x00000000
+06-23 09:28:00.928 W/ResourceType( 6005): No package identifier when getting value for resource number 0x00000000
+06-23 09:28:00.953 I/RemoteTerminalSettingsDataSource( 5333): Binder:5333_5 get(key = CAMPAIGN_LIST_STONE,value = null)
+06-23 09:28:00.954 I/manman  ( 1004): the packages==br.com.stone.posandroid.newsapp
+06-23 09:28:01.003 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_4 get(key = TAX_IDENTIFICATION_ENABLED_KEY,value = null)
+06-23 09:28:01.092 I/art     ( 1004): Background partial concurrent mark sweep GC freed 26588(1423KB) AllocSpace objects, 0(0B) LOS objects, 25% free, 11MB/15MB, paused 2.188ms total 153.351ms
+06-23 09:28:01.205 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:01.205 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:01.218 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:01.218 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:01.245 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:01.245 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:01.246 I/LocalTerminalSettingsDataSource( 5333): Binder:5333_1 get(key = MERCHANT_NAME_ENABLED_KEY,value = null)
+06-23 09:28:01.552 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=7.72 dur=1035.85 max=512.82 min=8.16
+06-23 09:28:01.565 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:35.714298,dur:1036.00,max:295.48,min:2.25
+06-23 09:28:01.912 E/PQ      ( 6084): [PQ][PQWhiteList] libwlparser.so is absent
+06-23 09:28:02.001 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:02.002 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:02.135 I/Radio-JNI( 6084): register_android_hardware_Radio DONE
+06-23 09:28:02.277 W/BroadcastQueue( 1004): Skipping deliver [background] BroadcastRecord{1d7e4db u-1 android.net.conn.CONNECTIVITY_CHANGE} to ReceiverList{d095b78 6084 (unknown name)/2000/u-1 remote:4ca0dd5}: process crashing
+06-23 09:28:02.297 W/ContextImpl( 1004): Calling a method in the system process without a qualified user: android.app.ContextImpl.sendBroadcast:889 com.android.server.pm.PackageManagerService.chooseBestActivity:5467 com.android.server.pm.PackageManagerService.resolveIntent:5292 com.android.server.am.ActivityStackSupervisor.resolveIntent:1199 com.android.server.am.ActivityStackSupervisor.resolveIntent:1194 
+06-23 09:28:02.298 I/ActivityManager( 1004): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=br.com.sistemalechef.rpmobile/.MainActivity} from uid 2000 on display 0
+06-23 09:28:02.299 I/APP_LOCK( 1004): isSecure took 0 ms
+06-23 09:28:02.304 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.305 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.307 I/APP_LOCK( 1004): br.com.sistemalechef.rpmobile is not locked
+06-23 09:28:02.309 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.309 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.314 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.314 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.318 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.318 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.321 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.321 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.327 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.327 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.331 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.332 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.335 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.335 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.344 I/art     ( 6084): System.exit called, status: 0
+06-23 09:28:02.344 I/AndroidRuntime( 6084): VM exiting with result code 0, cleanup skipped.
+06-23 09:28:02.345 I/BufferQueue(  346): [unnamed-346-56](this:0xae16c400,id:56,api:0,p:-1,c:-1) BufferQueue core=(346:/system/bin/surfaceflinger)
+06-23 09:28:02.346 I/BufferQueueConsumer(  346): [unnamed-346-56](this:0xae16c400,id:56,api:0,p:-1,c:346) connect(C): consumer=(346:/system/bin/surfaceflinger) controlledByApp=false
+06-23 09:28:02.346 I/BufferQueueConsumer(  346): [unnamed-346-56](this:0xae16c400,id:56,api:0,p:-1,c:346) setConsumerName: unnamed-346-56
+06-23 09:28:02.346 I/BufferQueueConsumer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:0,p:-1,c:346) setConsumerName: Starting br.com.sistemalechef.rpmobile
+06-23 09:28:02.346 I/BufferQueueConsumer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:0,p:-1,c:346) setDefaultBufferSize: width=1 height=1
+06-23 09:28:02.348 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.348 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.356 I/BufferQueueConsumer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:0,p:-1,c:346) setDefaultBufferSize: width=720 height=1440
+06-23 09:28:02.358 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.358 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.360 I/ADB_SERVICES(  348): post waitpid (pid=6084) status=0000
+06-23 09:28:02.362 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.362 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.363 I/BufferQueueProducer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:2,p:1004,c:346) connect(P): api=2 producer=(1004:system_server) producerControlledByApp=false
+06-23 09:28:02.364 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.364 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.367 I/APP_LOCK( 1004): br.com.sistemalechef.rpmobile is not locked
+06-23 09:28:02.379 W/Process ( 1004): zygoteSendArgsAndGetResult: start read result...
+06-23 09:28:02.383 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.383 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{fa46609 u0 br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity}
+06-23 09:28:02.384 I/Zygote  (  383): ForkAndSpecializeCommon: Finished, pid of child process is 6097 
+06-23 09:28:02.389 W/Process ( 1004): -18385925ms so far, end read result
+06-23 09:28:02.389 I/ActivityManager( 1004): Start proc 6097:br.com.sistemalechef.rpmobile/u0a171 for activity br.com.sistemalechef.rpmobile/.MainActivity
+06-23 09:28:02.425 I/libPerfService( 1004): [perfNotifyAppState] foreground:br.com.sistemalechef.rpmobile, pid:6097
+06-23 09:28:02.437 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.437 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:02.442 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.442 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:02.448 I/BufferQueueProducer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:1,p:1752,c:346) disconnect(P): api 1
+06-23 09:28:02.448 I/BufferQueueConsumer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:1,p:-1,c:346) getReleasedBuffers: returning mask 0xffffffffffffffff
+06-23 09:28:02.448 I/BufferQueueProducer(  346): [FrameBufferSurface_0](this:0xaec49400,id:0,api:1,p:346,c:346) queueBuffer: fps=0.14 dur=285584.68 max=284898.53 min=11.71
+06-23 09:28:02.459 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:02.459 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:02.487 I/art     ( 6097): Starting a blocking GC HeapTrim
+06-23 09:28:02.567 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:15.957475,dur:1002.66,max:525.23,min:15.52
+06-23 09:28:02.590 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.89 dur=1038.63 max=519.06 min=172.52
+06-23 09:28:02.790 I/SurfaceFlinger(  346): EventThread Client Pid (6097) created
+06-23 09:28:02.791 I/SurfaceFlinger(  346): EventThread Client Pid (6097) created
+06-23 09:28:02.828 W/SoLoader( 6097): Initializing SoLoader: 0
+06-23 09:28:02.829 W/SoLoader( 6097): Recording new base apk path: /data/app/br.com.sistemalechef.rpmobile-1/base.apk
+06-23 09:28:02.829 W/SoLoader( 6097): Previously recorded 0 base apk paths.
+06-23 09:28:02.832 I/SoLoader( 6097): Preparing SO source: DirectorySoSource[root = /system/vendor/lib flags = 2]
+06-23 09:28:02.833 I/SoLoader( 6097): Preparing SO source: DirectorySoSource[root = /system/lib flags = 2]
+06-23 09:28:02.834 I/SoLoader( 6097): Preparing SO source: DirectApkSoSource[root = [/data/app/br.com.sistemalechef.rpmobile-1/base.apk!/lib/armeabi-v7a]]
+06-23 09:28:02.880 I/SoLoader( 6097): Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/br.com.sistemalechef.rpmobile-1/lib/arm flags = 0]]
+06-23 09:28:02.880 I/SoLoader( 6097): init finish: 4 SO sources prepared
+06-23 09:28:02.881 W/SoLoader( 6097): SoLoader initialized: 8
+06-23 09:28:03.105 W/art     ( 6097): Before Android 4.1, method android.graphics.PorterDuffColorFilter androidx.vectordrawable.graphics.drawable.VectorDrawableCompat.updateTintFilter(android.graphics.PorterDuffColorFilter, android.content.res.ColorStateList, android.graphics.PorterDuff$Mode) would have incorrectly overridden the package-private method in android.graphics.drawable.Drawable
+06-23 09:28:03.136 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.136 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.151 I/thermal_repeater(  370): select timeout
+06-23 09:28:03.155 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.155 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.161 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.161 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.179 W/unknown:BridgelessReact( 6097): ReactHost{0}.startSurface(surfaceId = 0): Schedule
+06-23 09:28:03.179 W/unknown:BridgelessReact( 6097): ReactHost{0}.attachSurface(surfaceId = 0)
+06-23 09:28:03.181 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask()
+06-23 09:28:03.181 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask(): Start
+06-23 09:28:03.181 W/unknown:BridgelessReact( 6097): ReactHost{0}.getJSBundleLoader()
+06-23 09:28:03.184 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactContext(): Creating BridgelessReactContext
+06-23 09:28:03.187 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask(): Creating ReactInstance
+06-23 09:28:03.227 W/unknown:BridgelessReact( 6097): ReactHost{0}.onHostResume(activity)
+06-23 09:28:03.227 W/unknown:BridgelessReact( 6097): ReactContext.onHostResume()
+06-23 09:28:03.240 I/SurfaceFlinger(  346): EventThread Client Pid (6097) created
+06-23 09:28:03.245 I/SurfaceFlinger(  346): [SF client] NEW(0xaf218230) for (1004:system_server)
+06-23 09:28:03.274 I/BufferQueue(  346): [unnamed-346-57](this:0xad304400,id:57,api:0,p:-1,c:-1) BufferQueue core=(346:/system/bin/surfaceflinger)
+06-23 09:28:03.274 I/BufferQueueConsumer(  346): [unnamed-346-57](this:0xad304400,id:57,api:0,p:-1,c:346) connect(C): consumer=(346:/system/bin/surfaceflinger) controlledByApp=false
+06-23 09:28:03.274 I/BufferQueueConsumer(  346): [unnamed-346-57](this:0xad304400,id:57,api:0,p:-1,c:346) setConsumerName: unnamed-346-57
+06-23 09:28:03.274 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:0,p:-1,c:346) setConsumerName: br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity
+06-23 09:28:03.274 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:0,p:-1,c:346) setDefaultBufferSize: width=1 height=1
+06-23 09:28:03.276 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.276 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.278 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.278 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.290 I/BufferQueueConsumer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:0,p:-1,c:346) setDefaultBufferSize: width=720 height=1440
+06-23 09:28:03.293 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.293 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.342 I/OpenGLRenderer( 6097): Initialized EGL, version 1.4
+06-23 09:28:03.356 I/OpenGLRenderer( 6097): Get disable program binary service property (0)
+06-23 09:28:03.356 I/OpenGLRenderer( 6097): Initializing program atlas...
+06-23 09:28:03.357 I/ProgramBinary/Service( 6097): ProgramBinaryService client side disable debugging.
+06-23 09:28:03.357 I/ProgramBinary/Service( 6097): ProgramBinaryService client side disable binary content debugging.
+06-23 09:28:03.359 I/OpenGLRenderer( 6097): Program binary detail: Binary length is 365004, program map length is 124.
+06-23 09:28:03.359 I/OpenGLRenderer( 6097): Succeeded to mmap program binaries. File descriptor is 61, and path is /dev/ashmem.
+06-23 09:28:03.359 I/OpenGLRenderer( 6097): No need to use file discriptor anymore, close fd(61).
+06-23 09:28:03.360 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:1,p:6097,c:346) connect(P): api=1 producer=(6097:br.com.sistemalechef.rpmobile) producerControlledByApp=true
+06-23 09:28:03.361 W/libEGL  ( 6097): [ANDROID_RECORDABLE] format: 1
+06-23 09:28:03.406 I/PerfService( 6097): PerfServiceNative api init
+06-23 09:28:03.408 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.408 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.411 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.411 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{3a538a7 u0 Starting br.com.sistemalechef.rpmobile}
+06-23 09:28:03.418 I/ActivityManager( 1004): Displayed br.com.sistemalechef.rpmobile/.MainActivity: +1s50ms
+06-23 09:28:03.425 I/perfservd( 1644): 0: set freq: -1 -1
+06-23 09:28:03.426 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.426 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2abad31 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:03.441 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.441 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2abad31 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:03.497 I/BufferQueueConsumer(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:1,p:-1,c:-1) disconnect(C)
+06-23 09:28:03.497 I/BufferQueue(  346): [br.com.stone.posandroid.launcherapp/br.com.stone.posandroid.foundation.core.launcher.ui.MainActivity](this:0xae14a400,id:55,api:1,p:-1,c:-1) ~BufferQueueCore
+06-23 09:28:03.534 I/BufferQueueProducer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:2,p:1004,c:346) disconnect(P): api 2
+06-23 09:28:03.534 I/BufferQueueConsumer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:2,p:-1,c:346) getReleasedBuffers: returning mask 0xffffffffffffffff
+06-23 09:28:03.536 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.536 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2abad31 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:03.540 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:03.540 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2abad31 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:03.549 I/BufferQueueConsumer(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:2,p:-1,c:-1) disconnect(C)
+06-23 09:28:03.550 I/BufferQueue(  346): [Starting br.com.sistemalechef.rpmobile](this:0xae16c400,id:56,api:2,p:-1,c:-1) ~BufferQueueCore
+06-23 09:28:03.557 I/art     ( 6097): Do partial code cache collection, code=24KB, data=27KB
+06-23 09:28:03.559 I/art     ( 6097): After code cache collection, code=24KB, data=27KB
+06-23 09:28:03.559 I/art     ( 6097): Increasing code cache capacity to 128KB
+06-23 09:28:03.562 I/ExpoModulesCore( 6097): ✅ AppContext was initialized
+06-23 09:28:03.567 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:48.994995,dur:1000.10,max:103.79,min:15.13
+06-23 09:28:03.626 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=1.93 dur=1035.59 max=520.83 min=514.76
+06-23 09:28:03.662 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask(): Loading JS Bundle
+06-23 09:28:03.663 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask(): Calling DevSupportManagerBase.onNewReactContextCreated(reactContext)
+06-23 09:28:03.664 W/unknown:BridgelessReact( 6097): ReactContext.onHostResume()
+06-23 09:28:03.664 W/unknown:BridgelessReact( 6097): ReactHost{0}.startSurface(surfaceId = 0): Execute
+06-23 09:28:03.665 W/unknown:BridgelessReact( 6097): ReactHost{0}.getOrCreateReactInstanceTask(): Executing ReactInstanceEventListeners
+06-23 09:28:03.885 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenFooterManager
+06-23 09:28:03.903 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.uimanager.LayoutShadowNode
+06-23 09:28:03.917 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenContentWrapperManager
+06-23 09:28:03.923 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class expo.modules.kotlin.views.GroupViewManagerWrapper
+06-23 09:28:03.932 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class expo.modules.kotlin.views.SimpleViewManagerWrapper
+06-23 09:28:03.947 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.TabsHostViewManager
+06-23 09:28:03.954 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ModalScreenViewManager
+06-23 09:28:03.963 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenContainerViewManager
+06-23 09:28:03.966 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderSubviewManager
+06-23 09:28:03.969 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderConfigViewManager
+06-23 09:28:03.977 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.SearchBarManager
+06-23 09:28:03.984 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.TabScreenViewManager
+06-23 09:28:03.988 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenViewManager
+06-23 09:28:03.991 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.rnscreens.ScreenStackViewManager
+06-23 09:28:03.993 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaProviderManager
+06-23 09:28:03.996 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewManager
+06-23 09:28:04.004 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:04.004 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:04.006 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewShadowNode
+06-23 09:28:04.113 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.progressbar.ReactProgressBarViewManager
+06-23 09:28:04.116 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.progressbar.ProgressBarShadowNode
+06-23 09:28:04.126 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextViewManager
+06-23 09:28:04.127 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextShadowNode
+06-23 09:28:04.144 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollContainerViewManager
+06-23 09:28:04.160 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.scroll.ReactScrollViewManager
+06-23 09:28:04.179 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerButtonViewManager
+06-23 09:28:04.191 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.unimplementedview.ReactUnimplementedViewManager
+06-23 09:28:04.200 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageViewManager
+06-23 09:28:04.201 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageShadowNode
+06-23 09:28:04.215 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.swiperefresh.SwipeRefreshLayoutManager
+06-23 09:28:04.234 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactTextViewManager
+06-23 09:28:04.240 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactTextShadowNode
+06-23 09:28:04.269 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputManager
+06-23 09:28:04.280 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputShadowNode
+06-23 09:28:04.293 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.modal.ReactModalHostManager
+06-23 09:28:04.307 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager
+06-23 09:28:04.311 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchShadowNode
+06-23 09:28:04.319 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.safeareaview.ReactSafeAreaViewManager
+06-23 09:28:04.320 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.safeareaview.ReactSafeAreaViewShadowNode
+06-23 09:28:04.325 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactRawTextManager
+06-23 09:28:04.326 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.text.ReactRawTextShadowNode
+06-23 09:28:04.335 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollViewManager
+06-23 09:28:04.347 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.view.ReactViewManager
+06-23 09:28:04.356 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerRootViewManager
+06-23 09:28:04.366 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.image.ReactImageManager
+06-23 09:28:04.382 W/unknown:ViewManagerPropertyUpdater( 6097): Could not find generated setter for class com.facebook.react.views.drawer.ReactDrawerLayoutManager
+06-23 09:28:04.398 W/BridgelessReactContext( 6097): [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+06-23 09:28:04.421 I/ExpoModulesCore( 6097): ✅ JSI interop was installed
+06-23 09:28:04.428 I/ExpoModulesCore( 6097): ✅ Constants were exported
+06-23 09:28:04.525 I/FA      ( 1752): Application backgrounded at: timestamp_millis: 1782217682522
+06-23 09:28:04.637 I/ReactNativeJS( 6097): Running "main"
+06-23 09:28:04.646 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=1.96 dur=1020.31 max=517.14 min=503.17
+06-23 09:28:04.673 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.712610,dur:1105.95,max:533.99,min:69.11
+06-23 09:28:04.709 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:1,p:6097,c:346) queueBuffer: fps=0.77 dur=1303.59 max=1303.59 min=1303.59
+06-23 09:28:04.971 I/WebViewFactory( 6097): Loading com.google.android.webview version 69.0.3497.100 (code 349710000)
+06-23 09:28:05.043 I/art     ( 6097): Do partial code cache collection, code=43KB, data=62KB
+06-23 09:28:05.053 I/art     ( 6097): After code cache collection, code=43KB, data=62KB
+06-23 09:28:05.053 I/art     ( 6097): Increasing code cache capacity to 256KB
+06-23 09:28:05.091 I/art     ( 6097): Rejecting re-init on previously-failed class java.lang.Class<com.android.webview.chromium.TracingControllerAdapter>: java.lang.NoClassDefFoundError: Failed resolution of: Landroid/webkit/TracingController;
+06-23 09:28:05.091 I/art     ( 6097):   at java.lang.Class java.lang.Class.classForName!(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+06-23 09:28:05.091 I/art     ( 6097):   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:400)
+06-23 09:28:05.091 I/art     ( 6097):   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:374)
+06-23 09:28:05.091 I/art     ( 6097):   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:194)
+06-23 09:28:05.091 I/art     ( 6097):   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:39)
+06-23 09:28:05.091 I/art     ( 6097):   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.kt:73)
+06-23 09:28:05.091 I/art     ( 6097):   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.kt:30)
+06-23 09:28:05.092 I/art     ( 6097):   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+06-23 09:28:05.092 I/art     ( 6097):   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.kt:37)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+06-23 09:28:05.092 I/art     ( 6097):   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1133)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:607)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.lang.Thread.run() (Thread.java:761)
+06-23 09:28:05.092 I/art     ( 6097): Caused by: java.lang.ClassNotFoundException: Didn't find class "android.webkit.TracingController" on path: DexPathList[[zip file "/system/app/webview/webview.apk"],nativeLibraryDirectories=[/system/app/webview/lib/arm, /system/app/webview/webview.apk!/lib/armeabi-v7a, /system/lib, /vendor/lib, /system/lib, /vendor/lib]]
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:56)
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:380)
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class java.lang.Class.classForName!(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:400)
+06-23 09:28:05.092 I/art     ( 6097):   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:374)
+06-23 09:28:05.092 I/art     ( 6097):   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:194)
+06-23 09:28:05.092 I/art     ( 6097):   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:39)
+06-23 09:28:05.092 I/art     ( 6097):   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.kt:73)
+06-23 09:28:05.092 I/art     ( 6097):   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.kt:30)
+06-23 09:28:05.092 I/art     ( 6097):   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+06-23 09:28:05.092 I/art     ( 6097):   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.kt:37)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+06-23 09:28:05.092 I/art     ( 6097):   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+06-23 09:28:05.092 I/art     ( 6097):   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1133)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:607)
+06-23 09:28:05.092 I/art     ( 6097):   at void java.lang.Thread.run() (Thread.java:761)
+06-23 09:28:05.092 I/art     ( 6097): 
+06-23 09:28:05.098 W/[RNScreens]( 6097): disableBackButtonMenu prop is not available on Android
+06-23 09:28:05.098 W/[RNScreens]( 6097): largeTitleHideShadow prop is not available on Android
+06-23 09:28:05.098 W/[RNScreens]( 6097): backTitleVisible prop is not available on Android
+06-23 09:28:05.118 I/cr_LibraryLoader( 6097): Time to load native libraries: 5 ms (timestamps 8250-8255)
+06-23 09:28:05.197 I/chromium( 6097): [INFO:library_loader_hooks.cc(36)] Chromium logging enabled: level = 0, default verbosity = 0
+06-23 09:28:05.198 I/cr_LibraryLoader( 6097): Expected native library version number "69.0.3497.100", actual native library version number "69.0.3497.100"
+06-23 09:28:05.465 I/art     ( 6097): Background partial concurrent mark sweep GC freed 33750(2MB) AllocSpace objects, 8(612KB) LOS objects, 36% free, 6MB/10MB, paused 6.928ms total 120.045ms
+06-23 09:28:05.573 W/WindowManager( 1004): updateLightNavigationBarLw--imeWin:null
+06-23 09:28:05.573 W/WindowManager( 1004): updateLightNavigationBarLw--navColorWin:Window{2abad31 u0 br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity}
+06-23 09:28:05.662 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.95 dur=1015.57 max=522.79 min=16.36
+06-23 09:28:05.676 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:7.979120,dur:1002.62,max:450.69,min:14.97
+06-23 09:28:06.006 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:06.006 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:06.228 I/art     ( 6097): Do full code cache collection, code=88KB, data=123KB
+06-23 09:28:06.237 I/art     ( 6097): Starting a blocking GC JitCodeCache
+06-23 09:28:06.237 I/art     ( 6097): After code cache collection, code=69KB, data=64KB
+06-23 09:28:06.403 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:1,p:6097,c:346) queueBuffer: fps=2.95 dur=1693.96 max=859.94 min=18.94
+06-23 09:28:06.760 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=7.28 dur=1098.45 max=513.46 min=8.18
+06-23 09:28:06.766 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:8.257730,dur:1089.89,max:502.60,min:15.76
+06-23 09:28:07.090 I/art     ( 6097): Do partial code cache collection, code=126KB, data=124KB
+06-23 09:28:07.091 I/art     ( 6097): After code cache collection, code=122KB, data=122KB
+06-23 09:28:07.091 I/art     ( 6097): Increasing code cache capacity to 512KB
+06-23 09:28:07.216 I/System.out( 6097): [socket][3:-1] exception
+06-23 09:28:07.217 I/System.out( 6097): [socket][3:-1] exception
+06-23 09:28:07.224 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.245 I/System.out( 6097): [socket][4:-1] exception
+06-23 09:28:07.247 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.269 I/System.out( 6097): [socket][5:-1] exception
+06-23 09:28:07.277 I/System.out( 6097): [socket][6:-1] exception
+06-23 09:28:07.284 I/System.out( 6097): [socket][7:-1] exception
+06-23 09:28:07.296 I/System.out( 6097): [socket][9:-1] exception
+06-23 09:28:07.299 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.300 I/System.out( 6097): [socket][9:-1] exception
+06-23 09:28:07.310 I/System.out( 6097): [socket][10:-1] exception
+06-23 09:28:07.313 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.315 I/System.out( 6097): [socket][11:-1] exception
+06-23 09:28:07.326 I/System.out( 6097): [socket][13:-1] exception
+06-23 09:28:07.329 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.331 I/System.out( 6097): [socket][13:-1] exception
+06-23 09:28:07.339 I/System.out( 6097): [socket][14:-1] exception
+06-23 09:28:07.342 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.349 I/System.out( 6097): [socket][15:-1] exception
+06-23 09:28:07.351 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.363 I/System.out( 6097): [socket][18:-1] exception
+06-23 09:28:07.366 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.368 I/System.out( 6097): [socket][18:-1] exception
+06-23 09:28:07.369 I/System.out( 6097): [socket][18:-1] exception
+06-23 09:28:07.381 I/System.out( 6097): [socket][19:-1] exception
+06-23 09:28:07.401 I/System.out( 6097): [socket][21:-1] exception
+06-23 09:28:07.404 I/System.out( 6097): [socket][21:-1] exception
+06-23 09:28:07.473 I/System.out( 6097): [socket][22:-1] exception
+06-23 09:28:07.484 I/BufferQueueProducer(  346): [br.com.sistemalechef.rpmobile/br.com.sistemalechef.rpmobile.MainActivity](this:0xad304400,id:57,api:1,p:6097,c:346) queueBuffer: fps=2.78 dur=1080.85 max=702.78 min=162.47
+06-23 09:28:07.507 I/System.out( 6097): [socket][23:-1] exception
+06-23 09:28:07.531 I/System.out( 6097): [socket][24:-1] exception
+06-23 09:28:07.534 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.539 I/System.out( 6097): [socket][25:-1] exception
+06-23 09:28:07.542 I/System.out( 6097): Close in OkHttp
+06-23 09:28:07.557 I/System.out( 6097): [socket][26:-1] exception
+06-23 09:28:07.588 I/System.out( 6097): [socket][27:-1] exception
+06-23 09:28:07.789 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=1.94 dur=1029.38 max=517.87 min=511.51
+06-23 09:28:07.802 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:3.858848,dur:1036.58,max:346.45,min:172.96
+06-23 09:28:08.006 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:08.007 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:08.152 I/thermal_repeater(  370): oh, queryMdThermalInfo (0)No such file or directory
+06-23 09:28:08.165 I/thermal_repeater(  370): [recvMdThermalInfo] ret=37, strLen=127,  2, 32767, -127, 20821, 32767, -20554
+06-23 09:28:09.054 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.37 dur=1264.17 max=520.08 min=224.24
+06-23 09:28:09.059 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.387155,dur:1256.73,max:519.13,min:224.51
+06-23 09:28:10.009 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:10.009 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:10.090 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.89 dur=1036.36 max=519.02 min=205.76
+06-23 09:28:10.097 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.891572,dur:1037.50,max:512.52,min:238.31
+06-23 09:28:11.127 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=1.93 dur=1036.88 max=519.56 min=517.32
+06-23 09:28:11.134 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:1.927464,dur:1037.63,max:518.89,min:518.74
+06-23 09:28:12.011 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:12.011 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:12.164 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=1.93 dur=1037.15 max=519.42 min=517.73
+06-23 09:28:12.172 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:1.927644,dur:1037.54,max:518.82,min:518.71
+06-23 09:28:13.171 I/thermal_repeater(  370): select timeout
+06-23 09:28:13.200 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.90 dur=1035.73 max=518.48 min=101.48
+06-23 09:28:13.209 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.891934,dur:1037.37,max:515.24,min:104.84
+06-23 09:28:13.940 W/Watchdog( 1004): **Get SF Time **1
+06-23 09:28:13.940 W/Watchdog( 1004): SWT Watchdog before synchronized:3357079
+06-23 09:28:13.940 W/Watchdog( 1004): SWT Watchdog after synchronized:3357079
+06-23 09:28:14.011 I/wmt_launcher(  338): fw log ctrl flag has been set
+06-23 09:28:14.012 I/wmt_launcher(  338): fw dynamic ctrl flag has been set
+06-23 09:28:14.236 I/BufferQueueProducer(  346): [StatusBar](this:0xae163c00,id:10,api:1,p:1131,c:346) queueBuffer: fps=2.89 dur=1036.57 max=517.73 min=68.29
+06-23 09:28:14.247 I/DisplayDevice(  346): [Built-in Screen (type:0)] fps:2.891063,dur:1037.68,max:515.99,min:69.89
+06-23 09:28:14.417 I/ADB_SERVICES(  348): sunmi A_OPEN name=shell,v2,raw:pidof br.com.sistemalechef.rpmobile 
+06-23 09:28:14.417 I/ADB_SERVICES(  348): sunmi A_OPEN prop_value=0 
+06-23 09:28:14.417 I/ADB_SERVICES(  348): service_to_fd shell,v2,raw:pidof br.com.sistemalechef.rpmobile
+06-23 09:28:14.497 I/ADB_SERVICES(  348): post waitpid (pid=6159) status=0000
+06-23 09:28:14.528 I/ADB_SERVICES(  348): sunmi A_OPEN name=shell,v2:export ANDROID_LOG_TAGS=''; exec logcat '-d' '-v' 'time' 
+06-23 09:28:14.529 I/ADB_SERVICES(  348): sunmi A_OPEN prop_value=0 
+06-23 09:28:14.529 I/ADB_SERVICES(  348): service_to_fd shell,v2:export ANDROID_LOG_TAGS=''; exec logcat '-d' '-v' 'time'

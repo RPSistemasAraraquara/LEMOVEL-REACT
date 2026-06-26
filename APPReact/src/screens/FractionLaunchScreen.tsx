@@ -3,7 +3,16 @@ import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput,
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
-import { formatTableStatusLabel, getMenuItemLaunchUnitPrice, getTableOrderDisplayLabel, MenuItem, ProductOptional, TableOrder } from '../services/api';
+import {
+  buildMenuItemRestrictedMessage,
+  formatTableStatusLabel,
+  getMenuItemLaunchUnitPrice,
+  getTableOrderDisplayLabel,
+  isMenuItemRestrictedToday,
+  MenuItem,
+  ProductOptional,
+  TableOrder
+} from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { useApp } from '../context/AppContext';
 import { useLinkedMesaBinding } from '../hooks/useLinkedMesaBinding';
@@ -384,6 +393,13 @@ export const FractionLaunchScreen: React.FC = () => {
   const fractionItems = useMemo(() => {
     return fractions.map((value) => (value ? availableById.get(value) : undefined));
   }, [availableById, fractions]);
+  const findRestrictedLaunchProduct = useCallback(() => {
+    if (isMenuItemRestrictedToday(product)) {
+      return product;
+    }
+
+    return fractionItems.find((item): item is MenuItem => Boolean(item && isMenuItemRestrictedToday(item))) || null;
+  }, [fractionItems, product]);
 
   const duplicateCount = useMemo(() => {
     const values = fractions.filter((item) => item !== null);
@@ -494,6 +510,12 @@ export const FractionLaunchScreen: React.FC = () => {
   };
 
   const onSelectFlavor = (index: number, idProduto: number) => {
+    const selectedProduct = availableById.get(idProduto);
+    if (selectedProduct && isMenuItemRestrictedToday(selectedProduct)) {
+      Alert.alert('Item restrito', buildMenuItemRestrictedMessage(selectedProduct));
+      return;
+    }
+
     const alreadySelectedInAnotherSlot = idProduto !== fractions[index] && selectedIds.has(idProduto);
     if (alreadySelectedInAnotherSlot) {
       Alert.alert('Sabor repetido', 'Cada fração precisa de um sabor diferente.');
@@ -574,6 +596,12 @@ export const FractionLaunchScreen: React.FC = () => {
     try {
       if (!canSave) {
         Alert.alert('Campos pendentes', 'Selecione um sabor diferente para cada fração.');
+        return;
+      }
+
+      const restrictedProduct = findRestrictedLaunchProduct();
+      if (restrictedProduct) {
+        Alert.alert('Item restrito', buildMenuItemRestrictedMessage(restrictedProduct));
         return;
       }
 

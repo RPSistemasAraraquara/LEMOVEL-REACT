@@ -136,7 +136,7 @@ export const LoginScreen: React.FC = () => {
           </View>
           <Image source={require('../../assets/Logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>RP MOVEL</Text>
-          <Text style={styles.versionLabel}>Versão 16.0.0</Text>
+          <Text style={styles.versionLabel}>Versão 18.0.3</Text>
         </View>
 
         <View style={styles.card}>

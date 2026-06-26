@@ -379,6 +379,14 @@ export const describeMachinePaymentError = (
     message = `Operação cancelada na ${providerLabel}. Nenhum pagamento foi registrado no app.`;
   } else if (normalizedCode.includes('busy') || normalizedMessage.includes('em andamento')) {
     message = `Já existe um pagamento ${providerLabel} em andamento. Aguarde a maquininha finalizar antes de tentar novamente.`;
+  } else if (
+    normalizedMessage.includes('erro de comunicacao') ||
+    normalizedMessage.includes('falha de comunicacao') ||
+    normalizedMessage.includes('erro de recebimento') ||
+    normalizedMessage.includes('falha ao receber') ||
+    normalizedMessage.includes('recebimento')
+  ) {
+    message = `A ${providerLabel} retornou erro de comunicação/recebimento antes de aprovar. Nenhum pagamento foi registrado no app. Confira a internet/chip da maquininha e, se a transação aparecer como aprovada na ${providerLabel}, confirme antes de tentar novamente.`;
   } else if (normalizedMessage === 'erro de processamento' || normalizedMessage.includes('erro de processamento')) {
     message = `A ${providerLabel} retornou "Erro de Processamento". Nenhum pagamento foi registrado no app. Confira a mensagem na maquininha e tente novamente.`;
   } else if (!normalizedMessage.includes('nenhum pagamento foi registrado')) {
@@ -2228,6 +2236,11 @@ const resolveMethodBySfi = (
   sfiCodigo?: number
 ): PaymentMethod => {
   if (typeof sfiCodigo !== 'number') {
+    return fallbackMethod;
+  }
+
+  const fallbackSfi = detectSfi(fallbackMethod);
+  if (typeof fallbackSfi === 'number' && Number(fallbackSfi) === Number(sfiCodigo)) {
     return fallbackMethod;
   }
 

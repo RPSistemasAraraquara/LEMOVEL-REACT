@@ -22,7 +22,7 @@ type
     procedure CalcularQuantidadeGratis;
     procedure AtribuirDadosDoProduto;
     procedure CalcularPromocao(AProduto: TAPIRPCheffEntityProduto);
-    procedure GravarVendaItem;
+    function GravarVendaItem: Boolean;
     procedure GravarVendaItemOpcional;
     procedure GravarItensGratis;
     procedure AtualizarValorVenda;
@@ -168,21 +168,27 @@ const
   MAX_TENTATIVAS = 3;
 var
   I: Integer;
+  LQuantidadeOriginal: Currency;
 begin
   ValidarCreditoCliente;
   CarregarQuantidadeVendido;
   CalcularQuantidadeGratis;
+  LQuantidadeOriginal := FItem.quantidade;
   for I := 1 to MAX_TENTATIVAS do
   begin
     FDAO.StartTransaction;
     try
-      FItem.quantidade := FItem.quantidade - FQuantidadeGratis;
+      FItem.quantidade := LQuantidadeOriginal - FQuantidadeGratis;
       if FItem.quantidade > 0 then
       begin
         AtribuirNumeroItem;
         AtribuirDadosDoProduto;
         CalcularPromocao(FProduto);
-        GravarVendaItem;
+        if not GravarVendaItem then
+        begin
+          FDAO.Commit;
+          Exit;
+        end;
         GravarVendaItemOpcional;
       end;
       GravarItensGratis;
@@ -202,10 +208,14 @@ procedure TAPIRPCheffServiceVendaLancarItemControleGratis.GravarItensGratis;
 var
   I: Integer;
   LObservacaoOriginal: string;
+  LMobileLaunchIdOriginal: string;
 begin
   LObservacaoOriginal := FItem.observacao;
+  LMobileLaunchIdOriginal := FItem.mobileLaunchId;
   for I := 1 to FQuantidadeGratis do
   begin
+    if LMobileLaunchIdOriginal <> EmptyStr then
+      FItem.mobileLaunchId := Format('%s:G%d', [LMobileLaunchIdOriginal, I]);
     FItem.quantidade := 1;
     AtribuirNumeroItem;
     AtribuirDadosDoProduto;
@@ -216,14 +226,15 @@ begin
     FItem.observacao := OBSERVACAO_ITEM_GRATIS;
     FItem.AtualizaValorTotal;
 
-    GravarVendaItem;
-    GravarVendaItemOpcional;
+    if GravarVendaItem then
+      GravarVendaItemOpcional;
   end;
   FItem.gratis := False;
   FItem.observacao := LObservacaoOriginal;
+  FItem.mobileLaunchId := LMobileLaunchIdOriginal;
 end;
 
-procedure TAPIRPCheffServiceVendaLancarItemControleGratis.GravarVendaItem;
+function TAPIRPCheffServiceVendaLancarItemControleGratis.GravarVendaItem: Boolean;
 var
   LVendaItemDAO: TAPIRPCheffDAOVendaItem;
 begin
@@ -236,7 +247,7 @@ begin
     if FItem.dataLancamento = 0 then
       FItem.dataLancamento := Now;
 
-    LVendaItemDAO.Inserir(FItem, FPendenteImpressao);
+    Result := LVendaItemDAO.Inserir(FItem, FPendenteImpressao);
   except
     on E: Exception do
     begin

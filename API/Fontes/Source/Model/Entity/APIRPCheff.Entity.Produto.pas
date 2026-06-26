@@ -70,6 +70,8 @@ type
     destructor Destroy; override;
 
     function UsaHappyHour: Boolean;
+    function VendaRestritaHoje: Boolean;
+    function DiaRestricaoAtualDescricao: string;
     function Valor: Currency;
     function ValorPorTamanho(ATamanho: string): Currency;
 
@@ -244,6 +246,37 @@ end;
 function TAPIRPCheffEntityProduto.UsaHappyHour: Boolean;
 begin
   Result := (FhappyHourAtivar) and (FhappyHour.HoraDeHappyHour);
+end;
+
+function TAPIRPCheffEntityProduto.DiaRestricaoAtualDescricao: string;
+begin
+  Result := 'hoje';
+  case DayOfTheWeek(Now) of
+    DayMonday    : Result := 'segunda-feira';
+    DayTuesday   : Result := 'terca-feira';
+    DayWednesday : Result := 'quarta-feira';
+    DayThursday  : Result := 'quinta-feira';
+    DayFriday    : Result := 'sexta-feira';
+    DaySaturday  : Result := 'sabado';
+    DaySunday    : Result := 'domingo';
+  end;
+end;
+
+function TAPIRPCheffEntityProduto.VendaRestritaHoje: Boolean;
+begin
+  Result := False;
+  if (not FrestringirVenda) or (not Assigned(Frestricao)) then
+    Exit;
+
+  case DayOfTheWeek(Now) of
+    DayMonday    : Result := Frestricao.segundaFeira;
+    DayTuesday   : Result := Frestricao.tercaFeira;
+    DayWednesday : Result := Frestricao.quartaFeira;
+    DayThursday  : Result := Frestricao.quintaFeira;
+    DayFriday    : Result := Frestricao.sextaFeira;
+    DaySaturday  : Result := Frestricao.sabado;
+    DaySunday    : Result := Frestricao.domingo;
+  end;
 end;
 
 function TAPIRPCheffEntityProduto.Valor: Currency;

@@ -99,22 +99,8 @@ begin
 end;
 
 function TAPIRPCheffServiceVendaFechamentoCommandGravarImpressao.PermiteImpressoraInterna: Boolean;
-var
-  LEmpresa: TAPIRPCheffEntityEmpresa;
 begin
   Result := FParent.Fechamento.impressoraInterna;
-  if not Result then
-    Exit;
-
-  LEmpresa := FParent.Empresa;
-  if not Assigned(LEmpresa) then
-    Exit;
-
-  Result := not (
-    LEmpresa.utilizaIntegracaoStone
-    or LEmpresa.utilizaIntegracaoPagBank
-    or LEmpresa.utilizaIntegracaoCielo
-  );
 end;
 
 end.

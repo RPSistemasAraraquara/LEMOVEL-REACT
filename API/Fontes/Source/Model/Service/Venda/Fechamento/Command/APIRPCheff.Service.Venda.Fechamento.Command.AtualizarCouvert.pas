@@ -31,6 +31,18 @@ begin
   LVenda := FParent.Venda;
   LPatchCouvert := TAPIRPCheffEntityVendaPatchCouvert.Create;
   try
+    if AFechamento.numeroCouvertMasculino < LVenda.numeroCouvertMasculino then
+      raise Exception.CreateFmt(
+        'Nao e permitido diminuir couvert masculino ja lancado. Quantidade atual: %d.',
+        [LVenda.numeroCouvertMasculino]
+      );
+
+    if AFechamento.numeroCouvertFeminino < LVenda.numeroCouvertFeminino then
+      raise Exception.CreateFmt(
+        'Nao e permitido diminuir couvert feminino ja lancado. Quantidade atual: %d.',
+        [LVenda.numeroCouvertFeminino]
+      );
+
     LPatchCouvert.numeroCouvertFeminino := AFechamento.numeroCouvertFeminino;
     LPatchCouvert.numeroCouvertMasculino := AFechamento.numeroCouvertMasculino;
     LPatchCouvert.idEmpresa := AFechamento.idEmpresa;

@@ -8,6 +8,12 @@ import { api } from '../services/api';
 import { SectionHeader } from '../components/SectionHeader';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
 import { Colors, Radius, Shadows, Space } from '../theme';
+import {
+  adjustCouvertText,
+  clampCouvertText,
+  normalizeCouvertCount,
+  validateCouvertNotReduced
+} from '../utils/couvertLock';
 
 type Route = RouteProp<RootStackParams, 'Couvert'>;
 
@@ -31,6 +37,7 @@ export const CouvertManagerScreen: React.FC = () => {
   const [numPessoas, setNumPessoas] = useState('0');
   const [masculino, setMasculino] = useState('0');
   const [feminino, setFeminino] = useState('0');
+  const [minimumCouvert, setMinimumCouvert] = useState({ masculino: 0, feminino: 0 });
   const vendaAtual = idVenda || activeTable?.idVenda;
 
   useEffect(() => {
@@ -40,9 +47,14 @@ export const CouvertManagerScreen: React.FC = () => {
       try {
         const sale = await api.getSale(vendaAtual, false);
         if (!sale) return;
+        const nextMinimum = {
+          masculino: normalizeCouvertCount(sale.numeroCouvertMasculino || 0),
+          feminino: normalizeCouvertCount(sale.numeroCouvertFeminino || 0)
+        };
         setNumPessoas(String(sale.numeroPessoas || 0));
-        setMasculino(String(sale.numeroCouvertMasculino || 0));
-        setFeminino(String(sale.numeroCouvertFeminino || 0));
+        setMasculino(String(nextMinimum.masculino));
+        setFeminino(String(nextMinimum.feminino));
+        setMinimumCouvert(nextMinimum);
       } finally {
         setLoading(false);
       }
@@ -55,15 +67,39 @@ export const CouvertManagerScreen: React.FC = () => {
     setter(String(next));
   };
 
+  const changeCouvertInteger = (
+    setter: (value: string) => void,
+    current: string,
+    delta: number,
+    minimum: number
+  ) => {
+    setter(adjustCouvertText(current, delta, minimum));
+  };
+
   const save = async () => {
     if (!vendaAtual) return;
+    const nextCouvert = {
+      masculino: normalizeCouvertCount(masculino),
+      feminino: normalizeCouvertCount(feminino)
+    };
+    const reductionMessage = validateCouvertNotReduced(nextCouvert, minimumCouvert);
+    if (reductionMessage) {
+      setMasculino(String(minimumCouvert.masculino));
+      setFeminino(String(minimumCouvert.feminino));
+      Alert.alert('Atenção', reductionMessage);
+      return;
+    }
+
     setSaving(true);
     try {
+      const numeroPessoas = Math.max(parseInteger(numPessoas), nextCouvert.masculino + nextCouvert.feminino);
       await api.updateCouvert(vendaAtual, {
-        numeroPessoas: parseNumber(numPessoas),
-        numeroCouvertMasculino: parseNumber(masculino),
-        numeroCouvertFeminino: parseNumber(feminino)
+        numeroPessoas,
+        numeroCouvertMasculino: nextCouvert.masculino,
+        numeroCouvertFeminino: nextCouvert.feminino
       });
+      setNumPessoas(String(numeroPessoas));
+      setMinimumCouvert(nextCouvert);
       await refreshDashboard();
       Alert.alert('Concluído', 'Informações de couvert atualizadas.');
     } catch (error: any) {
@@ -122,8 +158,9 @@ export const CouvertManagerScreen: React.FC = () => {
             <Text style={styles.label}>Couvert Masculino</Text>
             <View style={styles.counterRow}>
               <Pressable
-                style={styles.counterBtn}
-                onPress={() => changeInteger(setMasculino, masculino, -1)}
+                style={[styles.counterBtn, parseInteger(masculino) <= minimumCouvert.masculino ? styles.counterBtnDisabled : null]}
+                disabled={parseInteger(masculino) <= minimumCouvert.masculino}
+                onPress={() => changeCouvertInteger(setMasculino, masculino, -1, minimumCouvert.masculino)}
               >
                 <Text style={styles.counterText}>-</Text>
               </Pressable>
@@ -131,11 +168,11 @@ export const CouvertManagerScreen: React.FC = () => {
                 style={[styles.input, styles.counterInput]}
                 keyboardType="numeric"
                 value={masculino}
-                onChangeText={setMasculino}
+                onChangeText={(value) => setMasculino(clampCouvertText(value, minimumCouvert.masculino))}
               />
               <Pressable
                 style={styles.counterBtn}
-                onPress={() => changeInteger(setMasculino, masculino, +1)}
+                onPress={() => changeCouvertInteger(setMasculino, masculino, +1, minimumCouvert.masculino)}
               >
                 <Text style={styles.counterText}>+</Text>
               </Pressable>
@@ -143,8 +180,9 @@ export const CouvertManagerScreen: React.FC = () => {
             <Text style={styles.label}>Couvert Feminino</Text>
             <View style={styles.counterRow}>
               <Pressable
-                style={styles.counterBtn}
-                onPress={() => changeInteger(setFeminino, feminino, -1)}
+                style={[styles.counterBtn, parseInteger(feminino) <= minimumCouvert.feminino ? styles.counterBtnDisabled : null]}
+                disabled={parseInteger(feminino) <= minimumCouvert.feminino}
+                onPress={() => changeCouvertInteger(setFeminino, feminino, -1, minimumCouvert.feminino)}
               >
                 <Text style={styles.counterText}>-</Text>
               </Pressable>
@@ -152,11 +190,11 @@ export const CouvertManagerScreen: React.FC = () => {
                 style={[styles.input, styles.counterInput]}
                 keyboardType="numeric"
                 value={feminino}
-                onChangeText={setFeminino}
+                onChangeText={(value) => setFeminino(clampCouvertText(value, minimumCouvert.feminino))}
               />
               <Pressable
                 style={styles.counterBtn}
-                onPress={() => changeInteger(setFeminino, feminino, +1)}
+                onPress={() => changeCouvertInteger(setFeminino, feminino, +1, minimumCouvert.feminino)}
               >
                 <Text style={styles.counterText}>+</Text>
               </Pressable>
@@ -246,6 +284,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.cardSoft,
     ...Shadows.soft
+  },
+  counterBtnDisabled: {
+    opacity: 0.45
   },
   counterText: {
     color: Colors.primary,

@@ -16,6 +16,8 @@ type
   private
     FFechamento: TAPIRPCheffEntityVendaPostFechamento;
     function ObterIdFormaPagamento: Integer;
+    function ObterConfiguracao: TAPIRPCheffEntityConfiguracaoMesaComanda;
+    function ObterValorAcrescimo: Currency;
   public
     procedure Execute(AFechamento: TAPIRPCheffEntityVendaPostFechamento); override;
   end;
@@ -46,6 +48,7 @@ begin
       LEncerraVenda.idEmpresa   := AFechamento.idEmpresa;
       LEncerraVenda.idVenda     := AFechamento.idVenda;
       LEncerraVenda.valor       := LVenda.valorTotal;
+      LEncerraVenda.acrescimo   := ObterValorAcrescimo;
       LEncerraVenda.idFormaPgto := ObterIdFormaPagamento;
       if AFechamento.pagamentos.Count > 0 then
         if AFechamento.pagamentos[0].formaPagamento.cortesia then
@@ -58,6 +61,17 @@ begin
     end;
   finally
     FreeAndNil(LEncerraVenda);
+  end;
+end;
+
+function TAPIRPCheffServiceVendaFechamentoCommandInserirEncerraVenda.ObterConfiguracao: TAPIRPCheffEntityConfiguracaoMesaComanda;
+begin
+  Result := nil;
+  case FParent.Venda.tipoVenda of
+    tvMesa:
+      Result := FParent.DAO.ConfiguracaoMesaDAO.Buscar(FFechamento.idEmpresa);
+    tvComanda:
+      Result := FParent.DAO.ConfiguracaoComandaDAO.Buscar(FFechamento.idEmpresa);
   end;
 end;
 
@@ -97,6 +111,29 @@ begin
   end;
 
 
+end;
+
+function TAPIRPCheffServiceVendaFechamentoCommandInserirEncerraVenda.ObterValorAcrescimo: Currency;
+var
+  LConfiguracao: TAPIRPCheffEntityConfiguracaoMesaComanda;
+  LValorTaxaServico: Currency;
+  LValorCouvert: Currency;
+begin
+  LValorTaxaServico := 0;
+  if FFechamento.CobrarTaxaGarcom then
+    LValorTaxaServico := FFechamento.valorTaxaServico;
+
+  LValorCouvert := 0;
+  LConfiguracao := ObterConfiguracao;
+  try
+    if Assigned(LConfiguracao) and LConfiguracao.utilizaCouvert then
+      LValorCouvert := (FFechamento.numeroCouvertMasculino * LConfiguracao.valorCouvertMasculino) +
+        (FFechamento.numeroCouvertFeminino * LConfiguracao.valorCouvertFeminino);
+  finally
+    FreeAndNil(LConfiguracao);
+  end;
+
+  Result := SimpleRoundTo(LValorTaxaServico + LValorCouvert, -2);
 end;
 
 end.

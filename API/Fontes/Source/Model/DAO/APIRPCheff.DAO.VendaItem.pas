@@ -17,6 +17,7 @@ type
   private
     procedure Select;
     procedure CarregarOpcionaisEmLote(AItens: TObjectList<TAPIRPCheffEntityVendaItem>);
+    procedure GarantirControleLancamentoMobile;
 
 
   protected
@@ -30,7 +31,7 @@ type
     function Listar(AIdVenda: Integer; ASituacao: TRPCheffSituacaoItem): TObjectList<TAPIRPCheffEntityVendaItem>; overload;
     function Listar(AIdVenda, ACodProduto: Integer; ASituacao: TRPCheffSituacaoItem = siOK): TObjectList<TAPIRPCheffEntityVendaItem>; overload;
     procedure GarantirPrecisaoQuantidadeDecimal;
-    procedure Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True);
+    function Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True): Boolean;
     procedure LiberarImpressao(AIdEmpresa, AIdVenda: Integer);
     procedure Cancelar(ACancelamento: TAPIRPCheffEntityVendaItemCancelamento);
     function ListarVendasAgrupadosProdutos(AidVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>;
@@ -51,6 +52,8 @@ uses
 
 var
   GQuantidadeDecimalPrecisionChecked: Boolean = False;
+  GControleLancamentoMobileChecked: Boolean = False;
+  GSchemaLock: TObject;
 
 
 procedure TAPIRPCheffDAOVendaItem.GarantirPrecisaoQuantidadeDecimal;
@@ -61,71 +64,172 @@ begin
   if GQuantidadeDecimalPrecisionChecked then
     Exit;
 
-  LDataSet := Query.SQL('select column_name')
-    .SQL('from information_schema.columns')
-    .SQL('where table_schema = current_schema()')
-    .SQL('and lower(table_name) = ''vendaitem''')
-    .SQL('and lower(column_name) in (''ite_002'', ''quantidade_impressao'', ''qtd_paga_antec'')')
-    .SQL('and data_type = ''numeric''')
-    .SQL('and coalesce(numeric_scale, 0) < 3')
-    .OpenDataSet;
+  TMonitor.Enter(GSchemaLock);
   try
-    LDataSet.First;
-    while not LDataSet.Eof do
-    begin
-      LColumnName := LDataSet.FieldByName('column_name').AsString;
-      if SameText(LColumnName, 'ite_002') or SameText(LColumnName, 'quantidade_impressao') or SameText(LColumnName, 'qtd_paga_antec') then
-        Query.SQL('alter table vendaItem alter column %s type numeric(18,3)', [LColumnName]).ExecSQL;
-      LDataSet.Next;
-    end;
-  finally
-    FreeAndNil(LDataSet);
-  end;
+    if GQuantidadeDecimalPrecisionChecked then
+      Exit;
 
-  GQuantidadeDecimalPrecisionChecked := True;
+    LDataSet := Query.SQL('select column_name')
+      .SQL('from information_schema.columns')
+      .SQL('where table_schema = current_schema()')
+      .SQL('and lower(table_name) = ''vendaitem''')
+      .SQL('and lower(column_name) in (''ite_002'', ''quantidade_impressao'', ''qtd_paga_antec'')')
+      .SQL('and data_type = ''numeric''')
+      .SQL('and coalesce(numeric_scale, 0) < 3')
+      .OpenDataSet;
+    try
+      LDataSet.First;
+      while not LDataSet.Eof do
+      begin
+        LColumnName := LDataSet.FieldByName('column_name').AsString;
+        if SameText(LColumnName, 'ite_002') or SameText(LColumnName, 'quantidade_impressao') or SameText(LColumnName, 'qtd_paga_antec') then
+          Query.SQL('alter table vendaItem alter column %s type numeric(18,3)', [LColumnName]).ExecSQL;
+        LDataSet.Next;
+      end;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+
+    GQuantidadeDecimalPrecisionChecked := True;
+  finally
+    TMonitor.Exit(GSchemaLock);
+  end;
+end;
+
+procedure TAPIRPCheffDAOVendaItem.GarantirControleLancamentoMobile;
+var
+  LDataSet: TDataSet;
+begin
+  if GControleLancamentoMobileChecked then
+    Exit;
+
+  TMonitor.Enter(GSchemaLock);
+  try
+    if GControleLancamentoMobileChecked then
+      Exit;
+
+    LDataSet := Query.SQL('select column_name')
+      .SQL('from information_schema.columns')
+      .SQL('where table_schema = current_schema()')
+      .SQL('and lower(table_name) = ''vendaitem''')
+      .SQL('and lower(column_name) = ''id_lancamento_mobile''')
+      .OpenDataSet;
+    try
+      if LDataSet.IsEmpty then
+        Query.SQL('alter table vendaItem add column id_lancamento_mobile varchar(100)').ExecSQL;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+
+    Query.SQL('create unique index if not exists ux_vendaitem_lanc_mobile')
+      .SQL('on vendaItem (emp_001, ven_001, id_lancamento_mobile)')
+      .ExecSQL;
+
+    GControleLancamentoMobileChecked := True;
+  finally
+    TMonitor.Exit(GSchemaLock);
+  end;
 end;
 
 
-procedure TAPIRPCheffDAOVendaItem.Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True);
+function TAPIRPCheffDAOVendaItem.Inserir(AVendaItem: TAPIRPCheffEntityVendaItem; APendenteImpressao: Boolean = True): Boolean;
+var
+  LMobileLaunchId: string;
+  LDataSet: TDataSet;
 begin
+  LMobileLaunchId := Trim(Copy(AVendaItem.mobileLaunchId, 1, 100));
+  if LMobileLaunchId <> EmptyStr then
+    GarantirControleLancamentoMobile;
+
   StartTransaction;
   try
-    Query.SQL('INSERT INTO vendaItem (')
-      .SQL('  emp_001, ven_001, ite_001, mat_001, ite_002, ite_003, data_hora_lancamento,')
-      .SQL('  ite_005, ite_006, sit_001, produtoimpresso, pendenteimpressao, ite_013, ite_014, gar_001,')
-      .SQL('  desconto, acrescimo, tamanho, b_venda_tamanho, mesa_vinc,')
-      .SQL('  b_gratis, item_fracionado, quantidade_impressao, terminal_impressao, lancamento_mobile)')
-      .SQL('VALUES (')
-      .SQL('  :emp_001, :ven_001, :ite_001, :mat_001, :ite_002, :ite_003, :data_hora_lancamento,')
-      .SQL('  :ite_005, :ite_006, :sit_001, :produtoimpresso, :pendenteimpressao, :ite_013, :ite_014, :gar_001,')
-      .SQL('  :desconto, :acrescimo, :tamanho, :b_venda_tamanho, :mesa_vinc,')
-      .SQL('  :b_gratis, :item_fracionado, :quantidade_impressao, :terminal_impressao, :lancamento_mobile)')
-      .ParamAsInteger ('emp_001', AVendaItem.idEmpresa)
-      .ParamAsInteger ('ven_001', AVendaItem.idVenda)
-      .ParamAsInteger ('ite_001', AVendaItem.numeroItem)
-      .ParamAsInteger ('mat_001', AVendaItem.idProduto)
-      .ParamAsFloat('ite_002', AVendaItem.quantidade)
-      .ParamAsCurrency('ite_003', AVendaItem.valorUnitario)
-      .ParamAsDateTime('data_hora_lancamento', AVendaItem.dataLancamento)
-      .ParamAsCurrency('ite_005', AVendaItem.valorTotal)
-      .ParamAsString  ('ite_006', AVendaItem.observacao)
-      .ParamAsCurrency('desconto', AVendaItem.desconto)
-      .ParamAsCurrency('acrescimo', AVendaItem.acrescimo)
-      .ParamAsInteger ('sit_001', AVendaItem.situacao.DBValue)
-      .ParamAsBoolean ('produtoimpresso', False)
-      .ParamAsBoolean ('pendenteimpressao', APendenteImpressao)
-      .ParamAsInteger ('ite_013', AVendaItem.impressora1, True)
-      .ParamAsInteger ('ite_014', AVendaItem.impressora2, True)
-      .ParamAsInteger ('gar_001', AVendaItem.idGarcom)
-      .ParamAsString  ('tamanho', AVendaItem.tamanho, True)
-      .ParamAsBoolean ('b_venda_tamanho', AVendaItem.vendaPorTamanho)
-      .ParamAsInteger ('mesa_vinc', AVendaItem.idMesaVinculada)
-      .ParamAsBoolean ('b_gratis', AVendaItem.gratis)
-      .ParamAsInteger ('item_fracionado', AVendaItem.itemFracionado, True)
-      .ParamAsFloat('quantidade_impressao', AVendaItem.quantidade, True)
-      .ParamAsString  ('terminal_impressao', AVendaItem.TerminalImpressao)
-      .ParamAsBoolean ('lancamento_mobile', True)
-      .ExecSQL;
+    if LMobileLaunchId <> EmptyStr then
+    begin
+      LDataSet := Query.SQL('INSERT INTO vendaItem (')
+        .SQL('  emp_001, ven_001, ite_001, mat_001, ite_002, ite_003, data_hora_lancamento,')
+        .SQL('  ite_005, ite_006, sit_001, produtoimpresso, pendenteimpressao, ite_013, ite_014, gar_001,')
+        .SQL('  desconto, acrescimo, tamanho, b_venda_tamanho, mesa_vinc,')
+        .SQL('  b_gratis, item_fracionado, quantidade_impressao, terminal_impressao, lancamento_mobile, id_lancamento_mobile)')
+        .SQL('VALUES (')
+        .SQL('  :emp_001, :ven_001, :ite_001, :mat_001, :ite_002, :ite_003, :data_hora_lancamento,')
+        .SQL('  :ite_005, :ite_006, :sit_001, :produtoimpresso, :pendenteimpressao, :ite_013, :ite_014, :gar_001,')
+        .SQL('  :desconto, :acrescimo, :tamanho, :b_venda_tamanho, :mesa_vinc,')
+        .SQL('  :b_gratis, :item_fracionado, :quantidade_impressao, :terminal_impressao, :lancamento_mobile, :id_lancamento_mobile)')
+        .SQL('ON CONFLICT (emp_001, ven_001, id_lancamento_mobile) DO NOTHING')
+        .SQL('RETURNING ite_001')
+        .ParamAsInteger ('emp_001', AVendaItem.idEmpresa)
+        .ParamAsInteger ('ven_001', AVendaItem.idVenda)
+        .ParamAsInteger ('ite_001', AVendaItem.numeroItem)
+        .ParamAsInteger ('mat_001', AVendaItem.idProduto)
+        .ParamAsFloat('ite_002', AVendaItem.quantidade)
+        .ParamAsCurrency('ite_003', AVendaItem.valorUnitario)
+        .ParamAsDateTime('data_hora_lancamento', AVendaItem.dataLancamento)
+        .ParamAsCurrency('ite_005', AVendaItem.valorTotal)
+        .ParamAsString  ('ite_006', AVendaItem.observacao)
+        .ParamAsCurrency('desconto', AVendaItem.desconto)
+        .ParamAsCurrency('acrescimo', AVendaItem.acrescimo)
+        .ParamAsInteger ('sit_001', AVendaItem.situacao.DBValue)
+        .ParamAsBoolean ('produtoimpresso', False)
+        .ParamAsBoolean ('pendenteimpressao', APendenteImpressao)
+        .ParamAsInteger ('ite_013', AVendaItem.impressora1, True)
+        .ParamAsInteger ('ite_014', AVendaItem.impressora2, True)
+        .ParamAsInteger ('gar_001', AVendaItem.idGarcom)
+        .ParamAsString  ('tamanho', AVendaItem.tamanho, True)
+        .ParamAsBoolean ('b_venda_tamanho', AVendaItem.vendaPorTamanho)
+        .ParamAsInteger ('mesa_vinc', AVendaItem.idMesaVinculada)
+        .ParamAsBoolean ('b_gratis', AVendaItem.gratis)
+        .ParamAsInteger ('item_fracionado', AVendaItem.itemFracionado, True)
+        .ParamAsFloat('quantidade_impressao', AVendaItem.quantidade, True)
+        .ParamAsString  ('terminal_impressao', AVendaItem.TerminalImpressao)
+        .ParamAsBoolean ('lancamento_mobile', True)
+        .ParamAsString  ('id_lancamento_mobile', LMobileLaunchId)
+        .OpenDataSet;
+      try
+        Result := not LDataSet.IsEmpty;
+      finally
+        FreeAndNil(LDataSet);
+      end;
+    end
+    else
+    begin
+      Query.SQL('INSERT INTO vendaItem (')
+        .SQL('  emp_001, ven_001, ite_001, mat_001, ite_002, ite_003, data_hora_lancamento,')
+        .SQL('  ite_005, ite_006, sit_001, produtoimpresso, pendenteimpressao, ite_013, ite_014, gar_001,')
+        .SQL('  desconto, acrescimo, tamanho, b_venda_tamanho, mesa_vinc,')
+        .SQL('  b_gratis, item_fracionado, quantidade_impressao, terminal_impressao, lancamento_mobile)')
+        .SQL('VALUES (')
+        .SQL('  :emp_001, :ven_001, :ite_001, :mat_001, :ite_002, :ite_003, :data_hora_lancamento,')
+        .SQL('  :ite_005, :ite_006, :sit_001, :produtoimpresso, :pendenteimpressao, :ite_013, :ite_014, :gar_001,')
+        .SQL('  :desconto, :acrescimo, :tamanho, :b_venda_tamanho, :mesa_vinc,')
+        .SQL('  :b_gratis, :item_fracionado, :quantidade_impressao, :terminal_impressao, :lancamento_mobile)')
+        .ParamAsInteger ('emp_001', AVendaItem.idEmpresa)
+        .ParamAsInteger ('ven_001', AVendaItem.idVenda)
+        .ParamAsInteger ('ite_001', AVendaItem.numeroItem)
+        .ParamAsInteger ('mat_001', AVendaItem.idProduto)
+        .ParamAsFloat('ite_002', AVendaItem.quantidade)
+        .ParamAsCurrency('ite_003', AVendaItem.valorUnitario)
+        .ParamAsDateTime('data_hora_lancamento', AVendaItem.dataLancamento)
+        .ParamAsCurrency('ite_005', AVendaItem.valorTotal)
+        .ParamAsString  ('ite_006', AVendaItem.observacao)
+        .ParamAsCurrency('desconto', AVendaItem.desconto)
+        .ParamAsCurrency('acrescimo', AVendaItem.acrescimo)
+        .ParamAsInteger ('sit_001', AVendaItem.situacao.DBValue)
+        .ParamAsBoolean ('produtoimpresso', False)
+        .ParamAsBoolean ('pendenteimpressao', APendenteImpressao)
+        .ParamAsInteger ('ite_013', AVendaItem.impressora1, True)
+        .ParamAsInteger ('ite_014', AVendaItem.impressora2, True)
+        .ParamAsInteger ('gar_001', AVendaItem.idGarcom)
+        .ParamAsString  ('tamanho', AVendaItem.tamanho, True)
+        .ParamAsBoolean ('b_venda_tamanho', AVendaItem.vendaPorTamanho)
+        .ParamAsInteger ('mesa_vinc', AVendaItem.idMesaVinculada)
+        .ParamAsBoolean ('b_gratis', AVendaItem.gratis)
+        .ParamAsInteger ('item_fracionado', AVendaItem.itemFracionado, True)
+        .ParamAsFloat('quantidade_impressao', AVendaItem.quantidade, True)
+        .ParamAsString  ('terminal_impressao', AVendaItem.TerminalImpressao)
+        .ParamAsBoolean ('lancamento_mobile', True)
+        .ExecSQL;
+      Result := True;
+    end;
     Commit;
   except
     Rollback;
@@ -615,5 +719,11 @@ begin
     FreeAndNil(LDataSet);
   end;
 end;
+
+initialization
+  GSchemaLock := TObject.Create;
+
+finalization
+  FreeAndNil(GSchemaLock);
 
 end.

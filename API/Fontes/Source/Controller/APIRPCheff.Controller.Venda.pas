@@ -22,8 +22,8 @@ type
     procedure ConsultarTextPlain;
     function TipoMaquinaPagamentoRequest: TRPTipoMaquinaPagamento;
     function UsaImpressaoDaMaquininha(AValue: TRPTipoMaquinaPagamento): Boolean;
-    function EmpresaUsaImpressaoDaMaquininha(AIdEmpresa: Integer): Boolean;
-    function BloquearImpressoraWindows(AIdEmpresa: Integer; ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
+    function BloquearImpressoraWindows(ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
+    procedure ValidarCouvertNaoReduzido(ACouvert: TAPIRPCheffEntityVendaPatchCouvert);
   public
     [SwagGET('{idVenda}', 'Carregar Venda')]
     [SwagParamPath('idVenda', 'Id da Venda')]
@@ -120,10 +120,46 @@ begin
     if (LCouvert.numeroPessoas < LCouvert.NumeroCouvert) then
       LCouvert.numeroPessoas := LCouvert.NumeroCouvert;
 
+    ValidarCouvertNaoReduzido(LCouvert);
     Controller.DAO.VendaDAO.AtualizarCouvert(LCouvert);
     FResponse.Status(202);
   finally
     FreeAndNil(LCouvert);
+  end;
+end;
+
+procedure TAPIRPCheffControllerVenda.ValidarCouvertNaoReduzido(
+  ACouvert: TAPIRPCheffEntityVendaPatchCouvert);
+var
+  LVenda: TAPIRPCheffEntityVenda;
+begin
+  LVenda := Controller.DAO.VendaDAO.Buscar(ACouvert.idVenda);
+  try
+    if not Assigned(LVenda) then
+    begin
+      FResponse.Status(404);
+      raise Exception.CreateFmt('Venda %d nao encontrada.', [ACouvert.idVenda]);
+    end;
+
+    if ACouvert.numeroCouvertMasculino < LVenda.numeroCouvertMasculino then
+    begin
+      FResponse.Status(409);
+      raise Exception.CreateFmt(
+        'Nao e permitido diminuir couvert masculino ja lancado. Quantidade atual: %d.',
+        [LVenda.numeroCouvertMasculino]
+      );
+    end;
+
+    if ACouvert.numeroCouvertFeminino < LVenda.numeroCouvertFeminino then
+    begin
+      FResponse.Status(409);
+      raise Exception.CreateFmt(
+        'Nao e permitido diminuir couvert feminino ja lancado. Quantidade atual: %d.',
+        [LVenda.numeroCouvertFeminino]
+      );
+    end;
+  finally
+    FreeAndNil(LVenda);
   end;
 end;
 
@@ -178,7 +214,7 @@ begin
   if FRequest.Headers.ContainsKey('imprimirFichaIndividualProdutos') then
     LImprimirFichaIndividualProdutos := FRequest.Headers.Field('imprimirFichaIndividualProdutos').AsBoolean;
   LTipoMaquina := TipoMaquinaPagamentoRequest;
-  if BloquearImpressoraWindows(LIdEmpresa, LTipoMaquina) then
+  if BloquearImpressoraWindows(LTipoMaquina) then
     LImprimir := False;
   if LNumeroColunas <= 0 then
     LNumeroColunas := 48;
@@ -212,7 +248,7 @@ begin
   try
     LPreFechamento.idEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
     LPreFechamento.idVenda := FRequest.Params.Field('idVenda').AsInteger;
-    if BloquearImpressoraWindows(LPreFechamento.idEmpresa, LTipoMaquina) then
+    if BloquearImpressoraWindows(LTipoMaquina) then
       LPreFechamento.preFechamentoMobileImpressaoInterna := False;
     if (LPreFechamento.numeroPessoas < LPreFechamento.NumeroCouvert) then
       LPreFechamento.numeroPessoas := LPreFechamento.NumeroCouvert;
@@ -250,7 +286,7 @@ begin
   try
     LFechamento.idEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
     LFechamento.idVenda := LIdVenda;
-    if BloquearImpressoraWindows(LFechamento.idEmpresa, LTipoMaquina) then
+    if BloquearImpressoraWindows(LTipoMaquina) then
       LFechamento.impressoraInterna := False;
     LIdUsuarioHeader := Self.IdUsuario;
     if LIdUsuarioHeader > 0 then
@@ -350,34 +386,9 @@ begin
 end;
 
 function TAPIRPCheffControllerVenda.BloquearImpressoraWindows(
-  AIdEmpresa: Integer; ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
+  ATipoMaquina: TRPTipoMaquinaPagamento): Boolean;
 begin
   Result := UsaImpressaoDaMaquininha(ATipoMaquina);
-  if Result then
-    Exit;
-
-  Result := EmpresaUsaImpressaoDaMaquininha(AIdEmpresa);
-end;
-
-function TAPIRPCheffControllerVenda.EmpresaUsaImpressaoDaMaquininha(
-  AIdEmpresa: Integer): Boolean;
-var
-  LEmpresa: TAPIRPCheffEntityEmpresa;
-begin
-  Result := False;
-  Controller.IdEmpresa(AIdEmpresa).DAO.IdEmpresa(AIdEmpresa);
-  Controller.DAO.EmpresaDAO.IdEmpresa(AIdEmpresa);
-  LEmpresa := Controller.DAO.EmpresaDAO.Busca;
-  try
-    if not Assigned(LEmpresa) then
-      Exit;
-
-    Result := LEmpresa.utilizaIntegracaoStone
-      or LEmpresa.utilizaIntegracaoPagBank
-      or LEmpresa.utilizaIntegracaoCielo;
-  finally
-    FreeAndNil(LEmpresa);
-  end;
 end;
 
 function TAPIRPCheffControllerVenda.UsaImpressaoDaMaquininha(

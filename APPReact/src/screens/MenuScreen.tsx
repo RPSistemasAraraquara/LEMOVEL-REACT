@@ -17,7 +17,17 @@ import { CommonActions, RouteProp, useIsFocused, useNavigation, useRoute } from 
 import { CategoryChip } from '../components/CategoryChip';
 import { MemoFoodCard } from '../components/FoodCard';
 import { useApp } from '../context/AppContext';
-import { api, getTableOrderDisplayLabel, logSyncDiagnostic, MenuItem, normalizeSaleStatus } from '../services/api';
+import {
+  api,
+  buildMenuItemRestrictedMessage,
+  formatTableStatusLabel,
+  getTableOrderDisplayLabel,
+  isMenuItemRestrictedToday,
+  logSyncDiagnostic,
+  MenuItem,
+  normalizeSaleStatus,
+  TableOrder
+} from '../services/api';
 import { RootStackParams, TabParams } from '../navigation/AppNavigator';
 import { Colors, Radius, Shadows, Space } from '../theme';
 import { ScreenRouteLabel } from '../components/ScreenRouteLabel';
@@ -201,15 +211,19 @@ export const MenuScreen: React.FC = () => {
     [activeTable]
   );
 
+  const hasConfirmedSale = Boolean(activeTable?.idVenda && Number(activeTable.idVenda) > 0);
   const canLaunchByStatus = useMemo(
-    () => currentStatusNormalized.includes('pendente'),
-    [currentStatusNormalized]
+    () => !hasConfirmedSale || currentStatusNormalized.includes('pendente'),
+    [currentStatusNormalized, hasConfirmedSale]
   );
   const happyHourSaleType = useMemo<'mesa' | 'comanda'>(
     () => activeTable?.tipo || (appSettings.modoExibicao === 'comanda' ? 'comanda' : 'mesa'),
     [activeTable?.tipo, appSettings.modoExibicao]
   );
   const currentStatusLabel = useMemo(() => {
+    if (!hasConfirmedSale) {
+      return 'Venda não aberta';
+    }
     if (currentStatusNormalized.includes('prefechamento') || currentStatusNormalized.includes('pre-fechamento')) {
       return 'Pré-fechamento';
     }
@@ -230,7 +244,92 @@ export const MenuScreen: React.FC = () => {
     }
     const raw = (activeTable?.venda?.situacao || activeTable?.situacao || 'desconhecido').toString().trim();
     return raw || 'desconhecido';
-  }, [activeTable, currentStatusNormalized]);
+  }, [activeTable, currentStatusNormalized, hasConfirmedSale]);
+
+  const showLaunchBlocked = useCallback((title: string, message: string, type: SweetAlertType = 'warning') => {
+    setLaunchWarning(message);
+    showSweetAlert(title, message, type);
+  }, [showSweetAlert]);
+
+  const buildBlockedStatusMessage = useCallback((statusLabel = currentStatusLabel) => (
+    `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${statusLabel}.`
+  ), [currentStatusLabel]);
+
+  const buildConfirmedPendingTable = useCallback((
+    table: TableOrder,
+    saleStatus: string,
+    saleTotal: number,
+    saleName?: string
+  ): TableOrder => ({
+    ...table,
+    nomeMesaComanda: saleName || table.nomeMesaComanda,
+    valorTotal: Number.isFinite(saleTotal) ? saleTotal : Number(table.valorTotal || 0),
+    venda: {
+      ...(table.venda || {}),
+      idVenda: Number(table.idVenda || table.venda?.idVenda || 0),
+      situacao: saleStatus,
+      nomeMesaComanda: saleName || table.venda?.nomeMesaComanda,
+      valorTotal: Number.isFinite(saleTotal) ? saleTotal : Number(table.venda?.valorTotal || table.valorTotal || 0),
+      valorPagamentoAntecipado: Number(table.venda?.valorPagamentoAntecipado || 0)
+    }
+  }), []);
+
+  const confirmLaunchTable = useCallback(async (): Promise<TableOrder | null> => {
+    if (!activeTable) {
+      showLaunchBlocked('Fluxo inválido', 'Selecione uma mesa antes de lançar itens.', 'error');
+      return null;
+    }
+
+    if (!hasConfirmedSale || canLaunchByStatus) {
+      setLaunchWarning('');
+      return activeTable;
+    }
+
+    const localLooksLikeOpeningState = currentStatusNormalized.includes('digitacao') || currentStatusNormalized.length === 0;
+    if (localLooksLikeOpeningState) {
+      try {
+        const freshSale = await api.getSale(Number(activeTable.idVenda), false);
+        const freshStatus = normalizeSaleStatus(freshSale?.situacao || '');
+        if (freshSale?.idVenda && freshStatus.includes('pendente')) {
+          const refreshedTable = buildConfirmedPendingTable(
+            activeTable,
+            freshSale.situacao || 'Pendente',
+            Number(freshSale.valorTotal || activeTable.valorTotal || 0),
+            freshSale.nomeMesaComanda
+          );
+          setActiveTable(refreshedTable);
+          setLaunchWarning('');
+          return refreshedTable;
+        }
+
+        if (freshSale?.situacao) {
+          showLaunchBlocked('Atenção', buildBlockedStatusMessage(formatTableStatusLabel(freshSale.situacao)));
+          return null;
+        }
+      } catch (error: unknown) {
+        logSyncDiagnostic(`menu confirmar status venda falhou: ${getLogErrorMessage(error)}`, 2);
+      }
+
+      showLaunchBlocked(
+        'Conexão instável',
+        'Não foi possível confirmar a abertura da venda na API. Verifique a conexão e tente novamente.',
+        'warning'
+      );
+      return null;
+    }
+
+    showLaunchBlocked('Atenção', buildBlockedStatusMessage());
+    return null;
+  }, [
+    activeTable,
+    buildBlockedStatusMessage,
+    buildConfirmedPendingTable,
+    canLaunchByStatus,
+    currentStatusNormalized,
+    hasConfirmedSale,
+    setActiveTable,
+    showLaunchBlocked
+  ]);
 
   useEffect(() => {
     if (categories.length === 0 || products.length === 0) {
@@ -515,32 +614,26 @@ export const MenuScreen: React.FC = () => {
   }, [products]);
 
   const openLaunchScreen = useCallback((item: MenuItem) => {
-    if (!activeTable) {
-      const msg = 'Selecione uma mesa antes de lançar itens.';
-      setLaunchWarning(msg);
-      showSweetAlert('Fluxo inválido', msg, 'error');
-      return;
-    }
-
-    if (!canLaunchByStatus) {
-      const msg = `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${currentStatusLabel}.`;
-      setLaunchWarning(msg);
-      showSweetAlert('Atenção', msg, 'warning');
-      return;
-    }
-
-    setLaunchWarning('');
-
     void (async () => {
-      let currentTable = activeTable;
+      if (isMenuItemRestrictedToday(item)) {
+        showLaunchBlocked('Item restrito', buildMenuItemRestrictedMessage(item), 'warning');
+        return;
+      }
+
+      const launchTable = await confirmLaunchTable();
+      if (!launchTable) {
+        return;
+      }
+
+      let currentTable = launchTable;
       try {
-        if (!activeTable.idVenda) {
-          const refreshed = await openTableByCard(activeTable.idMesa, activeTable.nomeMesaComanda, activeTable.tipo);
+        if (!currentTable.idVenda) {
+          const refreshed = await openTableByCard(currentTable.idMesa, currentTable.nomeMesaComanda, currentTable.tipo);
           currentTable = refreshed;
           setActiveTable(refreshed);
         }
-      } catch {
-        // Mantém compatibilidade com fluxo antigo.
+      } catch (error: unknown) {
+        logSyncDiagnostic(`menu abrir venda antes do lancamento falhou: ${getLogErrorMessage(error)}`, 2);
       }
 
       const itemCategoryId = Number(item.idCategoria || 0);
@@ -575,16 +668,14 @@ export const MenuScreen: React.FC = () => {
       navigation.navigate('Lancamento', launchParams);
     })();
   }, [
-    activeTable,
-    canLaunchByStatus,
+    confirmLaunchTable,
     currentTableKey,
-    currentStatusLabel,
     effectiveCategoryId,
     navigation,
     openTableByCard,
     realCategories,
     setActiveTable,
-    showSweetAlert
+    showLaunchBlocked
   ]);
 
   const openProductByBarcode = useCallback(async (code: string) => {
@@ -593,17 +684,8 @@ export const MenuScreen: React.FC = () => {
       return;
     }
 
-    if (!activeTable) {
-      showSweetAlert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens por código.', 'error');
-      return;
-    }
-
-    if (!canLaunchByStatus) {
-      showSweetAlert(
-        'Atenção',
-        `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${currentStatusLabel}.`,
-        'warning'
-      );
+    const launchTable = await confirmLaunchTable();
+    if (!launchTable) {
       return;
     }
 
@@ -630,7 +712,7 @@ export const MenuScreen: React.FC = () => {
     setProductManualOpen(false);
     setProductManualText('');
     openLaunchScreen(found);
-  }, [activeTable, canLaunchByStatus, currentStatusLabel, findProductByBarcode, openLaunchScreen, refreshMenu, showSweetAlert]);
+  }, [confirmLaunchTable, findProductByBarcode, openLaunchScreen, refreshMenu, showSweetAlert]);
 
   const menuRowKeyExtractor = useCallback((row: MenuItem[], index: number) => {
     const rowKey = row.map((item) => getMenuItemIdentity(item)).join(':');
@@ -762,17 +844,8 @@ export const MenuScreen: React.FC = () => {
   }, [openProductByBarcode]);
 
   const onCameraProduct = useCallback(async () => {
-    if (!activeTable) {
-      showSweetAlert('Fluxo inválido', 'Selecione uma mesa antes de lançar itens por código.', 'error');
-      return;
-    }
-
-    if (!canLaunchByStatus) {
-      showSweetAlert(
-        'Atenção',
-        `Só é permitido lançar itens quando a mesa estiver pendente. Status atual: ${currentStatusLabel}.`,
-        'warning'
-      );
+    const launchTable = await confirmLaunchTable();
+    if (!launchTable) {
       return;
     }
 
@@ -814,7 +887,7 @@ export const MenuScreen: React.FC = () => {
     productCameraBusyRef.current = false;
     setProductCameraLoading(false);
     setProductCameraOpen(true);
-  }, [activeTable, canLaunchByStatus, CameraViewComponent, currentStatusLabel, showSweetAlert]);
+  }, [CameraViewComponent, confirmLaunchTable]);
 
   const mesaLabel = activeTable ? getTableOrderDisplayLabel(activeTable) : 'Mesa --';
   const searchActive = searchQuery.trim().length > 0;

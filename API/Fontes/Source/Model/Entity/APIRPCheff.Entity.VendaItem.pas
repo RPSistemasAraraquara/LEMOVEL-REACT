@@ -52,6 +52,7 @@ type
     FdescricaoTamanho          : string;
     FImprimirFichaIndividual   : Boolean;
     FTerminalImpressao         : string;
+    FMobileLaunchId            : string;
     FQuantidadePagaAntecipado  : Currency;
     FValorPagoAntecipado       : Currency;
     FValorTaxaServico          : Currency;
@@ -118,6 +119,7 @@ type
     property fracoes: TObjectList<TAPIRPCheffEntityVendaItemFracao> read Ffracoes write Ffracoes;
     property ImprimirFichaIndividual: Boolean read fImprimirFichaIndividual write FImprimirFichaIndividual;
     property TerminalImpressao: string read FTerminalImpressao write FTerminalImpressao;
+    property mobileLaunchId: string read FMobileLaunchId write FMobileLaunchId;
     property QuantidadePagaAntecipado: Currency read FQuantidadePagaAntecipado write FQuantidadePagaAntecipado;
     property ValorPagoAntecipado: Currency read FValorPagoAntecipado write FValorPagoAntecipado;
     property ValorTaxaServico: Currency read FValorTaxaServico write FValorTaxaServico;
@@ -162,6 +164,7 @@ type
     Fopcionais: TObjectList<TAPIRPCheffEntityVendaItemOpcional>;
     Facrescimo: Currency;
     FDescricaoTamanho: string;
+    FMobileLaunchId: string;
     procedure SetOpcionais(const AValue: TObjectList<TAPIRPCheffEntityVendaItemOpcional>);
   public
     constructor Create;
@@ -177,6 +180,7 @@ type
     property valorTotal: Currency read FvalorTotal write FvalorTotal;
     property observacao: string read Fobservacao write Fobservacao;
     property DescricaoTamanho: string read FDescricaoTamanho write FDescricaoTamanho;
+    property mobileLaunchId: string read FMobileLaunchId write FMobileLaunchId;
     property opcionais: TObjectList<TAPIRPCheffEntityVendaItemOpcional> read Fopcionais write SetOpcionais;
   end;
 
@@ -237,6 +241,7 @@ begin
   Self.FprodutoIdSetor            := ASource.produtoIdSetor;
   Self.FitemFracionado            := ASource.itemFracionado;
   Self.FTerminalImpressao         :=ASource.TerminalImpressao;
+  Self.FMobileLaunchId            := ASource.mobileLaunchId;
   Self.FnomeGarcom                := ASource.nomeGarcom;
 
   for LOpcional in ASource.opcionais do
@@ -327,6 +332,7 @@ begin
         LFracaoPrincipal.fracoes.Last.valorTotal := LItem.valorTotal;
         LFracaoPrincipal.fracoes.Last.observacao := LItem.observacao;
         LFracaoPrincipal.fracoes.Last.DescricaoTamanho:=LItem.descricaoTamanho;
+        LFracaoPrincipal.fracoes.Last.mobileLaunchId := LItem.mobileLaunchId;
 
         for var LOpcional in LItem.opcionais do
         begin
@@ -393,6 +399,7 @@ begin
   Self.numeroItem := ASource.numeroItem;
   Self.observacao := ASource.observacao;
   Self.DescricaoTamanho:=ASource.DescricaoTamanho;
+  Self.mobileLaunchId := ASource.mobileLaunchId;
 
   for var LOpcional in ASource.opcionais do
   begin
