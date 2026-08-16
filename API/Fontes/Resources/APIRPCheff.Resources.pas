@@ -33,6 +33,16 @@ type
     FIMPRESSORA_LINHAS_PULO: Integer;
     FIMPRESSORA_PAGINA_CODE: integer;
     FNFE_XML_CONFIGURACAO: string;
+    FNFE_SCHEMAS_PATH: string;
+    FNFCE_IDCSC: string;
+    FNFCE_CSC: string;
+    FNFCE_AMBIENTE: Integer;
+    FNFCE_SERIE: Integer;
+    FNFCE_NUMERO: Integer;
+    FNFCE_CERT_TIPO: Integer;
+    FNFCE_CERT_ARQUIVO: string;
+    FNFCE_CERT_SENHA: string;
+    FNFCE_CERT_SERIE: string;
 
     function ResourceFile: string;
     procedure LoadConfig;
@@ -59,6 +69,16 @@ type
     property IMPRESSORA_LINHAS_PULO: Integer read FIMPRESSORA_LINHAS_PULO write FIMPRESSORA_LINHAS_PULO;
     property IMPRESSORA_PAGINA_CODE: integer read FIMPRESSORA_PAGINA_CODE write FIMPRESSORA_PAGINA_CODE;
     property NFE_XML_CONFIGURACAO: string read FNFE_XML_CONFIGURACAO write FNFE_XML_CONFIGURACAO;
+    property NFE_SCHEMAS_PATH: string read FNFE_SCHEMAS_PATH write FNFE_SCHEMAS_PATH;
+    property NFCE_IDCSC: string read FNFCE_IDCSC write FNFCE_IDCSC;
+    property NFCE_CSC: string read FNFCE_CSC write FNFCE_CSC;
+    property NFCE_AMBIENTE: Integer read FNFCE_AMBIENTE write FNFCE_AMBIENTE;
+    property NFCE_SERIE: Integer read FNFCE_SERIE write FNFCE_SERIE;
+    property NFCE_NUMERO: Integer read FNFCE_NUMERO write FNFCE_NUMERO;
+    property NFCE_CERT_TIPO: Integer read FNFCE_CERT_TIPO write FNFCE_CERT_TIPO;
+    property NFCE_CERT_ARQUIVO: string read FNFCE_CERT_ARQUIVO write FNFCE_CERT_ARQUIVO;
+    property NFCE_CERT_SENHA: string read FNFCE_CERT_SENHA write FNFCE_CERT_SENHA;
+    property NFCE_CERT_SERIE: string read FNFCE_CERT_SERIE write FNFCE_CERT_SERIE;
   end;
 
 var
@@ -85,6 +105,17 @@ begin
   FIMPRESSORA_COLUNAS := 32;
   FIMPRESSORA_LINHAS_PULO := 1;
   FNFE_XML_CONFIGURACAO := ExtractFilePath(ParamStr(0)) + 'CONFIGURACAO.XML';
+  FNFE_SCHEMAS_PATH := ExtractFilePath(ParamStr(0)) + 'NFe\Schemas';
+  // Sobreposicao fiscal NFC-e (opcional): vazio/0 = usa o valor do CONFIGURACAO.XML.
+  FNFCE_IDCSC := EmptyStr;
+  FNFCE_CSC := EmptyStr;
+  FNFCE_AMBIENTE := 0;
+  FNFCE_SERIE := 0;
+  FNFCE_NUMERO := 0;
+  FNFCE_CERT_TIPO := 0;
+  FNFCE_CERT_ARQUIVO := EmptyStr;
+  FNFCE_CERT_SENHA := EmptyStr;
+  FNFCE_CERT_SERIE := EmptyStr;
   LoadConfig;
 end;
 

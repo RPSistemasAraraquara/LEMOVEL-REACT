@@ -10,7 +10,8 @@ uses
 type
   TADRConnModelGeneratorMySQL = class(TADRConnModelGenerator, IADRGenerator)
   protected
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
 
     function GetCurrentSequence(AName: string): Double; override;

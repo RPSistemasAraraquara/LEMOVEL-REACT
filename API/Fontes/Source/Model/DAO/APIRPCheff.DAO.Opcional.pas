@@ -109,12 +109,15 @@ begin
   if Length(AIdsProduto) = 0 then
     Exit;
 
+  // Performance: IN com literais inteiros (ids vem de mat_001 do proprio
+  // banco). Um parametro nomeado por produto estourava O(n^2) no bind do
+  // TParams (ParamByName linear) e o limite de 65.535 binds do protocolo.
   LInClause := '';
   for I := Low(AIdsProduto) to High(AIdsProduto) do
   begin
     if LInClause <> '' then
       LInClause := LInClause + ', ';
-    LInClause := LInClause + ':idProduto' + IntToStr(I);
+    LInClause := LInClause + IntToStr(AIdsProduto[I]);
   end;
 
   try
@@ -125,8 +128,6 @@ begin
       .SQL('and materiais_opcional.id_material in (' + LInClause + ')')
       .SQL('and opcional.id_situacao = 4')
       .ParamAsInteger('idEmpresa', FIdEmpresa);
-    for I := Low(AIdsProduto) to High(AIdsProduto) do
-      Query.ParamAsInteger('idProduto' + IntToStr(I), AIdsProduto[I]);
 
     LDataSet := Query.OpenDataSet;
     try

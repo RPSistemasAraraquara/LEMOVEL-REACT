@@ -23,6 +23,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    procedure AplicarValoresDeTaxasComValor(AVenda: TAPIRPCheffEntityVenda; AValorTaxaGarcom: Currency);
     function AplicarTaxaServico(AValue: Boolean): TAPIRPCheffServiceVendaConsulta;
     function DAO(AValue: TAPIRPCheffDAOFactory): TAPIRPCheffServiceVendaConsulta;
     function Buscar(AIdVenda: Integer; ABuscarItens: Boolean): TAPIRPCheffEntityVenda;
@@ -41,10 +42,22 @@ end;
 
 procedure TAPIRPCheffServiceVendaConsulta.AplicarValoresDeTaxas(AVenda: TAPIRPCheffEntityVenda);
 var
-  LValorBase: Currency;
   LValorTaxaGarcom:Currency;
 begin
   LValorTaxaGarcom:=0;
+  CarregarConfiguracao(AVenda);
+  if (Assigned(FConfiguracao)) and (FAplicarTaxaServico) and
+     (FConfiguracao.utilizaTaxaServico) and (AVenda.itens.Count = 0) then
+    LValorTaxaGarcom:=FDAO.VendaItemDAO.ListarProdutosSomenteTaxaGarcom(AVenda.idVenda);
+  AplicarValoresDeTaxasComValor(AVenda, LValorTaxaGarcom);
+end;
+
+// Performance: mesma regra do AplicarValoresDeTaxas, mas com o somatorio da
+// taxa ja resolvido pelo chamador (carga em lote do GET /mesa) - evita 1
+// SELECT por venda. Couvert e formula do RoundTo identicos aos originais.
+procedure TAPIRPCheffServiceVendaConsulta.AplicarValoresDeTaxasComValor(AVenda: TAPIRPCheffEntityVenda;
+  AValorTaxaGarcom: Currency);
+begin
   CarregarConfiguracao(AVenda);
   if Assigned(FConfiguracao) then
   begin
@@ -52,12 +65,7 @@ begin
     AVenda.valorCouvertFeminino := AVenda.numeroCouvertFeminino * FConfiguracao.valorCouvertFeminino;
 
     if (FAplicarTaxaServico) and (FConfiguracao.utilizaTaxaServico) then
-    begin
-      if AVenda.itens.Count = 0 then
-        LValorTaxaGarcom:=FDAO.VendaItemDAO.ListarProdutosSomenteTaxaGarcom(AVenda.idVenda);
-      LValorBase := LValorTaxaGarcom;
-      AVenda.valorTaxaServico := RoundTo(LValorBase * FConfiguracao.percentualTaxaServico / 100 + MinDouble, -2);
-    end;
+      AVenda.valorTaxaServico := RoundTo(AValorTaxaGarcom * FConfiguracao.percentualTaxaServico / 100 + MinDouble, -2);
   end;
 end;
 

@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.StrUtils,
+  System.Math,
   ACBrUtil.Base,
   ACBrNFe.Classes,
   pcnConversao,
@@ -42,13 +43,15 @@ begin
 
     LCstPis := StrToCSTPIS(LOk, LVendaItem.Produto.PisCodigoSaida.ToString);
     if Integer(LCstPis) < 0 then
-      raise Exception.CreateFmt('PIS CST do produto não cadastrado [%d]',
+      raise Exception.CreateFmt('PIS CST do produto nï¿½o cadastrado [%d]',
         [LVendaItem.Produto.PisCodigoSaida]);
 
     LNFeProduto.Imposto.PIS.CST := LCstPis;
     LNFeProduto.Imposto.PIS.vBC := LVendaItem.ValorTotal;
     LNFeProduto.Imposto.PIS.pPis := LVendaItem.Produto.Pis;
-    LNFeProduto.Imposto.PIS.vPIS := LVendaItem.ValorTotal * LVendaItem.Produto.Pis / 100;
+    // Arredonda POR ITEM: o XML leva o valor com 2 casas e a SEFAZ confere o
+    // total contra o somatorio dos itens (rejeicao "Total do PIS difere").
+    LNFeProduto.Imposto.PIS.vPIS := RoundTo(LVendaItem.ValorTotal * LVendaItem.Produto.Pis / 100, -2);
     LNFeProduto.Imposto.PIS.qBCProd := 0;
     LNFeProduto.Imposto.PIS.vAliqProd := 0;
 

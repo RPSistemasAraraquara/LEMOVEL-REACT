@@ -82,7 +82,6 @@ begin
   finally
      FreeAndNil(LDataSet);
   end;
-
 end;
 
 function TAPIRPCheffDAOVendaPagamentoAntecipado.DataSetToEntity(ADataSet: TDataSet): TAPIRPCheffEntityVendaPagamentoAntecipado;
@@ -120,7 +119,7 @@ begin
         Result.formaPagamento.taxaCartao                     := ADataSet.FieldByName('taxa_cartao').AsCurrency;
         Result.formaPagamento.prazoCartao                    := ADataSet.FieldByName('prazo_cartao').AsInteger;
         Result.formaPagamento.utilizaPagamentoOnline         := ADataSet.FieldByName('utilizaPagamentoOnline').AsBoolean;
-        Result.formaPagamento.PermitePagamentoParceladoOnline := ADataSet.FieldByName('permite_pag_parcelado').AsBoolean;
+        Result.formaPagamento.PermitePagamentoParceladoOnline:= ADataSet.FieldByName('permite_pag_parcelado').AsBoolean;
         Result.formaPagamento.Juros                          := ADataSet.FieldByName('juros').AsFloat;
         Result.formaPagamento.emiteFiscal                    := ADataSet.FieldByName('emite_fiscal').AsBoolean;
         Result.formaPagamento.ExibirFormaPgtoAPP             := ADataSet.FieldByName('exibir_forma_app').AsBoolean;

@@ -126,7 +126,10 @@ begin
     if LPair.JsonValue is TJSOnObject then
     begin
       ProcessOptions(TJSOnObject(LPair.JsonValue));
-      if LPair.JsonValue.ToString.Equals('{}') then
+      // RP fix perf: um TJSONObject imprime '{}' se e somente se Count = 0
+      // (apos o ProcessOptions recursivo acima). Evita re-serializar cada
+      // objeto aninhado so para testar vazio. Saida identica byte a byte.
+      if TJSOnObject(LPair.JsonValue).Count = 0 then
       begin
         AJsonObject.RemovePair(LPair.JsonString.Value).DisposeOf;
         Continue;
@@ -147,7 +150,11 @@ begin
     end
     else
     begin
-      if (LPair.JsonValue.value = '') or (LPair.JsonValue.ToJSON = '0') then
+      // RP fix perf: ToJSON so pode ser '0' em TJSONNumber (string sai com
+      // aspas, bool 'true'/'false', null 'null') - evita alocar a string
+      // ToJSON para todo par escalar. Mesmos pares removidos de antes.
+      if (LPair.JsonValue.value = '') or
+         ((LPair.JsonValue is TJSONNumber) and (LPair.JsonValue.ToJSON = '0')) then
       begin
         AJsonObject.RemovePair(LPair.JsonString.Value).DisposeOf;
       end;
@@ -158,16 +165,24 @@ end;
 function TGBJSONDeserializer<T>.ValueListToJson(AObject: TObject; AProperty: TRttiProperty): string;
 var
   LType: TRttiType;
+  LElemType: TRttiType;
+  LCountProp: TRttiProperty;
   LMethod: TRttiMethod;
   LValue: TValue;
   I: Integer;
   LJsonValue: string;
 begin
+  LElemType := nil;
   LValue := AProperty.GetValue(AObject);
   if LValue.AsObject = nil then
     Exit('[]');
 
   LType := TGBRTTI.GetInstance.GetType(LValue.AsObject.ClassType);
+  // RP fix perf: curto-circuito para lista vazia ANTES do Invoke de ToArray
+  // (que copia o array interno via RTTI). Mesmo texto '[]' do caminho abaixo.
+  LCountProp := LType.GetProperty('Count');
+  if Assigned(LCountProp) and (LCountProp.GetValue(LValue.AsObject).AsInteger = 0) then
+    Exit('[]');
   LMethod := LType.GetMethod('ToArray');
   LValue := LMethod.Invoke(LValue.AsObject, []);
 
@@ -181,7 +196,11 @@ begin
       Result := Result + ObjectToJsonString(LValue.GetArrayElement(I).AsObject) + ','
   	else
     begin
-      LType := AProperty.GetListType(AObject);
+      // RP fix perf: GetListType (que faz FindType por nome em todos os
+      // tipos do binario) e invariante do loop - resolve uma vez so.
+      if LElemType = nil then
+        LElemType := AProperty.GetListType(AObject);
+      LType := LElemType;
       LJsonValue:= EmptyStr;
 
       if LType.TypeKind.IsString then

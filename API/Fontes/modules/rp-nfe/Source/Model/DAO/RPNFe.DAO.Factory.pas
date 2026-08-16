@@ -5,6 +5,7 @@ interface
 uses
   RPNFe.Components,
   RPNFe.DAO.Aliquota,
+  RPNFe.DAO.ClassTribRT,
   RPNFe.DAO.Configuracao,
   RPNFe.DAO.ContaAReceber,
   RPNFe.DAO.Empresa,
@@ -20,6 +21,7 @@ type
   private
     FComponents: TRPNFeComponents;
     FAliquotaDAO: TRPNFeDAOAliquota;
+    FClassTribRTDAO: TRPNFeDAOClassTribRT;
     FConfiguracaoDAO: TRPNFeDAOConfiguracao;
     FContaAReceberDAO: TRPNFeDAOContaAReceber;
     FEmpresaDAO: TRPNFeDAOEmpresa;
@@ -34,6 +36,7 @@ type
     destructor Destroy; override;
 
     function AliquotaDAO: TRPNFeDAOAliquota;
+    function ClassTribRTDAO: TRPNFeDAOClassTribRT;
     function ConfiguracaoDAO: TRPNFeDAOConfiguracao;
     function ContaAReceberDAO: TRPNFeDAOContaAReceber;
     function EmpresaDAO: TRPNFeDAOEmpresa;
@@ -54,6 +57,14 @@ begin
   if not Assigned(FAliquotaDAO) then
     FAliquotaDAO := TRPNFeDAOAliquota.Create(FComponents);
   Result := FAliquotaDAO;
+  Result.ManagerTransaction(True);
+end;
+
+function TRPNFeDAOFactory.ClassTribRTDAO: TRPNFeDAOClassTribRT;
+begin
+  if not Assigned(FClassTribRTDAO) then
+    FClassTribRTDAO := TRPNFeDAOClassTribRT.Create(FComponents);
+  Result := FClassTribRTDAO;
   Result.ManagerTransaction(True);
 end;
 
@@ -80,6 +91,7 @@ end;
 destructor TRPNFeDAOFactory.Destroy;
 begin
   FAliquotaDAO.Free;
+  FClassTribRTDAO.Free;
   FConfiguracaoDAO.Free;
   FContaAReceberDAO.Free;
   FEmpresaDAO.Free;

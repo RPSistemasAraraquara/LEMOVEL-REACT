@@ -97,31 +97,20 @@ begin
 end;
 
 procedure TAPIRPCheffServiceVendaLancarItemNormal.AtribuirDadosDoProduto;
-var
-  LEmpresa:TAPIRPCheffEntityEmpresa;
-  LVenda: TAPIRPCheffEntityVenda;
 begin
-  LEmpresa := FDAO.EmpresaDAO.Busca;
-  try
-    LVenda := FDAO.VendaDAO.Buscar(FItem.idVenda);
-    try
-      FItem.impressora1           := FProduto.impressora1;
-      FItem.impressora2           := FProduto.impressora2;
-      FItem.produtoDescricao      := FProduto.descricao;
-      FItem.produtoCodReferencia  := FProduto.codReferencia;
-      FItem.produtoIdCategoria    := FProduto.idCategoria;
-      FItem.vendaPorTamanho       := FProduto.vendaPorTamanho;
-      FItem.valorUnitario         := FProduto.Valor;
-      if (FItem.vendaPorTamanho) and (not FProduto.UsaHappyHour) then
-        FItem.valorUnitario       := FProduto.ValorPorTamanho(FItem.tamanho);
+  // Performance: as buscas de Empresa e Venda que existiam aqui eram codigo
+  // morto (2 SELECTs por item lancado, valores nunca usados) - removidas.
+  FItem.impressora1           := FProduto.impressora1;
+  FItem.impressora2           := FProduto.impressora2;
+  FItem.produtoDescricao      := FProduto.descricao;
+  FItem.produtoCodReferencia  := FProduto.codReferencia;
+  FItem.produtoIdCategoria    := FProduto.idCategoria;
+  FItem.vendaPorTamanho       := FProduto.vendaPorTamanho;
+  FItem.valorUnitario         := FProduto.Valor;
+  if (FItem.vendaPorTamanho) and (not FProduto.UsaHappyHour) then
+    FItem.valorUnitario       := FProduto.ValorPorTamanho(FItem.tamanho);
 
-      CalcularPromocao(FProduto);
-    finally
-      FreeAndNil(LVenda);
-    end;
-  finally
-    FreeAndNil(LEmpresa);
-  end;
+  CalcularPromocao(FProduto);
 end;
 
 procedure TAPIRPCheffServiceVendaLancarItemNormal.Execute;

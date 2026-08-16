@@ -339,6 +339,47 @@ export async function countStoredCatalogProductSummaries(catalogKey: string): Pr
   }
 }
 
+export async function countProductsMissingImage(catalogKey: string): Promise<number | null> {
+  if (!isSupportedPlatform()) {
+    return null;
+  }
+
+  try {
+    await ensureSchemaAsync();
+    const db = await getDatabaseAsync();
+    if (!db) {
+      return null;
+    }
+
+    // total junto com missing: uma tabela SEM linhas deste catalogo (espelho
+    // SQLite nunca populado) devolveria COUNT(*)=0 e habilitaria o fast-path
+    // indevidamente - nesse caso respondemos null para o chamador cair no
+    // caminho completo (loadCachedProducts + hasMissingCatalogImageCache).
+    const row = await db.getFirstAsync<{ total: number; missing: number }>(
+      `
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN possui_imagem = 1 AND (imagem_local_path IS NULL OR imagem_local_path = '') THEN 1 ELSE 0 END) AS missing
+        FROM ${PRODUCT_TABLE_NAME}
+        WHERE catalog_key = ?
+      `,
+      catalogKey
+    );
+    if (!row) {
+      return null;
+    }
+
+    const total = Number(row.total);
+    if (!Number.isFinite(total) || total <= 0) {
+      return null;
+    }
+
+    const missing = Number(row.missing);
+    return Number.isFinite(missing) ? missing : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadStoredCatalogProducts(
   catalogKey: string,
   options: { compact?: boolean } = {}

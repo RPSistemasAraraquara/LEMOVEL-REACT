@@ -64,6 +64,7 @@ uses
   APIRPCheff.Entity.VendaPagamentoAntecipado in 'Source\Model\Entity\APIRPCheff.Entity.VendaPagamentoAntecipado.pas',
   APIRPCheff.DAO.VendaPagamentoAntecipado in 'Source\Model\DAO\APIRPCheff.DAO.VendaPagamentoAntecipado.pas',
   APIRPCheff.Service.Venda.Fechamento in 'Source\Model\Service\Venda\Fechamento\APIRPCheff.Service.Venda.Fechamento.pas',
+  APIRPCheff.Service.Venda.ReemitirNota in 'Source\Model\Service\Venda\ReemitirNota\APIRPCheff.Service.Venda.ReemitirNota.pas',
   APIRPCheff.Entity.EncerraVenda in 'Source\Model\Entity\APIRPCheff.Entity.EncerraVenda.pas',
   APIRPCheff.DAO.EncerraVenda in 'Source\Model\DAO\APIRPCheff.DAO.EncerraVenda.pas',
   APIRPCheff.Entity.EncerraVendaItem in 'Source\Model\Entity\APIRPCheff.Entity.EncerraVendaItem.pas',

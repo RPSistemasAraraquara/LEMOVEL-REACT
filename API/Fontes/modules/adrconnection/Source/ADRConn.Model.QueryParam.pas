@@ -14,7 +14,10 @@ uses
 type
   TADRConnModelQueryParam = class(TInterfacedObject, IADRQueryParam)
   private
-    [Weak]
+    // RP fix: [Weak] registrava cada parametro na tabela global de weak refs
+    // da RTL (TInstHashMap), que corrompe sob concorrencia e entra em loop
+    // infinito de CPU (PopInstItem). [Unsafe] quebra o ciclo sem refcount.
+    [Unsafe]
     FQueryParams: IADRQueryParams;
     FParams: TParams;
     FParam: TParam;
@@ -90,7 +93,10 @@ type
 
   TADRConnModelQueryParams = class(TInterfacedObject, IADRQueryParams)
   private
-    [Weak]
+    // RP fix: [Weak] registrava cada parametro na tabela global de weak refs
+    // da RTL (TInstHashMap), que corrompe sob concorrencia e entra em loop
+    // infinito de CPU (PopInstItem). [Unsafe] quebra o ciclo sem refcount.
+    [Unsafe]
     FQuery: IADRQuery;
     FParams: TParams;
     FQueryParams: TDictionary<string, IADRQueryParam>;
@@ -122,7 +128,10 @@ type
 
   TADRConnModelQueryBatchParams = class(TInterfacedObject, IADRQueryBatchParams)
   private
-    [Weak]
+    // RP fix: [Weak] registrava cada parametro na tabela global de weak refs
+    // da RTL (TInstHashMap), que corrompe sob concorrencia e entra em loop
+    // infinito de CPU (PopInstItem). [Unsafe] quebra o ciclo sem refcount.
+    [Unsafe]
     FQuery: IADRQuery;
     FBatchParams: TObjectList<TParams>;
     function GetBatchParams(AIndex: Integer): TParams;

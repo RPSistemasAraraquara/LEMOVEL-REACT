@@ -412,4 +412,9 @@ begin
   Result := Self = tkVariant;
 end;
 
+initialization
+  // RP fix: cria o singleton no boot (thread principal). A criacao preguicosa
+  // em GetInstance nao tinha lock e podia duplicar/corromper sob concorrencia.
+  TGBRTTI.GetInstance;
+
 end.

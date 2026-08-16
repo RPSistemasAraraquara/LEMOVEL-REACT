@@ -113,7 +113,9 @@ begin
 
         FItem.itemFracionado := LDAO.UltimoItemFracionado(FItem.idVenda) + 1;
         LItemVenda.Assign(FItem);
-        LItemVenda.numeroItem := LDAO.UltimoNumeroItemLancado(FItem.idVenda) + 1;
+        // Performance: numeroItem do template era calculado aqui (1 SELECT
+        // max) e sobrescrito por fracao em SalvarOutrasFracoes - o template
+        // nunca e inserido, entao a leitura era codigo morto.
         LItemVenda.itemFracionado := FItem.itemFracionado;
 
         LItemVenda.quantidade := SimpleRoundTo(1 / (FItem.fracoes.Count), -3);

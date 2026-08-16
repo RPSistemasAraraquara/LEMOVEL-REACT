@@ -63,6 +63,24 @@ begin
       Result.Produto.Pgni := ADataSet.FieldByName('Pgni').AsFloat;
       Result.Produto.Adrem := ADataSet.FieldByName('Adrem').AsFloat;
 
+      Result.Produto.CstRtNfce := ADataSet.FieldByName('cst_rt_nfce').AsString;
+      Result.Produto.CClassTribRtNfce := ADataSet.FieldByName('cclasstrib_rt_nfce').AsString;
+      Result.Produto.RtParamBcVlProd := ADataSet.FieldByName('rt_param_bc_vlprod').AsBoolean;
+      Result.Produto.RtParamBcVlFrete := ADataSet.FieldByName('rt_param_bc_vlfrete').AsBoolean;
+      Result.Produto.RtParamBcVlSeg := ADataSet.FieldByName('rt_param_bc_vlseg').AsBoolean;
+      Result.Produto.RtParamBcVlDesp := ADataSet.FieldByName('rt_param_bc_vldesp').AsBoolean;
+      Result.Produto.RtParamBcII := ADataSet.FieldByName('rt_param_bc_ii').AsBoolean;
+      Result.Produto.RtParamBcIS := ADataSet.FieldByName('rt_param_bc_is').AsBoolean;
+      Result.Produto.RtParamBcDesconto := ADataSet.FieldByName('rt_param_bc_desconto').AsBoolean;
+      Result.Produto.RtParamBcPis := ADataSet.FieldByName('rt_param_bc_pis').AsBoolean;
+      Result.Produto.RtParamBcCofins := ADataSet.FieldByName('rt_param_bc_cofins').AsBoolean;
+      Result.Produto.RtParamBcIcms := ADataSet.FieldByName('rt_param_bc_icms').AsBoolean;
+      Result.Produto.RtParamBcIcmsDest := ADataSet.FieldByName('rt_param_bc_icmsdest').AsBoolean;
+      Result.Produto.RtParamBcFcp := ADataSet.FieldByName('rt_param_bc_fcp').AsBoolean;
+      Result.Produto.RtParamBcFcpDest := ADataSet.FieldByName('rt_param_bc_fcpdest').AsBoolean;
+      Result.Produto.RtParamBcIcmsMono := ADataSet.FieldByName('rt_param_bc_icmsmono').AsBoolean;
+      Result.Produto.RtParamBcIssqn := ADataSet.FieldByName('rt_param_bc_issqn').AsBoolean;
+
       Result.Unidade.Codigo := ADataSet.FieldByName('UNI_001').AsInteger;
       Result.Unidade.Unidade := ADataSet.FieldByName('UNI_003').AsString;
       Result.Unidade.Descricao := ADataSet.FieldByName('UNI_002').AsString;
@@ -96,6 +114,15 @@ begin
     .SQL('  materiais.cof_codigo_saida, materiais.cofins, materiais.redBaseCalcIcms,')
     .SQL('  materiais.redBaseCalcSt, materiais.codigo_anp, materiais.peso_partida_anp,')
     .SQL('  materiais.pglp, materiais.pgnn, materiais.pgni, materiais.adrem,')
+    .SQL('  materiais.cst_rt_nfce, materiais.cclasstrib_rt_nfce,')
+    .SQL('  materiais.rt_param_bc_vlprod, materiais.rt_param_bc_vlfrete,')
+    .SQL('  materiais.rt_param_bc_vlseg, materiais.rt_param_bc_vldesp,')
+    .SQL('  materiais.rt_param_bc_ii, materiais.rt_param_bc_is,')
+    .SQL('  materiais.rt_param_bc_desconto, materiais.rt_param_bc_pis,')
+    .SQL('  materiais.rt_param_bc_cofins, materiais.rt_param_bc_icms,')
+    .SQL('  materiais.rt_param_bc_icmsdest, materiais.rt_param_bc_fcp,')
+    .SQL('  materiais.rt_param_bc_fcpdest, materiais.rt_param_bc_icmsmono,')
+    .SQL('  materiais.rt_param_bc_issqn,')
     .SQL('  unidades.uni_001, unidades.uni_002, unidades.uni_003')
     .SQL('from vendaItem')
     .SQL('inner join materiais on materiais.mat_001 = vendaItem.mat_001')

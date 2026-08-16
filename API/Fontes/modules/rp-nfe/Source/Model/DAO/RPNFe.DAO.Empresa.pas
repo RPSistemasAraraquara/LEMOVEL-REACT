@@ -16,7 +16,18 @@ type
     function DataSetToEntity(ADataSet: TDataSet): TRPNFeEntityEmpresa; override;
   public
     function Buscar(AIdEmpresa: Integer): TRPNFeEntityEmpresa;
+    // Alocacao ATOMICA e DURAVEL do proximo nNF: um unico UPDATE..RETURNING
+    // com lock de linha - mesmo que a conexao do pool esteja com snapshot
+    // velho/transacao vazada, o UPDATE le o valor mais atual comitado (era
+    // SELECT separado + incremento, e uma leitura velha repetia nNF ja usado
+    // na SEFAZ = Duplicidade). Commit explicito ANTES do envio: numero
+    // consumido nao pode ser desfeito por rollback depois da autorizacao.
+    function AlocarNumeroNFCe(AIdEmpresa: Integer): Integer;
     procedure AtualizarNumeroNFCe(AIdEmpresa: Integer);
+    // Semente de numeracao (override da API): eleva empresas.numero_nfce ao
+    // piso informado SEM nunca diminuir (greatest) - persistir e obrigatorio,
+    // senao a proxima emissao rele o valor antigo do banco e repete o nNF.
+    procedure SementeNumeroNFCe(AIdEmpresa, ANumero: Integer);
     procedure AtualizarNumeroNFe(AIdEmpresa: Integer);
     procedure AtualizarNumeracao(AIdEmpresa, AModelo: Integer);
   end;
@@ -33,10 +44,44 @@ begin
     AtualizarNumeroNFCe(AIdEmpresa);
 end;
 
+function TRPNFeDAOEmpresa.AlocarNumeroNFCe(AIdEmpresa: Integer): Integer;
+var
+  LDataSet: TDataSet;
+begin
+  StartTransaction;
+  try
+    LDataSet := Query.SQL('update empresas set numero_nfce = coalesce(numero_nfce, 0) + 1')
+      .SQL('where emp_001 = :idEmpresa')
+      .SQL('returning numero_nfce')
+      .ParamAsInteger('idEmpresa', AIdEmpresa)
+      .OpenDataSet;
+    try
+      if (LDataSet = nil) or LDataSet.IsEmpty then
+        raise Exception.CreateFmt('Empresa %d não encontrada ao alocar numeração da NFC-e.', [AIdEmpresa]);
+      Result := LDataSet.FieldByName('numero_nfce').AsInteger;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+    Commit;
+  except
+    Rollback;
+    raise;
+  end;
+end;
+
 procedure TRPNFeDAOEmpresa.AtualizarNumeroNFCe(AIdEmpresa: Integer);
 begin
   Query.SQL('update empresas set numero_nfce = coalesce(numero_nfce, 0) + 1')
     .SQL('where emp_001 = :idEmpresa')
+    .ParamAsInteger('idEmpresa', AIdEmpresa)
+    .ExecSQL;
+end;
+
+procedure TRPNFeDAOEmpresa.SementeNumeroNFCe(AIdEmpresa, ANumero: Integer);
+begin
+  Query.SQL('update empresas set numero_nfce = greatest(coalesce(numero_nfce, 0), :numero)')
+    .SQL('where emp_001 = :idEmpresa')
+    .ParamAsInteger('numero', ANumero)
     .ParamAsInteger('idEmpresa', AIdEmpresa)
     .ExecSQL;
 end;
@@ -89,6 +134,9 @@ begin
       Result.AliquotaMunicipalPadrao := ADataSet.FieldByName('aliqMunicipalPadrao').AsFloat;
       Result.AliquotaEstadualPadrao := ADataSet.FieldByName('aliqEstadualPadrao').AsFloat;
       Result.AliquotaFederalPadrao := ADataSet.FieldByName('aliqFedNacionalPadrao').AsFloat;
+      Result.AliqCbs := ADataSet.FieldByName('aliq_cbs').AsFloat;
+      Result.AliqIbsUf := ADataSet.FieldByName('aliq_ibs_uf').AsFloat;
+      Result.AliqIbsMun := ADataSet.FieldByName('aliq_ibs_mun').AsFloat;
     except
       Result.Free;
       raise;
@@ -106,7 +154,8 @@ begin
     .SQL('  empresas.aliqMunicipalPadrao, empresas.aliqEstadualPadrao,')
     .SQL('  empresas.aliqFedNacionalPadrao, empresas.crt_codigo,')
     .SQL('  empresas.cep_003, empresas.crt_codigo, cidades.cid_002, cidades.cid_003,')
-    .SQL('  estados.est_003')
+    .SQL('  estados.est_003,')
+    .SQL('  empresas.aliq_cbs, estados.aliq_ibs_uf, cidades.aliq_ibs_mun')
     .SQL('from empresas')
     .SQL('left join cidades on empresas.cid_001 = cidades.cid_001')
     .SQL('left join estados on cidades.est_001 = estados.est_001')

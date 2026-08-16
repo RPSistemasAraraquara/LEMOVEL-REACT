@@ -36,6 +36,7 @@ type
     procedure Cancelar(ACancelamento: TAPIRPCheffEntityVendaItemCancelamento);
     function ListarVendasAgrupadosProdutos(AidVenda: Integer): TObjectList<TAPIRPCheffEntityVendaItem>;
     function ListarProdutosSomenteTaxaGarcom(AIdVenda: Integer): Currency;
+    function SomarTaxaGarcomLote(const AIds: TArray<Integer>): TDictionary<Integer, Currency>;
     procedure TotalizarItensVenda(AIdVenda: Integer; out ATotalItens, ADesconto: Currency);
     procedure AplicarDescontoProporcional(AidVenda: Integer;ADesconto: Currency);
     procedure RatearTaxaGarcomPorItens(AidVenda: Integer);
@@ -504,6 +505,52 @@ begin
     finally
       FreeAndNil(LDataSet);
     end;
+end;
+
+// Performance: mesma query do ListarProdutosSomenteTaxaGarcom (mesmos joins
+// e predicados), agrupada por ven_001 para atender todas as mesas de uma vez.
+// Venda sem grupo no resultado = 0 (igual ao coalesce da versao unitaria).
+function TAPIRPCheffDAOVendaItem.SomarTaxaGarcomLote(const AIds: TArray<Integer>): TDictionary<Integer, Currency>;
+var
+  LDataSet: TDataSet;
+  LIn: string;
+  I: Integer;
+begin
+  Result := TDictionary<Integer, Currency>.Create;
+  if Length(AIds) = 0 then
+    Exit;
+
+  try
+    LIn := '';
+    for I := Low(AIds) to High(AIds) do
+    begin
+      if LIn <> '' then
+        LIn := LIn + ', ';
+      LIn := LIn + IntToStr(AIds[I]);
+    end;
+
+    LDataSet := Query.SQL(' select vendaItem.ven_001, coalesce(sum(ite_005),0) as ite_005 from vendaitem                       ')
+      .SQL(' join materiais on vendaitem.mat_001 = materiais.mat_001 and vendaitem.emp_001 = materiais.emp_001    ')
+      .SQL(' where  not materiais.b_nao_taxa and vendaItem.ven_001 in (' + LIn + ')                               ')
+      .SQL(' and vendaitem.sit_001=4  and vendaitem.emp_001=:idEmpresa                                            ')
+      .SQL(' group by vendaItem.ven_001                                                                           ')
+      .ParamAsInteger('idEmpresa', FIdEmpresa)
+      .OpenDataSet;
+    try
+      LDataSet.First;
+      while not LDataSet.Eof do
+      begin
+        Result.AddOrSetValue(LDataSet.FieldByName('ven_001').AsInteger,
+          LDataSet.FieldByName('ite_005').AsCurrency);
+        LDataSet.Next;
+      end;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+  except
+    Result.Free;
+    raise;
+  end;
 end;
 
 procedure TAPIRPCheffDAOVendaItem.TotalizarItensVenda(AIdVenda: Integer; out ATotalItens,

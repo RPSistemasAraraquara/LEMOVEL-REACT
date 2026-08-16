@@ -7,11 +7,13 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.util.Base64;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
@@ -1070,6 +1072,18 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
       }
 
       String type = safeLower(command.optString("type"));
+
+      // DANFCe da NFC-e: o servidor manda a imagem do cupom fiscal em base64
+      // ({type:'image', imagePath|imageData}) - imprime como bitmap.
+      if ("image".equals(type)) {
+        String imageBase64 = safePreserve(command.optString("imagePath"));
+        if (imageBase64.trim().isEmpty()) {
+          imageBase64 = safePreserve(command.optString("imageData"));
+        }
+        printSunmiImage(imageBase64);
+        return;
+      }
+
       String text = safePreserve(command.optString("content"));
       if ("line".equals(type) && text.trim().isEmpty()) {
         text = "--------------------------------";
@@ -1094,6 +1108,56 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
     String[] lines = normalized.split("\n", -1);
     for (String line : lines) {
       printSunmiStyledLine(line, "left", "medium", "");
+    }
+  }
+
+  // Imprime uma imagem base64 (ex.: DANFCe) na impressora Sunmi da Stone,
+  // redimensionada para a largura do papel e fatiada em blocos para nao
+  // estourar o limite de altura de bitmap do servico.
+  private void printSunmiImage(String imageBase64) throws RemoteException {
+    String raw = safePreserve(imageBase64).trim();
+    if (raw.isEmpty()) {
+      return;
+    }
+
+    Bitmap source = null;
+    Bitmap scaled = null;
+    try {
+      byte[] bytes = Base64.decode(raw, Base64.DEFAULT);
+      source = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+      if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0) {
+        return;
+      }
+
+      int targetWidth = SUNMI_PAPER_WIDTH;
+      int targetHeight = Math.max(1, Math.round(source.getHeight() * (targetWidth / (float) source.getWidth())));
+      scaled = Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
+
+      final int chunkMaxHeight = 512;
+      int offsetY = 0;
+      while (offsetY < scaled.getHeight()) {
+        int chunkHeight = Math.min(chunkMaxHeight, scaled.getHeight() - offsetY);
+        Bitmap chunk = Bitmap.createBitmap(scaled, 0, offsetY, targetWidth, chunkHeight);
+        try {
+          sunmiPrinterService.printBitmapCustom(chunk, SUNMI_BITMAP_TYPE_BLACK_AND_WHITE, null);
+        } finally {
+          if (!chunk.isRecycled()) {
+            chunk.recycle();
+          }
+        }
+        offsetY += chunkHeight;
+      }
+    } catch (RemoteException error) {
+      throw error;
+    } catch (Throwable ignored) {
+      // Imagem invalida: segue sem interromper o restante da impressao.
+    } finally {
+      if (scaled != null && !scaled.isRecycled()) {
+        scaled.recycle();
+      }
+      if (source != null && !source.isRecycled() && source != scaled) {
+        source.recycle();
+      }
     }
   }
 

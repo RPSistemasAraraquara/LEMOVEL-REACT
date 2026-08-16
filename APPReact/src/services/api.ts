@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { NativeModules, Platform } from 'react-native';
-import { loadStoredMachineSettings, saveStoredMachineSettings } from './machineSettingsDb';
+import { loadStoredMachineSettings, saveStoredMachineSettings, saveStoredIntegracaoNfce } from './machineSettingsDb';
 import {
+  countProductsMissingImage,
   countStoredCatalogProductSummaries,
   loadStoredCatalogFingerprint,
   loadStoredCatalogProduct,
@@ -259,6 +260,11 @@ export type SaleClosurePayload = {
   pagamentos: SaleClosureLine[];
   impressoraInterna?: boolean;
   imprimirPreFechamentoMobile?: boolean;
+  // Escolha do operador ao aprovar a venda: 1 = Nao Fiscal, 2 = Fiscal.
+  opcaoFiscal?: number;
+  // CPF/CNPJ do consumidor na NFC-e (so digitos; vazio/ausente = sem
+  // identificacao). Validado na tela de fechamento antes do envio.
+  cpfCnpjNota?: string;
 };
 
 export type MachinePaymentType = 'tmpNenhum' | 'tmpVero' | 'tmpStone' | 'tmpPlugPag' | 'tmpCielo';
@@ -410,6 +416,8 @@ export type CompanyConfig = {
   couvertMascFemObrigatorio?: boolean;
   valorCouvertMasculino?: number;
   valorCouvertFeminino?: number;
+  // empresas.integracao_nfce do Postgres (default false)
+  integracaoNfce?: boolean;
 };
 
 export type CompanyInfo = {
@@ -425,6 +433,8 @@ export type MobileAppSettings = {
   baseUrl: string;
   empresaId: number;
   terminalImpressao: string;
+  // Identificacao da maquininha na venda/consulta fiscal: "<numero> (Stone)".
+  numeroMaquina: string;
   salvarLoginSenha: boolean;
   utilizaCatraca: boolean;
   cobrarMaiorValorFracionado: boolean;
@@ -452,6 +462,9 @@ export type MobileAppSettings = {
   utilizaMaquininhaStone: boolean;
   tipoIntegracao: 'nenhum' | 'vero' | 'stone' | 'pagbank' | 'cielo' | 'getnet';
   modeloMaquininha: string;
+  // Emissao de NFC-e habilitada para a empresa (empresas.integracao_nfce);
+  // alimentado pelo "Sincronizar tudo" e espelhado no SQLite. Default false.
+  integracaoNfce: boolean;
   usuario?: string;
   senha?: string;
 };
@@ -560,9 +573,12 @@ const fallbackTables: TableOrder[] = [
 ];
 
 export const defaultMobileSettings: MobileAppSettings = {
-  baseUrl: 'https://mobile.rpfood.com.br',
+  // TESTE LOCAL: apontando para a maquina do dev (192.168.15.35:9000).
+  // >>> REVERTER para 'https://mobile.rpfood.com.br' antes de gerar producao <<<
+  baseUrl: 'http://192.168.15.35:9000',
   empresaId: 1,
   terminalImpressao: 'PB3S249E76533',
+  numeroMaquina: '1',
   salvarLoginSenha: true,
   utilizaCatraca: false,
   cobrarMaiorValorFracionado: false,
@@ -590,6 +606,7 @@ export const defaultMobileSettings: MobileAppSettings = {
   utilizaMaquininhaStone: true,
   tipoIntegracao: 'pagbank',
   modeloMaquininha: 'PagBank',
+  integracaoNfce: false,
   usuario: '1',
   senha: '1'
 };
@@ -599,8 +616,11 @@ const CATALOG_STORAGE_VERSION = 5;
 const CATALOG_PRODUCT_WRITE_BATCH_SIZE = 80;
 const PRODUCT_CATALOG_TIMEOUT_MS = 60000;
 const SYNC_PRODUCT_CATALOG_TIMEOUT_MS = 30000;
+// Timeout dedicado para a busca de produtos na sincronizacao: catalogos grandes
+// podem levar bem mais que os 30s usados nas demais etapas (ex.: categorias).
+const SYNC_PRODUCT_FETCH_TIMEOUT_MS = 180000;
 const PRODUCT_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const PRODUCT_IMAGE_DOWNLOAD_CONCURRENCY = 2;
+const PRODUCT_IMAGE_DOWNLOAD_CONCURRENCY = 4;
 
 function buildCatalogStoragePrefix(baseUrl: string, empresaId: number): string {
   const normalizedBaseUrl = String(baseUrl || '')
@@ -680,6 +700,10 @@ type NativeHttpModule = {
 type ApiRequestInit = RequestInit & {
   timeoutMs?: number;
   preferNativeHttp?: boolean;
+  // Operacoes NAO idempotentes (ex.: fechamento de venda) nao podem ser
+  // reenviadas automaticamente: um timeout no meio da emissao da NFC-e
+  // geraria fechamentos duplicados em fila no servidor.
+  noRetry?: boolean;
 };
 
 const nativeHttpModule: NativeHttpModule | undefined =
@@ -1315,6 +1339,7 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
       defaultMobileSettings.empresaId
     ),
     terminalImpressao: sanitizeText(value.terminalImpressao, defaultMobileSettings.terminalImpressao),
+    numeroMaquina: sanitizeText(value.numeroMaquina, defaultMobileSettings.numeroMaquina),
     salvarLoginSenha,
     utilizaCatraca: parseBoolean(value.utilizaCatraca, defaultMobileSettings.utilizaCatraca),
     cobrarMaiorValorFracionado: parseBoolean(
@@ -1387,6 +1412,7 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
     utilizaMaquininhaStone: parseBoolean(value.utilizaMaquininhaStone, false) || tipoIntegracao !== 'nenhum',
     tipoIntegracao,
     modeloMaquininha: sanitizeText(value.modeloMaquininha, defaultMobileSettings.modeloMaquininha),
+    integracaoNfce: parseBoolean(value.integracaoNfce, defaultMobileSettings.integracaoNfce),
     usuario: salvarLoginSenha
       ? sanitizeText((value as Record<string, unknown>).usuario, defaultMobileSettings.usuario || '')
       : '',
@@ -1442,7 +1468,8 @@ export const saveMobileSettings = async (payload: MobileAppSettings): Promise<vo
   await saveStoredMachineSettings({
     utilizaMaquininhaStone: data.utilizaMaquininhaStone,
     tipoIntegracao: data.tipoIntegracao,
-    modeloMaquininha: data.modeloMaquininha
+    modeloMaquininha: data.modeloMaquininha,
+    integracaoNfce: data.integracaoNfce
   });
 };
 
@@ -2535,7 +2562,8 @@ function parseCompanyConfig(value: any): CompanyConfig {
       false
     ),
     valorCouvertMasculino: parseNumber(value?.valorCouvertMasculino ?? value?.valor_couvert_masc_mesa, 0),
-    valorCouvertFeminino: parseNumber(value?.valorCouvertFeminino ?? value?.valor_couvert_fem_mesa, 0)
+    valorCouvertFeminino: parseNumber(value?.valorCouvertFeminino ?? value?.valor_couvert_fem_mesa, 0),
+    integracaoNfce: parseBoolean(value?.integracaoNfce ?? value?.integracao_nfce, false)
   };
 }
 
@@ -3035,6 +3063,35 @@ export class ApiClient {
     }
   }
 
+  // Nome do terminal exibido na venda/consulta fiscal do retaguarda:
+  // "<numero da maquina> (Stone|PagBank|Cielo|...)". O numero vem do campo
+  // "Numero da maquina" das configuracoes e a marca do tipo de integracao.
+  // A impressao de producao continua usando resolveTerminalName puro para nao
+  // quebrar o roteamento por terminal (COPA/DELIVERY/etc).
+  private async resolveTerminalDisplayName(): Promise<string> {
+    try {
+      const settings = await loadMobileSettings();
+      const base =
+        sanitizeText(settings.numeroMaquina, '') ||
+        sanitizeText(settings.terminalImpressao, '').toUpperCase() ||
+        'MOBILE';
+      const brandByIntegration: Record<string, string> = {
+        stone: 'Stone',
+        pagbank: 'PagBank',
+        cielo: 'Cielo',
+        getnet: 'GetNet',
+        vero: 'Vero'
+      };
+      const brand = brandByIntegration[settings.tipoIntegracao] || '';
+      if (!brand || base.toUpperCase().includes(`(${brand.toUpperCase()})`)) {
+        return base;
+      }
+      return `${base} (${brand})`;
+    } catch {
+      return 'MOBILE';
+    }
+  }
+
   private async withTerminalImpressao(item: LaunchItemPayload): Promise<LaunchItemPayload> {
     const terminal = (
       sanitizeText(item.terminalImpressao, '') ||
@@ -3049,7 +3106,13 @@ export class ApiClient {
   }
 
   private async withTerminalImpressaoBatch(items: LaunchItemPayload[]): Promise<LaunchItemPayload[]> {
-    const terminal = await this.resolveTerminalName();
+    // Performance: so le AsyncStorage/SQLite quando algum item NAO trouxe o
+    // terminal (o fluxo normal preenche em todos - a leitura era paga em todo
+    // envio a toa).
+    const algumSemTerminal = items.some(
+      (item) => !sanitizeText(item.terminalImpressao, '') && !sanitizeText(item.TerminalImpressao, '')
+    );
+    const terminal = algumSemTerminal ? await this.resolveTerminalName() : '';
     return items.map((item) => {
       const itemTerminal = (
         sanitizeText(item.terminalImpressao, '') ||
@@ -3214,8 +3277,13 @@ export class ApiClient {
       }
     }
 
-    const resolvedProducts: MenuItem[] = [];
-    for (const product of products) {
+    // Primeiro passe: resolve tudo que nao precisa de rede e coleta os candidatos
+    // a prefetch, preservando a posicao original de cada produto no array.
+    const resolvedProducts: MenuItem[] = new Array<MenuItem>(products.length);
+    const prefetchCandidates: Array<{ index: number; product: MenuItem; productId: number }> = [];
+
+    for (let index = 0; index < products.length; index += 1) {
+      const product = products[index];
       const productId = Number(product.idProduto || product.id || 0);
       const previousProduct = previousProductsById.get(productId);
       const imagePayload = extractStoredImagePayload(product.imagem_db || product.imagem);
@@ -3225,78 +3293,106 @@ export class ApiClient {
 
       if (!imagePayload) {
         if (knownLocalPath) {
-          resolvedProducts.push({
+          resolvedProducts[index] = {
             ...product,
             imagem: knownLocalPath,
             imagem_db: undefined,
             imagemLocalPath: knownLocalPath,
             possuiImagem: product.possuiImagem !== false
-          });
+          };
           continue;
         }
 
         if (options.prefetchMissingRemote && product.possuiImagem !== false && productId > 0) {
-          const remoteImagePath = await cacheProductImageOnDemand(this.baseUrl, this.idEmpresa, productId).catch(() => undefined);
-          if (remoteImagePath) {
-            resolvedProducts.push({
-              ...product,
-              imagem: remoteImagePath,
-              imagem_db: undefined,
-              imagemLocalPath: remoteImagePath,
-              possuiImagem: true
-            });
-            continue;
-          }
+          prefetchCandidates.push({ index, product, productId });
+          continue;
         }
 
-        resolvedProducts.push({
+        resolvedProducts[index] = {
           ...product,
           imagem_db: undefined,
           imagemLocalPath: undefined
-        });
+        };
         continue;
       }
 
       if (knownLocalPath && previousProduct?.imagem_db === imagePayload) {
-        resolvedProducts.push({
+        resolvedProducts[index] = {
           ...product,
           imagem: knownLocalPath,
           imagem_db: undefined,
           imagemLocalPath: knownLocalPath,
           possuiImagem: true
-        });
+        };
         continue;
       }
 
       if (Platform.OS === 'web') {
         const inlineImageUri = buildDataUri(imagePayload, detectImageMimeTypeFromBase64(imagePayload));
-        resolvedProducts.push({
+        resolvedProducts[index] = {
           ...product,
           imagem: inlineImageUri,
           imagem_db: undefined,
           imagemLocalPath: inlineImageUri,
           possuiImagem: true
-        });
+        };
         continue;
       }
 
       const imageExtension = getImageFileExtensionFromPayload(imagePayload);
-      const imagePath = `${imageDirectory as string}${productId || resolvedProducts.length + 1}.${imageExtension}`;
+      const imagePath = `${imageDirectory as string}${productId || index + 1}.${imageExtension}`;
 
       try {
         await FileSystem.writeAsStringAsync(imagePath, imagePayload, {
           encoding: FileSystem.EncodingType.Base64
         });
-        resolvedProducts.push({
+        resolvedProducts[index] = {
           ...product,
           imagem: imagePath,
           imagem_db: undefined,
           imagemLocalPath: imagePath,
           possuiImagem: true
-        });
+        };
       } catch {
-        resolvedProducts.push(stripInlineProductImage(product, true));
+        resolvedProducts[index] = stripInlineProductImage(product, true);
       }
+    }
+
+    if (prefetchCandidates.length > 0) {
+      // Downloads em paralelo (deduplicados por produto), limitados pela fila
+      // runProductImageDownload dentro de cacheProductImageOnDemand. A resolucao
+      // por produto e identica a do fluxo serial anterior.
+      const downloadsByProductId = new Map<number, Promise<string | undefined>>();
+      prefetchCandidates.forEach(({ productId }) => {
+        if (!downloadsByProductId.has(productId)) {
+          downloadsByProductId.set(
+            productId,
+            cacheProductImageOnDemand(this.baseUrl, this.idEmpresa, productId).catch(() => undefined)
+          );
+        }
+      });
+
+      await Promise.all(
+        prefetchCandidates.map(async ({ index, product, productId }) => {
+          const remoteImagePath = await downloadsByProductId.get(productId);
+          if (remoteImagePath) {
+            resolvedProducts[index] = {
+              ...product,
+              imagem: remoteImagePath,
+              imagem_db: undefined,
+              imagemLocalPath: remoteImagePath,
+              possuiImagem: true
+            };
+            return;
+          }
+
+          resolvedProducts[index] = {
+            ...product,
+            imagem_db: undefined,
+            imagemLocalPath: undefined
+          };
+        })
+      );
     }
 
     return resolvedProducts;
@@ -3528,7 +3624,14 @@ export class ApiClient {
         return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
       }
 
-      const entries = await AsyncStorage.multiGet(ids.map((id) => this.getCatalogProductKey(id)));
+      const productKeys = ids.map((id) => this.getCatalogProductKey(id));
+      const entries: Array<[string, string | null]> = [];
+      for (let index = 0; index < productKeys.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+        const batchEntries = await AsyncStorage.multiGet(
+          productKeys.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE)
+        );
+        batchEntries.forEach(([key, value]) => entries.push([key, value]));
+      }
       const products = parseRows(entries.map(([, raw]) => raw || ''));
       const fingerprint = await AsyncStorage.getItem(this.getCatalogProductFingerprintKey()).catch(() => null);
       this.cachedCatalogProducts = products;
@@ -3591,10 +3694,9 @@ export class ApiClient {
   private async syncCatalogProductCount(): Promise<number> {
     const startedAt = Date.now();
     const productPath = `rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=false`;
-    const cachedProducts = await this.loadCachedProducts();
     const { response, payload, rawText } = await this.request(productPath, {
       preferNativeHttp: Platform.OS === 'android',
-      timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
+      timeoutMs: SYNC_PRODUCT_FETCH_TIMEOUT_MS
     });
     if (!response.ok) {
       throw new Error(`Falha ao consultar ${productPath}: ${response.status}`);
@@ -3611,6 +3713,27 @@ export class ApiClient {
     let knownFingerprint = this.cachedCatalogProductsFingerprint;
     if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
       knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+    }
+
+    if (remoteFingerprint && knownFingerprint === remoteFingerprint) {
+      // Fast-path barato: conta imagens pendentes direto no SQLite, sem carregar
+      // o catalogo inteiro em memoria. null = SQLite indisponivel (cai no fluxo atual).
+      const missingImageCount = await countProductsMissingImage(this.getCatalogStoragePrefix());
+      if (missingImageCount === 0) {
+        this.cachedCatalogProductsFingerprint = remoteFingerprint;
+        logSyncDiagnostic(`produtos prontos inalterado count=${payload.length} em ${Date.now() - startedAt}ms`);
+        return payload.length;
+      }
+    }
+
+    const cachedProducts = await this.loadCachedProducts();
+    if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
+      // loadCachedProducts pode reidratar o fingerprint (ex.: cache legado migrado do
+      // AsyncStorage); reavalia com as mesmas fontes do fluxo original.
+      knownFingerprint = this.cachedCatalogProductsFingerprint;
+      if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
+        knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+      }
     }
 
     if (remoteFingerprint && knownFingerprint === remoteFingerprint && !hasMissingCatalogImageCache(cachedProducts)) {
@@ -3660,7 +3783,14 @@ export class ApiClient {
     }
 
     try {
-      const entries = await AsyncStorage.multiGet(previousIds.map((id) => this.getCatalogProductKey(id)));
+      const productKeys = previousIds.map((id) => this.getCatalogProductKey(id));
+      const entries: Array<[string, string | null]> = [];
+      for (let index = 0; index < productKeys.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+        const batchEntries = await AsyncStorage.multiGet(
+          productKeys.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE)
+        );
+        batchEntries.forEach(([key, value]) => entries.push([key, value]));
+      }
       if (entries.some(([, value]) => !value)) {
         return null;
       }
@@ -3913,7 +4043,7 @@ export class ApiClient {
   }
 
   private async request(path: string, init: ApiRequestInit = {}) {
-    const { timeoutMs: customTimeoutMs, preferNativeHttp = false, ...fetchInit } = init;
+    const { timeoutMs: customTimeoutMs, preferNativeHttp = false, noRetry = false, ...fetchInit } = init;
     const timeoutMs =
       typeof customTimeoutMs === 'number' && Number.isFinite(customTimeoutMs) && customTimeoutMs > 0
         ? customTimeoutMs
@@ -3925,6 +4055,10 @@ export class ApiClient {
     };
     const url = this.buildUrl(path);
     const fallbackTimeoutMs = Math.max(timeoutMs, Platform.OS === 'android' ? quickConnectionCheckTimeoutMs : 1500);
+
+    if (noRetry) {
+      return this.requestWithFetch(path, url, fetchInit, headers, timeoutMs);
+    }
 
     if (Platform.OS === 'android' && nativeHttpModule?.request) {
       if (preferNativeHttp) {
@@ -4253,6 +4387,14 @@ export class ApiClient {
       if (taskCode === 'configuracoes' || taskCode === 'configuracao') {
         const config = await this.getCompanyConfig();
         const total = Number(config.mesa !== null) + Number(config.comanda !== null);
+        if (total > 0) {
+          // empresas.integracao_nfce vem nas configuracoes de mesa/comanda
+          // (mesma linha de empresas); espelha no SQLite local para o app
+          // saber offline se a emissao de NFC-e esta habilitada.
+          const integracaoNfce = Boolean(config.mesa?.integracaoNfce ?? config.comanda?.integracaoNfce ?? false);
+          await saveStoredIntegracaoNfce(integracaoNfce);
+          logSyncDiagnostic(`configuracoes integracao_nfce=${integracaoNfce}`);
+        }
         return {
           key: task,
           status: total > 0 ? 'ok' : 'skip',
@@ -4539,7 +4681,7 @@ export class ApiClient {
 
   async openTable(tableId: number, nomeMesaComanda?: string, idUsuario = 0): Promise<TableOrder> {
     try {
-      const terminal = await this.resolveTerminalName();
+      const terminal = await this.resolveTerminalDisplayName();
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
@@ -4583,7 +4725,7 @@ export class ApiClient {
     idUsuario = 0
   ): Promise<TableOrder> {
     try {
-      const terminal = await this.resolveTerminalName();
+      const terminal = await this.resolveTerminalDisplayName();
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
@@ -4707,7 +4849,7 @@ export class ApiClient {
     idUsuario = 0
   ): Promise<void> {
     const resource = tipo === 'comanda' ? 'comanda' : 'mesa';
-    const terminal = await this.resolveTerminalName();
+    const terminal = await this.resolveTerminalDisplayName();
     const headers: Record<string, string> = {};
     if (Number(idUsuario || 0) > 0) {
       headers.idUsuario = String(Math.trunc(Number(idUsuario)));
@@ -4837,13 +4979,17 @@ export class ApiClient {
     }
 
     const queryMachine = options.tipoMaquina ? `?tipoMaquina=${encodeURIComponent(options.tipoMaquina)}` : '';
+    // Fechamento emite NFC-e na SEFAZ: pode demorar bem mais que uma chamada
+    // comum (primeira emissao carrega certificado). Timeout folgado e SEM
+    // retry automatico (fechamento nao e idempotente).
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${input.idVenda}/fechamento${queryMachine}`,
       {
         method: 'POST',
         headers,
         body: JSON.stringify(input),
-        timeoutMs: 30000
+        timeoutMs: 120000,
+        noRetry: true
       }
     );
     if (!response.ok) {
@@ -4854,6 +5000,41 @@ export class ApiClient {
     if (wantsTextPlain) {
       return typeof payload === 'string' ? payload : JSON.stringify(payload ?? '');
     }
+
+    // NFC-e nao-fatal: a venda foi fechada, mas o servidor pode avisar que a
+    // nota fiscal nao foi emitida (para reemitir depois).
+    const rawAviso = response.headers?.get?.('x-nfce-aviso') || '';
+    if (rawAviso) {
+      try {
+        return decodeURIComponent(rawAviso.replace(/\+/g, ' '));
+      } catch {
+        return rawAviso;
+      }
+    }
+  }
+
+  // Reemite a NFC-e de uma venda FECHADA que ficou sem nota (rejeicao da
+  // SEFAZ, queda de rede). O servidor aloca numeracao nova e valida se a
+  // venda ja tem nota autorizada. Nao-idempotente: sem retry automatico.
+  async reemitirNfce(idVenda: number): Promise<{ chave: string; numero: number }> {
+    const { response, payload } = await this.request(
+      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/nfce/reemitir`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        timeoutMs: 120000,
+        noRetry: true
+      }
+    );
+    if (!response.ok) {
+      throw new Error(extractApiErrorMessage(payload, 'Não foi possível reemitir a NFC-e.'));
+    }
+    const data = (payload || {}) as Record<string, unknown>;
+    return {
+      chave: sanitizeText(data.chave, ''),
+      numero: parseNumber(data.numero, 0)
+    };
   }
 
   async getSalePrint(idVenda: number, options: SalePrintRequest = {}): Promise<string> {
@@ -4985,7 +5166,10 @@ export class ApiClient {
       {
         method: 'POST',
         body: JSON.stringify(payload),
-        timeoutMs: 30000
+        timeoutMs: 60000,
+        // Registrar pagamento nao e idempotente: retry automatico poderia
+        // duplicar o pagamento.
+        noRetry: true
       }
     );
     if (!response.ok) {

@@ -197,6 +197,8 @@ type
     FimpressoraInterna           : Boolean;
     FvalorTaxaServico            : Currency;
     FCobrarTaxaGarcom            : Boolean;
+    FopcaoFiscal                 : Integer;
+    FcpfCnpjNota                 : string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -224,6 +226,11 @@ type
     property impressoraInterna: Boolean read FimpressoraInterna write FimpressoraInterna;
     property pagamentos: TObjectList<TAPIRPCheffEntityVendaPostFechamentoPagamento> read Fpagamentos write Fpagamentos;
     property CobrarTaxaGarcom: boolean read FCobrarTaxaGarcom write FCobrarTaxaGarcom;
+    // Escolha do operador no app: 0 = nao informado, 1 = Nao Fiscal, 2 = Fiscal.
+    property opcaoFiscal: Integer read FopcaoFiscal write FopcaoFiscal;
+    // CPF/CNPJ do consumidor para a NFC-e (so digitos; vazio = sem
+    // identificacao). Validado no app; gravado em encerravenda.ven_cpfconsum.
+    property cpfCnpjNota: string read FcpfCnpjNota write FcpfCnpjNota;
 
   end;
 

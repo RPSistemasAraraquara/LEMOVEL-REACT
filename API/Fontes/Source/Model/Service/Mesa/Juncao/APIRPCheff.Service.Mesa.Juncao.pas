@@ -6,6 +6,7 @@ uses
   APIRPCheff.Entity.Classes,
   APIRPCheff.Entity.Types,
   APIRPCheff.DAO.Factory,
+  APIRPCheff.DAO.Venda,
   System.SysUtils,
   System.Classes,
   System.Generics.Collections;
@@ -104,23 +105,38 @@ begin
 end;
 
 procedure TAPIRPCheffServiceMesaJuncao.MoverItens(AIdVendaOrigem: Integer);
+var
+  LDAO: TAPIRPCheffDAOVenda;
 begin
-  FDAO.VendaDAO.JuntarItensVenda(AIdVendaOrigem, FIdVendaDestino);
+  // ManagerTransaction(False): o commit e' controlado pelo Execute, para que
+  // mover itens/pagamentos e deletar a venda origem sejam uma unica transacao.
+  LDAO := FDAO.VendaDAO;
+  LDAO.ManagerTransaction(False);
+  LDAO.JuntarItensVenda(AIdVendaOrigem, FIdVendaDestino);
 end;
 
 procedure TAPIRPCheffServiceMesaJuncao.MoverPagamentos(AIdVendaOrigem: Integer);
+var
+  LDAO: TAPIRPCheffDAOVenda;
 begin
-  FDAO.VendaDAO.MoverPagamentosAntecipados(AIdVendaOrigem, FIdVendaDestino);
+  LDAO := FDAO.VendaDAO;
+  LDAO.ManagerTransaction(False);
+  LDAO.MoverPagamentosAntecipados(AIdVendaOrigem, FIdVendaDestino);
 end;
 
 procedure TAPIRPCheffServiceMesaJuncao.FinalizarVendaOrigem(AIdVendaOrigem: Integer);
+var
+  LDAO: TAPIRPCheffDAOVenda;
 begin
-  FDAO.VendaDAO.DeletarVendaJuncao(AIdVendaOrigem);
+  LDAO := FDAO.VendaDAO;
+  LDAO.ManagerTransaction(False);
+  LDAO.DeletarVendaJuncao(AIdVendaOrigem);
 end;
 
 procedure TAPIRPCheffServiceMesaJuncao.Execute;
 var
   LIdVendaOrigem: Integer;
+  LDAO: TAPIRPCheffDAOVenda;
 begin
   if FIdVendasOrigem.Count = 0 then
     raise Exception.Create('Nenhuma mesa/comanda de origem selecionada.');
@@ -128,14 +144,27 @@ begin
   ValidarVendaDestino;
   ValidarVendasOrigem;
 
-  for LIdVendaOrigem in FIdVendasOrigem do
-  begin
-    MoverItens(LIdVendaOrigem);
-    MoverPagamentos(LIdVendaOrigem);
-    FinalizarVendaOrigem(LIdVendaOrigem);
-  end;
+  // Transacao unica: mover itens/pagamentos, deletar as vendas origem e
+  // recalcular o total do destino sao atomicos. Se qualquer passo falhar,
+  // o Rollback desfaz tudo e as mesas/comandas origem continuam intactas.
+  FDAO.StartTransaction;
+  try
+    for LIdVendaOrigem in FIdVendasOrigem do
+    begin
+      MoverItens(LIdVendaOrigem);
+      MoverPagamentos(LIdVendaOrigem);
+      FinalizarVendaOrigem(LIdVendaOrigem);
+    end;
 
-  FDAO.VendaDAO.AtualizarTotalVenda(FDAO.IdEmpresa, FIdVendaDestino);
+    LDAO := FDAO.VendaDAO;
+    LDAO.ManagerTransaction(False);
+    LDAO.AtualizarTotalVenda(FDAO.IdEmpresa, FIdVendaDestino);
+
+    FDAO.Commit;
+  except
+    FDAO.Rollback;
+    raise;
+  end;
 end;
 
 end.

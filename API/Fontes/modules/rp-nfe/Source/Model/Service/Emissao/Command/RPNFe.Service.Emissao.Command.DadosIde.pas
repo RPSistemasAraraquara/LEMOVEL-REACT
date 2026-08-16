@@ -29,14 +29,17 @@ var
   LNumeroNFCe: Integer;
   LNFe: TNFe;
 begin
-  LNumeroNFCe := FParent.Empresa.NFCeNumero + 1;
+  // Alocacao atomica no banco (UPDATE..RETURNING + commit): elimina a
+  // Duplicidade de NF-e causada por leitura velha do numero_nfce em conexao
+  // com snapshot/transacao vazada do pool. O NFCeNumero da entidade e apenas
+  // informativo a partir daqui.
+  LNumeroNFCe := FParent.DAO.EmpresaDAO.AlocarNumeroNFCe(FParent.Empresa.Id);
+  FParent.Empresa.NFCeNumero := LNumeroNFCe;
   LNFe := FParent.Components.Emissor.ACBr.NotasFiscais.Items[0].NFe;
   LNFe.Ide.nNF := LNumeroNFCe;
   LNFe.Ide.cNF := Format('9%d9', [LNumeroNFCe]).ToInteger;
   LNFe.Ide.serie := FParent.Empresa.NFCeSerie;
-  Log('Numeração %d usada para NFCe', [LNumeroNFCe]);
-
-  FParent.DAO.EmpresaDAO.AtualizarNumeroNFCe(FParent.Empresa.Id);
+  Log('Numeraï¿½ï¿½o %d usada para NFCe', [LNumeroNFCe]);
 end;
 
 procedure TRPNFeServiceEmissaoCommandDadosIde.CarregarNumeroNFe;
@@ -49,7 +52,7 @@ begin
   LNFe.Ide.nNF := LNumeroNFe;
   LNFe.Ide.cNF := Format('9%d9', [LNumeroNFe]).ToInteger;
   LNFe.Ide.serie := FParent.Empresa.NFeSerie;
-  Log('Numeração %d usada para NFe', [LNumeroNFe]);
+  Log('Numeraï¿½ï¿½o %d usada para NFe', [LNumeroNFe]);
 
   FParent.DAO.EmpresaDAO.AtualizarNumeroNFe(FParent.Empresa.Id);
 end;

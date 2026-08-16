@@ -9,7 +9,8 @@ uses
 type
   TADRConnModelGenerator = class abstract(TInterfacedObject, IADRGenerator)
   protected
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FQuery: IADRQuery;
 
     function GetCurrentSequence(AName: string): Double; virtual; abstract;

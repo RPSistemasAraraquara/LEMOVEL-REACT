@@ -164,7 +164,9 @@ export const InitialScreen: React.FC = () => {
     initialScreenMode,
     setActiveTable,
     setInitialScreenMode,
-    setLinkedMesaSelection
+    setLinkedMesaSelection,
+    pauseAutoRefresh,
+    resumeAutoRefresh
   } = useApp();
 
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -435,6 +437,52 @@ export const InitialScreen: React.FC = () => {
     (item: TableOrder) => `${item.tipo || 'mesa'}-${item.idComanda || 0}-${item.idMesa}`,
     []
   );
+
+  // Enquanto o usuario rola a lista de mesas/comandas, o refresh automatico de
+  // 7s substitui a lista e joga a rolagem de volta para o topo. Pausamos o
+  // refresh durante a rolagem e retomamos apos uma janela de carencia, para a
+  // lista nao se mexer sob o dedo do usuario (nem logo depois que ele para).
+  const AUTO_REFRESH_RESUME_DELAY_MS = 5000;
+  const scrollPausedRef = React.useRef(false);
+  const resumeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearResumeTimer = React.useCallback(() => {
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  }, []);
+
+  const handleScrollActive = React.useCallback(() => {
+    clearResumeTimer();
+    if (!scrollPausedRef.current) {
+      scrollPausedRef.current = true;
+      pauseAutoRefresh();
+    }
+  }, [clearResumeTimer, pauseAutoRefresh]);
+
+  const handleScrollSettle = React.useCallback(() => {
+    clearResumeTimer();
+    resumeTimerRef.current = setTimeout(() => {
+      resumeTimerRef.current = null;
+      if (scrollPausedRef.current) {
+        scrollPausedRef.current = false;
+        resumeAutoRefresh();
+      }
+    }, AUTO_REFRESH_RESUME_DELAY_MS);
+  }, [clearResumeTimer, resumeAutoRefresh]);
+
+  // Ao sair da tela (ou desmontar), garante que nunca deixamos o refresh
+  // automatico pausado por engano.
+  React.useEffect(() => {
+    return () => {
+      clearResumeTimer();
+      if (scrollPausedRef.current) {
+        scrollPausedRef.current = false;
+        resumeAutoRefresh();
+      }
+    };
+  }, [clearResumeTimer, resumeAutoRefresh]);
 
   const parseQrText = (value: string) => {
     const normalized = value.trim();
@@ -1177,6 +1225,9 @@ export const InitialScreen: React.FC = () => {
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={handleScrollActive}
+        onScrollEndDrag={handleScrollSettle}
+        onMomentumScrollEnd={handleScrollSettle}
       />
     </View>
   );

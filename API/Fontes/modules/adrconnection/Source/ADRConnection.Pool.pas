@@ -100,8 +100,14 @@ end;
 procedure TADRConnectionPool.DoGetInstance(var AInstance: TADRConnectionPoolItem; var AInstanceOwner: Boolean);
 var
   LInstance: TADRConnectionPoolItem;
+  LConnection: IADRConnection;
 begin
   inherited;
+  // Obtem a conexao ANTES de criar o item: se OnGetConnection falhar (banco
+  // fora do ar), nenhum item meio-construido (Connection=nil) e devolvido -
+  // um item assim entrava na lista do pool e derrubava todas as requisicoes
+  // seguintes com access violation ate reiniciar a API.
+  LConnection := OnGetConnection;
   AInstanceOwner := True;
 {$IFDEF ADRCONN_FIREDAC}
   AInstance := TADRConnectionPoolItemFiredac.Create;
@@ -109,7 +115,7 @@ begin
   AInstance := TADRConnectionPoolItem.Create;
 {$ENDIF}
   LInstance := AInstance;
-  LInstance.FConnection := OnGetConnection;
+  LInstance.FConnection := LConnection;
 {$IFDEF ADRCONN_FIREDAC}
   TFDConnection(AInstance.FConnection.Component).OnError :=
     TADRConnectionPoolItemFiredac(AInstance).OnError;

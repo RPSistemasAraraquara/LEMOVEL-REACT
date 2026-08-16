@@ -86,6 +86,16 @@ def resolveTargetArchitectures = {
         .collect { it.trim() }
         .findAll { !it.isEmpty() }
 }
+def resolveJniLibExcludes = {
+    def configured = (findProperty('android.packagingOptions.jniLibs.excludes') ?: "").toString()
+    return configured
+        .split(",")
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+}
+def resolveEnableAbiSplit = {
+    return (findProperty('enableAbiSplit') ?: false).toBoolean()
+}
 def resolveApplicationId = {
     return (findProperty('appApplicationId') ?: "br.com.sistemalechef.rpmobile").toString().trim()
 }
@@ -137,8 +147,18 @@ android {
         manifestPlaceholders = [
             appScheme: resolveAppDeepLinkScheme()
         ]
-        ndk {
-            abiFilters(*resolveTargetArchitectures())
+        if (!resolveEnableAbiSplit()) {
+            ndk {
+                abiFilters(*resolveTargetArchitectures())
+            }
+        }
+    }
+    splits {
+        abi {
+            enable resolveEnableAbiSplit()
+            reset()
+            include(*resolveTargetArchitectures())
+            universalApk false
         }
     }
     signingConfigs {
@@ -172,6 +192,7 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
+            excludes += resolveJniLibExcludes()
         }
     }
     androidResources {

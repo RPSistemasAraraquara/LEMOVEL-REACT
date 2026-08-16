@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.StrUtils,
+  System.Math,
   ACBrUtil.Base,
   ACBrNFe.Classes,
   pcnConversao,
@@ -43,13 +44,15 @@ begin
 
     LCstCofins := StrToCSTCOFINS(LOk, LVendaItem.Produto.CofinsCodigoSaida.ToString);
     if Integer(LCstCofins) < 0 then
-      raise Exception.CreateFmt('COFINS CST do produto não cadastrado [%d]',
+      raise Exception.CreateFmt('COFINS CST do produto nï¿½o cadastrado [%d]',
         [LVendaItem.Produto.CofinsCodigoSaida]);
 
     LNFeProduto.Imposto.COFINS.CST := LCstCofins;
     LNFeProduto.Imposto.COFINS.vBC := LVendaItem.ValorTotal;
     LNFeProduto.Imposto.COFINS.pCOFINS := LVendaItem.Produto.Cofins;
-    LNFeProduto.Imposto.COFINS.vCOFINS := LVendaItem.ValorTotal * LVendaItem.Produto.Cofins / 100;;
+    // Arredonda POR ITEM: o XML leva o valor com 2 casas e a SEFAZ confere o
+    // total contra o somatorio dos itens (rejeicao "Total do COFINS difere").
+    LNFeProduto.Imposto.COFINS.vCOFINS := RoundTo(LVendaItem.ValorTotal * LVendaItem.Produto.Cofins / 100, -2);
     LNFeProduto.Imposto.COFINS.qBCProd := 0;
     LNFeProduto.Imposto.COFINS.vAliqProd := 0;
 

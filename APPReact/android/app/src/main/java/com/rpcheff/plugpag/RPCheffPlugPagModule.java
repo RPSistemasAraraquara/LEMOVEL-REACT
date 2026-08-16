@@ -1,6 +1,7 @@
 package com.rpcheff.plugpag;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -8,6 +9,7 @@ import android.graphics.Typeface;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -20,6 +22,10 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -162,7 +168,13 @@ public class RPCheffPlugPagModule extends ReactContextBaseJavaModule {
 
       new Thread(() -> {
         try {
-          File imageFile = buildReceiptImage(printContent, printColumns, printTitle);
+          // DANFCe da NFC-e: o servidor manda a imagem do cupom fiscal em
+          // base64 ({type:'image', imagePath|imageData}) - imprime o bitmap
+          // direto em vez de renderizar texto.
+          String receiptImageBase64 = extractReceiptImageBase64(printContent);
+          File imageFile = receiptImageBase64 != null
+            ? buildBase64ImageFile(receiptImageBase64)
+            : buildReceiptImage(printContent, printColumns, printTitle);
           TerminalServiceAppIdentification appIdentification = new TerminalServiceAppIdentification(
             TERMINAL_APP_NAME,
             TERMINAL_APP_VERSION,
@@ -542,6 +554,103 @@ public class RPCheffPlugPagModule extends ReactContextBaseJavaModule {
       default:
         return "Processando pagamento...";
     }
+  }
+
+  // Procura um comando {type:'image', imagePath|imageData} (base64) no
+  // conteudo JSON vindo do servidor. Retorna null quando o conteudo e texto.
+  private String extractReceiptImageBase64(String content) {
+    String trimmed = content == null ? "" : content.trim();
+    if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+      return null;
+    }
+
+    try {
+      Object parsed = new JSONTokener(trimmed).nextValue();
+      return findImageBase64(parsed);
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
+  private String findImageBase64(Object payload) {
+    if (payload instanceof JSONArray) {
+      JSONArray array = (JSONArray) payload;
+      for (int index = 0; index < array.length(); index++) {
+        String found = findImageBase64(array.opt(index));
+        if (found != null) {
+          return found;
+        }
+      }
+      return null;
+    }
+
+    if (payload instanceof JSONObject) {
+      JSONObject command = (JSONObject) payload;
+      if (command.has("commands")) {
+        return findImageBase64(command.optJSONArray("commands"));
+      }
+      if (command.has("data")) {
+        return findImageBase64(command.optJSONArray("data"));
+      }
+
+      String type = safe(command.optString("type")).toLowerCase(Locale.ROOT);
+      if ("image".equals(type)) {
+        String base64 = safe(command.optString("imagePath"));
+        if (base64.trim().isEmpty()) {
+          base64 = safe(command.optString("imageData"));
+        }
+        return base64.trim().isEmpty() ? null : base64.trim();
+      }
+    }
+
+    return null;
+  }
+
+  // Decodifica a imagem base64, redimensiona para a largura do papel e grava
+  // como PNG para o doPrint da PagBank.
+  private File buildBase64ImageFile(String imageBase64) throws IOException {
+    byte[] bytes;
+    try {
+      bytes = Base64.decode(imageBase64, Base64.DEFAULT);
+    } catch (Throwable error) {
+      throw new IOException("Imagem de impressão inválida (base64).");
+    }
+
+    Bitmap source = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+    if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0) {
+      throw new IOException("Imagem de impressão inválida.");
+    }
+
+    Bitmap scaled = source;
+    if (source.getWidth() != RECEIPT_WIDTH_PX) {
+      int targetHeight = Math.max(1, Math.round(source.getHeight() * (RECEIPT_WIDTH_PX / (float) source.getWidth())));
+      scaled = Bitmap.createScaledBitmap(source, RECEIPT_WIDTH_PX, targetHeight, true);
+    }
+
+    File baseDir = getReactApplicationContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+    if (baseDir == null) {
+      baseDir = getReactApplicationContext().getFilesDir();
+    }
+
+    File printDir = new File(baseDir, "print");
+    if (!printDir.exists() && !printDir.mkdirs()) {
+      throw new IOException("Não foi possível criar a pasta de impressão.");
+    }
+
+    File imageFile = new File(printDir, "print-" + System.currentTimeMillis() + ".png");
+    try (FileOutputStream outputStream = new FileOutputStream(imageFile)) {
+      scaled.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+      outputStream.flush();
+    } finally {
+      if (scaled != source && !scaled.isRecycled()) {
+        scaled.recycle();
+      }
+      if (!source.isRecycled()) {
+        source.recycle();
+      }
+    }
+
+    return imageFile;
   }
 
   private File buildReceiptImage(String content, int columns, String title) throws IOException {

@@ -17,7 +17,8 @@ uses
 type
   TADRConnModelFiredacQuery = class(TInterfacedObject, IADRQuery)
   private
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
     FDQuery: TFDQuery;
     FGenerator: IADRGenerator;

@@ -49,7 +49,9 @@ uses
 procedure TAPIRPCheffServiceVendaLancarItem.CarregarProduto;
 begin
   FreeAndNil(FProduto);
-  FProduto := FDAO.ProdutoDAO.Buscar(FItem.idProduto);
+  // Sem opcionais: o lancamento usa apenas dados do produto + promocao (os
+  // opcionais gravados vem do payload do app) - poupa 1 SELECT por item.
+  FProduto := FDAO.ProdutoDAO.Buscar(FItem.idProduto, False);
 
   if not Assigned(FProduto) then
     raise Exception.CreateFmt('Produto %d n'#227'o encontrado.', [FItem.idProduto]);
@@ -83,7 +85,7 @@ begin
     if (LIdProdutoFracao <= 0) or (LIdProdutoFracao = FProduto.idProduto) then
       Continue;
 
-    LProdutoFracao := FDAO.ProdutoDAO.Buscar(LIdProdutoFracao);
+    LProdutoFracao := FDAO.ProdutoDAO.Buscar(LIdProdutoFracao, False);
     try
       if not Assigned(LProdutoFracao) then
         raise Exception.CreateFmt('Produto %d n'#227'o encontrado.', [LIdProdutoFracao]);

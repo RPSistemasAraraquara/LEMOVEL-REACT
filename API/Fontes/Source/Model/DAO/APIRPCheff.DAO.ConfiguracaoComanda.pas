@@ -55,6 +55,7 @@ begin
       Result.utilizaConsumacaoMinima   := ADataSet.FieldByName('consumacao_comanda').AsBoolean;
       Result.consumacaoMinima          := ADataSet.FieldByName('consumacao_minima_comanda').AsCurrency;
       Result.permiteTrocoTodasAsFormas := ADataSet.FieldByName('b_permite_troco_todas_formas').AsBoolean;
+      Result.integracaoNfce            := ADataSet.FieldByName('integracao_nfce').AsBoolean;
     except
       Result.Free;
       raise;
@@ -67,7 +68,7 @@ begin
   Query.SQL('select emp_001, tempo_consumo_comanda, taxa_adicional_comanda,')
     .SQL('  taxa_servico_comanda, couvert_comanda, couvert_obrig_comanda, valor_couvert_masc_comanda,')
     .SQL('  valor_couvert_fem_comanda, consumacao_comanda, consumacao_minima_comanda,')
-    .SQL('  b_permite_troco_todas_formas')
+    .SQL('  b_permite_troco_todas_formas, integracao_nfce')
     .SQL('from empresas');
 end;
 

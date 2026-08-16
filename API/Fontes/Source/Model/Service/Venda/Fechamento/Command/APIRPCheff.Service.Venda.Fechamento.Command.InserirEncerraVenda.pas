@@ -18,6 +18,7 @@ type
     function ObterIdFormaPagamento: Integer;
     function ObterConfiguracao: TAPIRPCheffEntityConfiguracaoMesaComanda;
     function ObterValorAcrescimo: Currency;
+    function ObterCpfCnpjNota: string;
   public
     procedure Execute(AFechamento: TAPIRPCheffEntityVendaPostFechamento); override;
   end;
@@ -32,24 +33,35 @@ var
   LEncerraVenda: TAPIRPCheffEntityEncerraVenda;
   LVenda: TAPIRPCheffEntityVenda;
   LDAO: TAPIRPCheffDAOEncerraVenda;
+  LCpfCnpjNota: string;
 begin
   FFechamento := AFechamento;
+  LCpfCnpjNota := ObterCpfCnpjNota;
   LEncerraVenda := FParent.DAO.EncerraVendaDAO.Buscar(AFechamento.idVenda);
   LVenda := FParent.Venda;
   try
     if Assigned(LEncerraVenda) then
     begin
+      // Retentativa de fechamento: honra o CPF/CNPJ informado NESTA tentativa
+      // (a emissao pos-commit le encerravenda.ven_cpfconsum).
+      if LCpfCnpjNota <> '' then
+      begin
+        LDAO := FParent.DAO.EncerraVendaDAO;
+        LDAO.ManagerTransaction(False);
+        LDAO.AtualizarCpfConsumidor(LEncerraVenda.idEncerraVenda, LCpfCnpjNota);
+      end;
       FParent.IdEncerraVenda(LEncerraVenda.idEncerraVenda);
       Exit;
     end
     else
     begin
-      LEncerraVenda             := TAPIRPCheffEntityEncerraVenda.Create;
-      LEncerraVenda.idEmpresa   := AFechamento.idEmpresa;
-      LEncerraVenda.idVenda     := AFechamento.idVenda;
-      LEncerraVenda.valor       := LVenda.valorTotal;
-      LEncerraVenda.acrescimo   := ObterValorAcrescimo;
-      LEncerraVenda.idFormaPgto := ObterIdFormaPagamento;
+      LEncerraVenda               := TAPIRPCheffEntityEncerraVenda.Create;
+      LEncerraVenda.idEmpresa     := AFechamento.idEmpresa;
+      LEncerraVenda.idVenda       := AFechamento.idVenda;
+      LEncerraVenda.valor         := LVenda.valorTotal;
+      LEncerraVenda.acrescimo     := ObterValorAcrescimo;
+      LEncerraVenda.idFormaPgto   := ObterIdFormaPagamento;
+      LEncerraVenda.cpfConsumidor := LCpfCnpjNota;
       if AFechamento.pagamentos.Count > 0 then
         if AFechamento.pagamentos[0].formaPagamento.cortesia then
           LEncerraVenda.valor   := 0;
@@ -62,6 +74,22 @@ begin
   finally
     FreeAndNil(LEncerraVenda);
   end;
+end;
+
+// So digitos e apenas tamanhos validos (11 = CPF, 14 = CNPJ); qualquer outra
+// coisa vira vazio (nota sem identificacao). A validacao de digito
+// verificador acontece no app antes do envio.
+function TAPIRPCheffServiceVendaFechamentoCommandInserirEncerraVenda.ObterCpfCnpjNota: string;
+var
+  C: Char;
+begin
+  Result := '';
+  for C in FFechamento.cpfCnpjNota do
+    if CharInSet(C, ['0'..'9']) then
+      Result := Result + C;
+
+  if (Length(Result) <> 11) and (Length(Result) <> 14) then
+    Result := '';
 end;
 
 function TAPIRPCheffServiceVendaFechamentoCommandInserirEncerraVenda.ObterConfiguracao: TAPIRPCheffEntityConfiguracaoMesaComanda;

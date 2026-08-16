@@ -19,6 +19,7 @@ type
   public
     function Buscar(AIdVenda: Integer): TAPIRPCheffEntityEncerraVenda;
     procedure Inserir(AValue: TAPIRPCheffEntityEncerraVenda);
+    procedure AtualizarCpfConsumidor(AIdEncerraVenda: Integer; const ACpfCnpj: string);
   end;
 
 implementation
@@ -71,10 +72,10 @@ begin
   try
     FQuery.SQL('insert into encerraVenda(                                     ')
       .SQL('  enc_001, emp_001, ven_001, enc_003, enc_006,                    ')
-      .SQL('  enc_007, for_001, sit_001, enc_002)                             ')
+      .SQL('  enc_007, for_001, sit_001, enc_002, ven_cpfconsum)              ')
       .SQL('values (                                                          ')
       .SQL('  :enc_001, :emp_001, :ven_001, :enc_003, :enc_006,               ')
-      .SQL('  :enc_007, :for_001, :sit_001, localtimestamp)                   ')
+      .SQL('  :enc_007, :for_001, :sit_001, localtimestamp, :ven_cpfconsum)   ')
       .ParamAsInteger('enc_001', LId)
       .ParamAsInteger('emp_001', AValue.idEmpresa)
       .ParamAsInteger('ven_001', AValue.idVenda)
@@ -83,9 +84,29 @@ begin
       .ParamAsCurrency('enc_007', AValue.desconto)
       .ParamAsInteger('for_001', AValue.idFormaPgto, True)
       .ParamAsInteger('sit_001', 1)
+      .ParamAsString('ven_cpfconsum', AValue.cpfConsumidor, True)
       .ExecSQL;
     Commit;
     AValue.idEncerraVenda := LId;
+  except
+    Rollback;
+    raise;
+  end;
+end;
+
+// Retentativa de fechamento com encerravenda ja inserido: honra o CPF/CNPJ
+// informado pelo operador nesta tentativa (a emissao le ven_cpfconsum).
+procedure TAPIRPCheffDAOEncerraVenda.AtualizarCpfConsumidor(AIdEncerraVenda: Integer; const ACpfCnpj: string);
+begin
+  StartTransaction;
+  try
+    FQuery.SQL('update encerraVenda set ven_cpfconsum = :ven_cpfconsum')
+      .SQL('where enc_001 = :enc_001 and emp_001 = :emp_001')
+      .ParamAsString('ven_cpfconsum', ACpfCnpj, True)
+      .ParamAsInteger('enc_001', AIdEncerraVenda)
+      .ParamAsInteger('emp_001', FIdEmpresa)
+      .ExecSQL;
+    Commit;
   except
     Rollback;
     raise;

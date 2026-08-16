@@ -46,6 +46,7 @@ import {
   turnOffGetNetPosDigitalLeds,
   turnOnGetNetPosDigitalLeds
 } from '../services/getnetPosDigital';
+import { loadStoredMachineSettings } from '../services/machineSettingsDb';
 import type { StoredGetNetSubsellers, StoredGetNetTransaction } from '../services/machineSettingsDb';
 
 type DisplayMode = 'mesa' | 'comanda' | 'mesaComanda';
@@ -53,6 +54,7 @@ type DisplayMode = 'mesa' | 'comanda' | 'mesaComanda';
 type SettingsState = {
   servidor: string;
   terminalImpressao: string;
+  numeroMaquina: string;
   salvarLoginSenha: boolean;
   utilizaCatraca: boolean;
   cobrarMaiorValorFracionado: boolean;
@@ -245,6 +247,7 @@ const withConnectionCheckTimeout = (
 const toSettingsState = (settings: MobileAppSettings): SettingsState => ({
   servidor: settings.baseUrl,
   terminalImpressao: settings.terminalImpressao,
+  numeroMaquina: settings.numeroMaquina,
   salvarLoginSenha: settings.salvarLoginSenha,
   utilizaCatraca: settings.utilizaCatraca,
   cobrarMaiorValorFracionado: settings.cobrarMaiorValorFracionado,
@@ -288,6 +291,7 @@ const toMobileAppSettings = (
   baseUrl: values.servidor.trim(),
   empresaId: parseInt(empresa, 10) || existing.empresaId,
   terminalImpressao: values.terminalImpressao.trim(),
+  numeroMaquina: values.numeroMaquina.trim(),
   salvarLoginSenha: values.salvarLoginSenha,
   utilizaCatraca: values.utilizaCatraca,
   cobrarMaiorValorFracionado: values.cobrarMaiorValorFracionado,
@@ -342,6 +346,23 @@ export const SettingsScreen: React.FC = () => {
   const [ultimoGetNetSubsellers, setUltimoGetNetSubsellers] = useState<StoredGetNetSubsellers | null>(null);
   const hasLocalChangesRef = useRef(false);
   const savingRef = useRef(false);
+  // Indicador somente leitura: le direto do SQLite (fonte alimentada pelo
+  // "Sincronizar tudo"), para refletir o valor mais recente ao abrir a tela.
+  const [integracaoNfce, setIntegracaoNfce] = useState<boolean>(appSettings.integracaoNfce);
+
+  useEffect(() => {
+    let active = true;
+    loadStoredMachineSettings()
+      .then((stored) => {
+        if (active && stored) {
+          setIntegracaoNfce(stored.integracaoNfce);
+        }
+      })
+      .catch(() => null);
+    return () => {
+      active = false;
+    };
+  }, [appSettings.integracaoNfce]);
 
   useEffect(() => {
     if (savingRef.current || hasLocalChangesRef.current) {
@@ -881,11 +902,23 @@ export const SettingsScreen: React.FC = () => {
           placeholder="Terminal/porta da impressão"
         />
         <FieldInput
+          label="Número da máquina"
+          value={settingMemo.numeroMaquina}
+          onChangeText={(text) => setValue('numeroMaquina', text)}
+          placeholder="1"
+        />
+        <FieldInput
           label="Empresa"
           value={empresa}
           onChangeText={setEmpresaValue}
           placeholder="1"
           keyboardType="numeric"
+        />
+
+        <SettingReadOnlySwitch
+          label="Integração com NFC-e"
+          description="Definida no retaguarda por empresa. Atualiza ao Sincronizar tudo."
+          value={integracaoNfce}
         />
 
         <SettingSwitch
@@ -1350,6 +1383,35 @@ const SettingSwitch = ({
   );
 };
 
+// Indicador somente leitura: mostra o estado sem permitir alteracao pelo
+// operador (o valor vem do retaguarda via "Sincronizar tudo").
+const SettingReadOnlySwitch = ({
+  label,
+  description,
+  value
+}: {
+  label: string;
+  description: string;
+  value: boolean;
+}) => {
+  return (
+    <View style={styles.settingRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.settingTitle}>{label}</Text>
+        <Text style={styles.settingDesc}>{description}</Text>
+      </View>
+      <View style={styles.readOnlyStateWrap}>
+        <View style={[styles.readOnlyBadge, value ? styles.readOnlyBadgeOn : styles.readOnlyBadgeOff]}>
+          <Text style={[styles.readOnlyBadgeText, value ? styles.readOnlyBadgeTextOn : styles.readOnlyBadgeTextOff]}>
+            {value ? 'Habilitada' : 'Desabilitada'}
+          </Text>
+        </View>
+        <Switch value={value} disabled />
+      </View>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: Space.md },
   content: { paddingBottom: 120 },
@@ -1427,6 +1489,35 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 11,
     marginTop: 4
+  },
+  readOnlyStateWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  readOnlyBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  readOnlyBadgeOn: {
+    backgroundColor: 'rgba(31, 138, 77, 0.12)',
+    borderColor: Colors.success
+  },
+  readOnlyBadgeOff: {
+    backgroundColor: 'rgba(120, 120, 120, 0.10)',
+    borderColor: Colors.border
+  },
+  readOnlyBadgeText: {
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  readOnlyBadgeTextOn: {
+    color: Colors.success
+  },
+  readOnlyBadgeTextOff: {
+    color: Colors.textMuted
   },
   radioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {

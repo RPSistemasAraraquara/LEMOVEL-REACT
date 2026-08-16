@@ -10,7 +10,9 @@ uses
 type
   TADRConnModelParams = class(TInterfacedObject, IADRConnectionParams)
   private
-    [WeakAttribute]
+    // RP fix: [Unsafe] no lugar de [WeakAttribute] (grafia longa do mesmo
+    // [Weak]) - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
     FDatabase: string;
     FUserName: string;

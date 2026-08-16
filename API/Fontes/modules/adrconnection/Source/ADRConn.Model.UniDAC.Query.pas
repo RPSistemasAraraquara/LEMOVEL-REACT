@@ -18,7 +18,8 @@ uses
 type
   TADRConnModelUniDACQuery = class(TInterfacedObject, IADRQuery)
   private
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
     FQuery: TUniQuery;
     FGenerator: IADRGenerator;

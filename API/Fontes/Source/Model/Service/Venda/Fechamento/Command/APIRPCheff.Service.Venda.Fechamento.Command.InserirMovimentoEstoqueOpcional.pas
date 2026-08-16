@@ -9,6 +9,7 @@ uses
   APIRPCheff.DAO.Factory,
   System.Generics.Collections,
   System.SysUtils;
+  // LogFechamento vem de APIRPCheff.Service.Venda.Fechamento.Command.
 
   type
   TAPIRPCheffServiceVendaFechamentoCommandInserirMovimentoEstoqueOpcional = class(TAPIRPCheffServiceVendaFechamentoCommand)
@@ -43,17 +44,39 @@ begin
   if FParent.VendaItens.Count = 0 then
     Exit;
 
-  LVendaItemOpcional := FParent.DAO.VendaItemOpcionalDAO.ListarPorVenda(FParent.VendaItens[0].idVenda);
+  LogFechamento('  opcional: antes de ListarPorVenda');
+  LVendaItemOpcional := FParent.DAO.VendaItemOpcionalDAO.ListarPorVenda(FParent.Venda.idVenda);
+  LogFechamento(Format('  opcional: ListarPorVenda ok (%d opcionais)', [LVendaItemOpcional.Count]));
   try
-    for I :=0 to Pred(FParent.VendaItens.Count) do
+    // Cada opcional baixa estoque UMA vez, com a quantidade do item DONO
+    // (Venda.itens = lista NAO agrupada, numeroItem = ite_001 real). O laco
+    // antigo item x opcional multiplicava a baixa: venda com 3 itens e 1
+    // opcional baixava o estoque do opcional 3 vezes.
+    for J :=0 to Pred(LVendaItemOpcional.Count) do
     begin
-      FVendaItem := FParent.VendaItens[I];
-      for J :=0 to Pred(LVendaItemOpcional.Count) do
+      FVendaItemOpcional := LVendaItemOpcional[J];
+
+      FVendaItem := nil;
+      for I := 0 to Pred(FParent.Venda.itens.Count) do
+        if FParent.Venda.itens[I].numeroItem = FVendaItemOpcional.idVendaItem then
+        begin
+          FVendaItem := FParent.Venda.itens[I];
+          Break;
+        end;
+
+      if not Assigned(FVendaItem) then
       begin
-        FVendaItemOpcional := LVendaItemOpcional[J];
-        InserirMovimentoSetorEstoqueOpcional;
-        InserirMovimentoEstoqueOpcional;
+        LogFechamento(Format('  opcional: %d sem item dono (idVendaItem %d) - ignorado',
+          [FVendaItemOpcional.idOpcional, FVendaItemOpcional.idVendaItem]));
+        Continue;
       end;
+
+      LogFechamento(Format('  opcional: %d (item dono %d) - setor inicio',
+        [FVendaItemOpcional.idOpcional, FVendaItemOpcional.idVendaItem]));
+      InserirMovimentoSetorEstoqueOpcional;
+      LogFechamento(Format('  opcional: %d - movimento inicio', [FVendaItemOpcional.idOpcional]));
+      InserirMovimentoEstoqueOpcional;
+      LogFechamento(Format('  opcional: %d - fim', [FVendaItemOpcional.idOpcional]));
     end;
   finally
     FreeAndNil(LVendaItemOpcional);
@@ -75,13 +98,18 @@ begin
   LOpcional             := nil;
   LSetorEstoqueOpcional := nil;
   try
+    LogFechamento(Format('  opcional: buscar opcional %d', [FVendaItemOpcional.idOpcional]));
     LOpcional := LDAOOpcional.Buscar(FVendaItemOpcional.idOpcional);
+    LogFechamento('  opcional: buscar opcional ok');
     if Assigned(LOpcional) and (LOpcional.idOpcional > 0) then
     begin
       LDAOSetorEstoqueOpcional := FParent.DAO.SetorEstoqueOpcionalDAO;
       LDAOSetorEstoqueOpcional.ManagerTransaction(False);
 
+      LogFechamento(Format('  opcional: buscar setorEstoque (opc %d setor %d)',
+        [LOpcional.idOpcional, LOpcional.idSetor]));
       LSetorEstoqueOpcional := LDAOSetorEstoqueOpcional.Buscar(LOpcional.idOpcional, LOpcional.idSetor);
+      LogFechamento('  opcional: buscar setorEstoque ok');
       if Assigned(LSetorEstoqueOpcional) then
       begin
         QuantidadeAnterior                := LSetorEstoqueOpcional.quantidade;

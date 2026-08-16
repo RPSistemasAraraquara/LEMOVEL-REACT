@@ -67,23 +67,23 @@ begin
       LMotivo := E.Message.Replace(#$D, ' ').Replace(#$A, ' ');
       LStatus := FParent.Components.Emissor.ACBr.WebServices.Enviar.cStat;
       Log('Retorno %d - %s', [LStatus, LMotivo]);
-      Result.Erro := True;
-      Result.Status := LStatus;
-      Result.Motivo := LMotivo;
 
       if LStatus > 0 then
         LMotivo := FParent.Components.Emissor.ACBr.WebServices.Enviar.xMotivo;
 
       Log('Erro na sefaz %d - %s.', [LStatus, LMotivo]);
+      // A entidade nao chega ao caller quando ha raise: libera para nao vazar
+      // a cada emissao rejeitada (o erro viaja pela excecao).
+      FreeAndNil(Result);
       raise;
     end;
 
     on E: Exception do
     begin
-      Result.Erro := True;
       LStatus := FNotaFiscal.NFe.procNFe.cStat;
       LMotivo := FNotaFiscal.NFe.procNFe.xMotivo;
       E.Message := Format('Erro %d %s: %s', [LStatus, LMotivo, E.Message]);
+      FreeAndNil(Result);
       raise;
     end;
   end;
@@ -130,18 +130,27 @@ procedure TRPNFeServiceEmissaoCommandEnviarNota.SalvarXMLAutorizado(ANota: TRPNF
 var
   LXml: string;
   LPath: string;
+  LDataEmissao: TDateTime;
 begin
   if ANota.Erro then
     Exit;
 
-  try
-    LXml := FNotaFiscal.XMLAssinado;
-    LXml := FParent.Components.Emissor.FormatXmlContent(LXml);
-    LPath := Format('\modelo_%d_serie_%d_rp_%d_numero_%d_chave_%s-nfe.xml', [FNotaFiscal.NFe.Ide.modelo,
-      FNotaFiscal.NFe.Ide.serie, FNotaFiscal.NFe.Ide.cNF, FNotaFiscal.NFe.Ide.nNF, ANota.ChaveNFe]);
+  // O Xml da nota alimenta a impressao do DANFCe e a gravacao no banco: a
+  // atribuicao NAO pode depender do sucesso da gravacao em disco.
+  LXml := FNotaFiscal.XMLAssinado;
+  LXml := FParent.Components.Emissor.FormatXmlContent(LXml);
+  ANota.Xml := LXml;
 
-    ANota.Xml := LXml;
-    LPath := FParent.Configuracao.PathNFe + LPath;
+  try
+    // Mesmo caminho/nome do desktop (uEmissorNFCe.CaminhoXMLVendaAutorizada):
+    // <PathNFe>\yyyymm\<chave44>-nfe.xml. O desktop cancela/reimprime a partir
+    // deste arquivo, entao o padrao precisa bater.
+    LDataEmissao := ANota.DataAutorizacao;
+    if LDataEmissao = 0 then
+      LDataEmissao := Now;
+    LPath := Format('%s%s\%s-nfe.xml', [FParent.Configuracao.PathNFe,
+      FormatDateTime('yyyymm', LDataEmissao), ANota.ChaveNFe]);
+
     FParent.Components.Arquivos.Salvar(LXml, LPath);
   except
   end;

@@ -125,12 +125,13 @@ begin
   if Length(AIdsProduto) = 0 then
     Exit;
 
+  // Performance: IN com literais inteiros - ver APIRPCheff.DAO.Opcional
   LInClause := '';
   for I := Low(AIdsProduto) to High(AIdsProduto) do
   begin
     if LInClause <> '' then
       LInClause := LInClause + ', ';
-    LInClause := LInClause + ':idProduto' + IntToStr(I);
+    LInClause := LInClause + IntToStr(AIdsProduto[I]);
   end;
 
   try
@@ -138,8 +139,6 @@ begin
     Query.SQL('where id_empresa = :idEmpresa')
       .SQL('and id_material in (' + LInClause + ')')
       .ParamAsInteger('idEmpresa', FIdEmpresa);
-    for I := Low(AIdsProduto) to High(AIdsProduto) do
-      Query.ParamAsInteger('idProduto' + IntToStr(I), AIdsProduto[I]);
 
     LDataSet := Query.OpenDataSet;
     try

@@ -23,6 +23,7 @@ uses
   APIRPCheff.Resources,
   Vcl.Buttons,
   Vcl.ExtCtrls,
+  Vcl.FileCtrl,
   Vcl.ComCtrls;
 
 type
@@ -73,7 +74,31 @@ type
     EdtNFeArquivoConfiguracao         : TEdit;
     Label11                           : TLabel;
     BtnNFeProcurarArquivoConfiguracao : TButton;
+    Label12                           : TLabel;
+    EdtNFeDiretorioSchemas            : TEdit;
+    BtnNFeProcurarDiretorioSchemas    : TButton;
     FileDialog                        : TFileOpenDialog;
+    LblNFCeSobreposicao               : TLabel;
+    LblNFCeIdCSC                      : TLabel;
+    EdtNFCeIdCSC                      : TEdit;
+    LblNFCeCSC                        : TLabel;
+    EdtNFCeCSC                        : TEdit;
+    LblNFCeAmbiente                   : TLabel;
+    CbxNFCeAmbiente                   : TComboBox;
+    LblNFCeSerie                      : TLabel;
+    EdtNFCeSerie                      : TEdit;
+    LblNFCeNumero                     : TLabel;
+    EdtNFCeNumero                     : TEdit;
+    LblNFCeCertTipo                   : TLabel;
+    CbxNFCeCertTipo                   : TComboBox;
+    LblNFCeCertArquivo                : TLabel;
+    EdtNFCeCertArquivo                : TEdit;
+    BtnNFCeProcurarCertificado        : TButton;
+    LblNFCeCertSenha                  : TLabel;
+    EdtNFCeCertSenha                  : TEdit;
+    LblNFCeCertSerie                  : TLabel;
+    EdtNFCeCertSerie                  : TEdit;
+    CertDialog                        : TFileOpenDialog;
     procedure btnInstallServiceClick(Sender: TObject);
     procedure btnSalvarConfiguracaoClick(Sender: TObject);
     procedure btnStartServerClick(Sender: TObject);
@@ -84,6 +109,8 @@ type
     procedure btnTestarConexaoClick(Sender: TObject);
     procedure BtnTestarImpresssaoClick(Sender: TObject);
     procedure BtnNFeProcurarArquivoConfiguracaoClick(Sender: TObject);
+    procedure BtnNFeProcurarDiretorioSchemasClick(Sender: TObject);
+    procedure BtnNFCeProcurarCertificadoClick(Sender: TObject);
   private
     FController: TAPIRPCheffController;
     procedure SalvarConfiguracoes;
@@ -117,6 +144,21 @@ procedure TAPIRPCheffViewPrincipal.BtnNFeProcurarArquivoConfiguracaoClick(Sender
 begin
   if FileDialog.Execute then
     EdtNFeArquivoConfiguracao.Text := FileDialog.FileName;
+end;
+
+procedure TAPIRPCheffViewPrincipal.BtnNFeProcurarDiretorioSchemasClick(Sender: TObject);
+var
+  LDir: string;
+begin
+  LDir := EdtNFeDiretorioSchemas.Text;
+  if SelectDirectory('Selecione o diret'#243'rio dos schemas da NFC-e', '', LDir) then
+    EdtNFeDiretorioSchemas.Text := LDir;
+end;
+
+procedure TAPIRPCheffViewPrincipal.BtnNFCeProcurarCertificadoClick(Sender: TObject);
+begin
+  if CertDialog.Execute then
+    EdtNFCeCertArquivo.Text := CertDialog.FileName;
 end;
 
 procedure TAPIRPCheffViewPrincipal.btnSalvarConfiguracaoClick(Sender: TObject);
@@ -189,7 +231,28 @@ begin
   EdtImpressoraEspacos.Text      := APP_RESOURCES.IMPRESSORA_ESPACOS.ToString;
   EdtImpressoraLinhaPulo.Text    := APP_RESOURCES.IMPRESSORA_LINHAS_PULO.ToString;
   EdtNFeArquivoConfiguracao.Text := APP_RESOURCES.NFE_XML_CONFIGURACAO;
+  EdtNFeDiretorioSchemas.Text    := APP_RESOURCES.NFE_SCHEMAS_PATH;
   cbxPagCodigo.ItemIndex         := APP_RESOURCES.IMPRESSORA_PAGINA_CODE;
+
+  EdtNFCeIdCSC.Text              := APP_RESOURCES.NFCE_IDCSC;
+  EdtNFCeCSC.Text                := APP_RESOURCES.NFCE_CSC;
+  // Ambiente: ItemIndex 0=Nao informado, 1=Homologacao, 2=Producao (== valor gravado).
+  if (APP_RESOURCES.NFCE_AMBIENTE >= 0) and (APP_RESOURCES.NFCE_AMBIENTE <= 2) then
+    CbxNFCeAmbiente.ItemIndex := APP_RESOURCES.NFCE_AMBIENTE
+  else
+    CbxNFCeAmbiente.ItemIndex := 0;
+  EdtNFCeSerie.Text             := APP_RESOURCES.NFCE_SERIE.ToString;
+  EdtNFCeNumero.Text            := APP_RESOURCES.NFCE_NUMERO.ToString;
+  // Tipo cert: ItemIndex 0=Nao informado(0), 1=A1(1), 2=A3(3).
+  case APP_RESOURCES.NFCE_CERT_TIPO of
+    3: CbxNFCeCertTipo.ItemIndex := 2;
+    1: CbxNFCeCertTipo.ItemIndex := 1;
+  else
+    CbxNFCeCertTipo.ItemIndex := 0;
+  end;
+  EdtNFCeCertArquivo.Text       := APP_RESOURCES.NFCE_CERT_ARQUIVO;
+  EdtNFCeCertSenha.Text         := APP_RESOURCES.NFCE_CERT_SENHA;
+  EdtNFCeCertSerie.Text         := APP_RESOURCES.NFCE_CERT_SERIE;
 end;
 
 procedure TAPIRPCheffViewPrincipal.CarregarCodigosPagina;
@@ -312,7 +375,28 @@ begin
   APP_RESOURCES.IMPRESSORA_ESPACOS     := StrToIntDef(EdtImpressoraEspacos.Text, 0);
   APP_RESOURCES.IMPRESSORA_LINHAS_PULO := StrToIntDef(EdtImpressoraLinhaPulo.Text, 0);
   APP_RESOURCES.IMPRESSORA_PAGINA_CODE :=cbxPagCodigo.ItemIndex;
- // APP_RESOURCES.NFE_XML_CONFIGURACAO   := EdtNFeArquivoConfiguracao.Text;
+  APP_RESOURCES.NFE_XML_CONFIGURACAO   := EdtNFeArquivoConfiguracao.Text;
+  APP_RESOURCES.NFE_SCHEMAS_PATH       := EdtNFeDiretorioSchemas.Text;
+
+  APP_RESOURCES.NFCE_IDCSC             := Trim(EdtNFCeIdCSC.Text);
+  APP_RESOURCES.NFCE_CSC               := Trim(EdtNFCeCSC.Text);
+  // Ambiente: ItemIndex 0/1/2 == valor gravado (0=usa XML, 1=homolog., 2=prod.).
+  if CbxNFCeAmbiente.ItemIndex >= 0 then
+    APP_RESOURCES.NFCE_AMBIENTE := CbxNFCeAmbiente.ItemIndex
+  else
+    APP_RESOURCES.NFCE_AMBIENTE := 0;
+  APP_RESOURCES.NFCE_SERIE             := StrToIntDef(Trim(EdtNFCeSerie.Text), 0);
+  APP_RESOURCES.NFCE_NUMERO            := StrToIntDef(Trim(EdtNFCeNumero.Text), 0);
+  // Tipo cert: ItemIndex 0=Nao informado(0), 1=A1(1), 2=A3(3).
+  case CbxNFCeCertTipo.ItemIndex of
+    2: APP_RESOURCES.NFCE_CERT_TIPO := 3;
+    1: APP_RESOURCES.NFCE_CERT_TIPO := 1;
+  else
+    APP_RESOURCES.NFCE_CERT_TIPO := 0;
+  end;
+  APP_RESOURCES.NFCE_CERT_ARQUIVO      := Trim(EdtNFCeCertArquivo.Text);
+  APP_RESOURCES.NFCE_CERT_SENHA        := EdtNFCeCertSenha.Text;
+  APP_RESOURCES.NFCE_CERT_SERIE        := Trim(EdtNFCeCertSerie.Text);
   APP_RESOURCES.SaveConfig;
 end;
 

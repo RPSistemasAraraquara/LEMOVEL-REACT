@@ -27,6 +27,7 @@ type
     procedure FinalizarVenda(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
     function AtualizarNumeroCupom(AIdVenda: Integer): Integer;
     function Buscar(AIdVenda: Integer): TAPIRPCheffEntityVenda;
+    function BuscarLote(const AIds: TArray<Integer>): TObjectList<TAPIRPCheffEntityVenda>;
     function BuscarComMesaAguardandoLimpeza(ANumeroMesa: Integer): TAPIRPCheffEntityVenda;
     procedure Inserir(AVenda: TAPIRPCheffEntityVenda);
     procedure PreFechamento(APreFechamento: TAPIRPCheffEntityVendaPatchPreFechamento);
@@ -329,6 +330,55 @@ begin
     Result := DataSetToEntity(LDataSet);
   finally
     FreeAndNil(LDataSet);
+  end;
+end;
+
+// Performance: carrega em UMA query as vendas de todas as mesas (era 1 SELECT
+// por mesa aberta no GET /mesa). Mesmo Select/colunas do Buscar; IN com
+// literais inteiros (ids vem do proprio banco). Lista NAO e dona das
+// entidades - o chamador transfere cada venda para a mesa correspondente.
+function TAPIRPCheffDAOVenda.BuscarLote(const AIds: TArray<Integer>): TObjectList<TAPIRPCheffEntityVenda>;
+var
+  LDataSet: TDataSet;
+  LIn: string;
+  I: Integer;
+  LVenda: TAPIRPCheffEntityVenda;
+begin
+  Result := TObjectList<TAPIRPCheffEntityVenda>.Create(False);
+  if Length(AIds) = 0 then
+    Exit;
+
+  try
+    LIn := '';
+    for I := Low(AIds) to High(AIds) do
+    begin
+      if LIn <> '' then
+        LIn := LIn + ', ';
+      LIn := LIn + IntToStr(AIds[I]);
+    end;
+
+    Select;
+    LDataSet := Query.SQL('where venda.emp_001 = :idEmpresa')
+      .SQL('and venda.ven_001 in (' + LIn + ')')
+      .ParamAsInteger('idEmpresa', FIdEmpresa)
+      .OpenDataSet;
+    try
+      LDataSet.First;
+      while not LDataSet.Eof do
+      begin
+        LVenda := DataSetToEntity(LDataSet);
+        if Assigned(LVenda) then
+          Result.Add(LVenda);
+        LDataSet.Next;
+      end;
+    finally
+      FreeAndNil(LDataSet);
+    end;
+  except
+    for LVenda in Result do
+      LVenda.Free;
+    Result.Free;
+    raise;
   end;
 end;
 

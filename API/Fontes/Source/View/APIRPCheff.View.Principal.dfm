@@ -3,7 +3,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
   Top = 0
   BorderStyle = bsDialog
   Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 18.0.0.3'
-  ClientHeight = 375
+  ClientHeight = 537
   ClientWidth = 629
   Color = clBtnFace
   TransparentColorValue = clWhite
@@ -19,7 +19,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
     Left = 0
     Top = 0
     Width = 629
-    Height = 248
+    Height = 410
     ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
@@ -259,7 +259,6 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
     object TabNFe: TTabSheet
       Caption = 'NFe'
       ImageIndex = 2
-      TabVisible = False
       object LblConfiguracaoNFe: TLabel
         Left = 6
         Top = 9
@@ -296,11 +295,195 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
         TabOrder = 1
         OnClick = BtnNFeProcurarArquivoConfiguracaoClick
       end
+      object Label12: TLabel
+        Left = 9
+        Top = 95
+        Width = 158
+        Height = 15
+        Caption = 'Diret'#243'rio dos Schemas (NFe)'
+      end
+      object EdtNFeDiretorioSchemas: TEdit
+        Left = 9
+        Top = 114
+        Width = 576
+        Height = 23
+        TabOrder = 2
+      end
+      object BtnNFeProcurarDiretorioSchemas: TButton
+        Left = 587
+        Top = 113
+        Width = 33
+        Height = 25
+        Caption = '...'
+        TabOrder = 3
+        OnClick = BtnNFeProcurarDiretorioSchemasClick
+      end
+      object LblNFCeSobreposicao: TLabel
+        Left = 9
+        Top = 150
+        Width = 292
+        Height = 15
+        Caption = 'Sobreposi'#231#227'o Fiscal NFC-e (opcional - vazio/0 usa o XML)'
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object LblNFCeIdCSC: TLabel
+        Left = 9
+        Top = 172
+        Width = 37
+        Height = 15
+        Caption = 'ID CSC'
+      end
+      object LblNFCeCSC: TLabel
+        Left = 199
+        Top = 172
+        Width = 24
+        Height = 15
+        Caption = 'CSC'
+      end
+      object LblNFCeAmbiente: TLabel
+        Left = 459
+        Top = 172
+        Width = 52
+        Height = 15
+        Caption = 'Ambiente'
+      end
+      object LblNFCeSerie: TLabel
+        Left = 9
+        Top = 226
+        Width = 29
+        Height = 15
+        Caption = 'S'#233'rie'
+      end
+      object LblNFCeNumero: TLabel
+        Left = 99
+        Top = 226
+        Width = 99
+        Height = 15
+        Caption = 'N'#250'mero (pr'#243'ximo)'
+      end
+      object LblNFCeCertTipo: TLabel
+        Left = 239
+        Top = 226
+        Width = 100
+        Height = 15
+        Caption = 'Tipo do Certificado'
+      end
+      object LblNFCeCertArquivo: TLabel
+        Left = 9
+        Top = 280
+        Width = 148
+        Height = 15
+        Caption = 'Arquivo do Certificado (A1)'
+      end
+      object LblNFCeCertSenha: TLabel
+        Left = 9
+        Top = 334
+        Width = 59
+        Height = 15
+        Caption = 'Senha (A1)'
+      end
+      object LblNFCeCertSerie: TLabel
+        Left = 259
+        Top = 334
+        Width = 116
+        Height = 15
+        Caption = 'N'#250'mero de S'#233'rie (A3)'
+      end
+      object EdtNFCeIdCSC: TEdit
+        Left = 9
+        Top = 191
+        Width = 180
+        Height = 23
+        TabOrder = 4
+      end
+      object EdtNFCeCSC: TEdit
+        Left = 199
+        Top = 191
+        Width = 250
+        Height = 23
+        TabOrder = 5
+      end
+      object CbxNFCeAmbiente: TComboBox
+        Left = 459
+        Top = 191
+        Width = 152
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 6
+        Items.Strings = (
+          'N'#227'o informado (usa XML)'
+          'Homologa'#231#227'o'
+          'Produ'#231#227'o')
+      end
+      object EdtNFCeSerie: TEdit
+        Left = 9
+        Top = 245
+        Width = 80
+        Height = 23
+        NumbersOnly = True
+        TabOrder = 7
+      end
+      object EdtNFCeNumero: TEdit
+        Left = 99
+        Top = 245
+        Width = 130
+        Height = 23
+        NumbersOnly = True
+        TabOrder = 8
+      end
+      object CbxNFCeCertTipo: TComboBox
+        Left = 239
+        Top = 245
+        Width = 210
+        Height = 23
+        Style = csDropDownList
+        TabOrder = 9
+        Items.Strings = (
+          'N'#227'o informado (usa XML)'
+          'A1 - Arquivo (.pfx)'
+          'A3 - Token/Cart'#227'o')
+      end
+      object EdtNFCeCertArquivo: TEdit
+        Left = 9
+        Top = 299
+        Width = 540
+        Height = 23
+        TabOrder = 10
+      end
+      object BtnNFCeProcurarCertificado: TButton
+        Left = 552
+        Top = 298
+        Width = 33
+        Height = 25
+        Caption = '...'
+        TabOrder = 11
+        OnClick = BtnNFCeProcurarCertificadoClick
+      end
+      object EdtNFCeCertSenha: TEdit
+        Left = 9
+        Top = 353
+        Width = 240
+        Height = 23
+        PasswordChar = '*'
+        TabOrder = 12
+      end
+      object EdtNFCeCertSerie: TEdit
+        Left = 259
+        Top = 353
+        Width = 352
+        Height = 23
+        TabOrder = 13
+      end
     end
   end
   object Panel1: TPanel
     Left = 0
-    Top = 248
+    Top = 410
     Width = 629
     Height = 127
     Align = alBottom
@@ -396,5 +579,20 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
     Options = []
     Left = 416
     Top = 32
+  end
+  object CertDialog: TFileOpenDialog
+    FavoriteLinks = <>
+    FileTypes = <
+      item
+        DisplayName = 'Certificado A1 (*.pfx)'
+        FileMask = '*.pfx'
+      end
+      item
+        DisplayName = 'Todos os arquivos (*.*)'
+        FileMask = '*.*'
+      end>
+    Options = []
+    Left = 416
+    Top = 96
   end
 end

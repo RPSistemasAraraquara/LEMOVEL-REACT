@@ -55,6 +55,7 @@ begin
       Result.utilizaConsumacaoMinima   := ADataSet.FieldByName('consumacao_mesa').AsBoolean;
       Result.consumacaoMinima          := ADataSet.FieldByName('consumacao_minima_mesa').AsCurrency;
       Result.permiteTrocoTodasAsFormas := ADataSet.FieldByName('b_permite_troco_todas_formas').AsBoolean;
+      Result.integracaoNfce            := ADataSet.FieldByName('integracao_nfce').AsBoolean;
     except
       Result.Free;
       raise;
@@ -66,7 +67,8 @@ procedure TAPIRPCheffDAOConfiguracaoMesa.Select;
 begin
   Query.SQL('select emp_001, tempo_consumo_mesa, taxa_adicional_mesa, taxa_servico_mesa,')
     .SQL('  couvert_mesa, couvert_obrig_mesa, valor_couvert_masc_mesa, valor_couvert_fem_mesa,')
-    .SQL('  consumacao_mesa, consumacao_minima_mesa, b_permite_troco_todas_formas')
+    .SQL('  consumacao_mesa, consumacao_minima_mesa, b_permite_troco_todas_formas,')
+    .SQL('  integracao_nfce')
     .SQL('from empresas');
 end;
 

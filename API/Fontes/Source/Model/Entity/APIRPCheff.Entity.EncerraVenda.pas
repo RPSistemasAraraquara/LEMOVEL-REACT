@@ -12,6 +12,7 @@ type
     Fdesconto       : Currency;
     FidFormaPgto    : Integer;
     FidEncerraVenda : Integer;
+    FcpfConsumidor  : string;
   public
     property idEncerraVenda : Integer  read FidEncerraVenda        write FidEncerraVenda;
     property idEmpresa      : Integer  read FidEmpresa             write FidEmpresa;
@@ -20,6 +21,9 @@ type
     property acrescimo      : Currency read Facrescimo             write Facrescimo;
     property desconto       : Currency read Fdesconto              write Fdesconto;
     property idFormaPgto    : Integer  read FidFormaPgto           write FidFormaPgto;
+    // CPF/CNPJ do consumidor na nota (ven_cpfconsum) - a emissao da NFC-e le
+    // daqui (coalesce com clientes.cli_004 no rp-nfe)
+    property cpfConsumidor  : string   read FcpfConsumidor         write FcpfConsumidor;
   end;
 
 implementation

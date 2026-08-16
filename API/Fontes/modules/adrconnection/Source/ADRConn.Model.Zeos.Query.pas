@@ -18,7 +18,8 @@ uses
 type
   TADRConnModelZeosQuery = class(TInterfacedObject, IADRQuery)
   private
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
     FQuery: TZQuery;
     FGenerator: IADRGenerator;

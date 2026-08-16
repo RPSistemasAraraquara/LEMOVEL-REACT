@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.StrUtils,
+  System.Math,
   ACBrUtil.Base,
   ACBrNFe.Classes,
   pcnConversao,
@@ -71,7 +72,7 @@ begin
     23: LCsosn := csosn900;
     24: LCst := cst61;
   else
-    raise Exception.CreateFmt('CST/CSOSN do produto não cadastrado [%d].',
+    raise Exception.CreateFmt('CST/CSOSN do produto nï¿½o cadastrado [%d].',
       [AVendaItem.Produto.CsoCodigo]);
   end;
 
@@ -87,7 +88,7 @@ var
 begin
   LOrigem := StrToOrig(LOK, AVendaItem.Produto.OrmCodigo.ToString);
   if not LOK then
-    raise Exception.CreateFmt('Origem do produto não cadastrado [%d].', [AVendaItem.Produto.OrmCodigo]);
+    raise Exception.CreateFmt('Origem do produto nï¿½o cadastrado [%d].', [AVendaItem.Produto.OrmCodigo]);
 
   ANFeProduto.Imposto.ICMS.orig := LOrigem;
 end;
@@ -98,6 +99,7 @@ var
   LNFeProduto: TDetCollectionItem;
   LVendaItem: TRPNFeEntityVendaItem;
   LPercentualBase: Currency;
+  LTributado: Boolean;
 begin
   FNFe := FParent.Components.Emissor.ACBr.NotasFiscais.Items[0].NFe;
   for I := 0 to Pred(FParent.Venda.Itens.Count) do
@@ -109,20 +111,32 @@ begin
     AtribuirOrigem(LVendaItem, LNFeProduto);
     AtribuirCST(LVendaItem, LNFeProduto);
 
-    if (LNFeProduto.Imposto.ICMS.CST in [cst00, cst20, cst90, cstVazio]) or
-      (LNFeProduto.Imposto.ICMS.CSOSN = csosn101) then
-    begin    
+    // Mesma regra do uEmissorNFCe (CalcularImpostoICMS): somente CST 00/20/90 e
+    // CSOSN 101/900 calculam vBC/vICMS; os demais (40, 60, 102, 400, 500...)
+    // ficam zerados e fora do ICMSTot, senao o total diverge do somatorio dos
+    // itens (o XML desses grupos nao leva vBC).
+    // Item do Simples carrega CSOSN e deixa o CST no default cst00, entao o
+    // CSOSN decide primeiro.
+    if LNFeProduto.Imposto.ICMS.CSOSN <> csosnVazio then
+      LTributado := LNFeProduto.Imposto.ICMS.CSOSN in [csosn101, csosn900]
+    else
+      LTributado := LNFeProduto.Imposto.ICMS.CST in [cst00, cst20, cst90];
+
+    LNFeProduto.Imposto.ICMS.pICMS := LVendaItem.Produto.Icms;
+
+    if LTributado then
+    begin
       if LNFeProduto.Imposto.ICMS.CST in [cst20, cst90] then
       begin
         LPercentualBase := 100 - LVendaItem.Produto.ReducaoBaseCalculoIcms;
         LNFeProduto.Imposto.ICMS.pRedBC := LVendaItem.Produto.ReducaoBaseCalculoIcms;
       end;
+
+      // Arredonda por item, como o desktop, para o total bater com o somatorio.
+      LNFeProduto.Imposto.ICMS.vBC := RoundTo(LVendaItem.ValorTotal * (LPercentualBase / 100), -2);
+      LNFeProduto.Imposto.ICMS.vICMS := RoundTo(LNFeProduto.Imposto.ICMS.vBC * LVendaItem.Produto.Icms / 100, -2);
     end;
 
-    LNFeProduto.Imposto.ICMS.pICMS := LVendaItem.Produto.Icms;
-    LNFeProduto.Imposto.ICMS.vBC := LVendaItem.ValorTotal * (LPercentualBase / 100);
-    LNFeProduto.Imposto.ICMS.vICMS := LNFeProduto.Imposto.ICMS.vBC * LVendaItem.Produto.Icms / 100;
-    
     if LNFeProduto.Imposto.ICMS.vICMS = 0 then
       LNFeProduto.Imposto.ICMS.vBC := 0;
 

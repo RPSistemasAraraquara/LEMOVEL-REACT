@@ -35,6 +35,8 @@ type
     FSenha: string;
     FIdToken: string;
     FCscToken: string;
+    FNumeroSerie: string;
+    FTipo: Integer;
   public
     procedure Assign(ASource: TRPNFeEntityCertificadoDigital);
 
@@ -42,11 +44,16 @@ type
     function SetSenha(AValue: string): TRPNFeEntityCertificadoDigital;
     function SetIdToken(AValue: string): TRPNFeEntityCertificadoDigital;
     function SetCscToken(AValue: string): TRPNFeEntityCertificadoDigital;
+    function SetNumeroSerie(AValue: string): TRPNFeEntityCertificadoDigital;
+    function SetTipo(AValue: Integer): TRPNFeEntityCertificadoDigital;
 
     property ArquivoPfx: string read FArquivoPfx write FArquivoPfx;
     property Senha: string read FSenha write FSenha;
     property IdToken: string read FIdToken write FIdToken;
     property CscToken: string read FCscToken write FCscToken;
+    property NumeroSerie: string read FNumeroSerie write FNumeroSerie;
+    // Tipo do certificado: 1 = A1 (arquivo .pfx), 3 = A3 (token/cartao/WinCrypt).
+    property Tipo: Integer read FTipo write FTipo;
   end;
 
   TRPNFeEntityCliente = class
@@ -162,6 +169,11 @@ type
     FCrtCodigo: Integer;
     FNFeSerie: Integer;
     FNFeNumero: Integer;
+    // Reforma Tributaria (IBS/CBS): aliquotas do emitente.
+    // aliq_cbs vem de empresas; aliq_ibs_uf de estados; aliq_ibs_mun de cidades.
+    FAliqCbs: Double;
+    FAliqIbsUf: Double;
+    FAliqIbsMun: Double;
   public
     property Id: Integer read FId write FId;
     property Nome: string read FNome write FNome;
@@ -189,6 +201,36 @@ type
     property AliquotaMunicipalPadrao: Double read FAliquotaMunicipalPadrao write FAliquotaMunicipalPadrao;
     property AliquotaEstadualPadrao: Double read FAliquotaEstadualPadrao write FAliquotaEstadualPadrao;
     property AliquotaFederalPadrao: Double read FAliquotaFederalPadrao write FAliquotaFederalPadrao;
+    property AliqCbs: Double read FAliqCbs write FAliqCbs;
+    property AliqIbsUf: Double read FAliqIbsUf write FAliqIbsUf;
+    property AliqIbsMun: Double read FAliqIbsMun write FAliqIbsMun;
+  end;
+
+  // Reforma Tributaria: flags da classificacao tributaria (dfe_classtrib_rt +
+  // dfe_cst_rt), mesmas colunas consultadas pelo uEmissorNFCe do RPCHEFF_VCL.
+  TRPNFeEntityClassTribRT = class
+  private
+    FClassTrib: string;
+    FIndNfe: Boolean;
+    FIndNfce: Boolean;
+    FIndTribRegular: Boolean;
+    FPRedIbs: Double;
+    FPRedCbs: Double;
+    FIndRedAliq: Boolean;
+    FIndDif: Boolean;
+    FIndIbsCbsMono: Boolean;
+    FIndRedBc: Boolean;
+  public
+    property ClassTrib: string read FClassTrib write FClassTrib;
+    property IndNfe: Boolean read FIndNfe write FIndNfe;
+    property IndNfce: Boolean read FIndNfce write FIndNfce;
+    property IndTribRegular: Boolean read FIndTribRegular write FIndTribRegular;
+    property PRedIbs: Double read FPRedIbs write FPRedIbs;
+    property PRedCbs: Double read FPRedCbs write FPRedCbs;
+    property IndRedAliq: Boolean read FIndRedAliq write FIndRedAliq;
+    property IndDif: Boolean read FIndDif write FIndDif;
+    property IndIbsCbsMono: Boolean read FIndIbsCbsMono write FIndIbsCbsMono;
+    property IndRedBc: Boolean read FIndRedBc write FIndRedBc;
   end;
 
   TRPNFeEntityEncerraVenda = class
@@ -312,6 +354,25 @@ type
     FPgnn: Double;
     FPgni: Double;
     FAdrem: Double;
+    // Reforma Tributaria (IBS/CBS): CST/cClassTrib da NFC-e e parametros da
+    // base de calculo, mesmos campos de materiais usados pelo uEmissorNFCe.
+    FCstRtNfce: string;
+    FCClassTribRtNfce: string;
+    FRtParamBcVlProd: Boolean;
+    FRtParamBcVlFrete: Boolean;
+    FRtParamBcVlSeg: Boolean;
+    FRtParamBcVlDesp: Boolean;
+    FRtParamBcII: Boolean;
+    FRtParamBcIS: Boolean;
+    FRtParamBcDesconto: Boolean;
+    FRtParamBcPis: Boolean;
+    FRtParamBcCofins: Boolean;
+    FRtParamBcIcms: Boolean;
+    FRtParamBcIcmsDest: Boolean;
+    FRtParamBcFcp: Boolean;
+    FRtParamBcFcpDest: Boolean;
+    FRtParamBcIcmsMono: Boolean;
+    FRtParamBcIssqn: Boolean;
   public
     property Codigo: Integer read FCodigo write FCodigo;
     property Descricao: string read FDescricao write FDescricao;
@@ -340,6 +401,23 @@ type
     property Pgnn: Double read FPgnn write FPgnn;
     property Pgni: Double read FPgni write FPgni;
     property Adrem: Double read FAdrem write FAdrem;
+    property CstRtNfce: string read FCstRtNfce write FCstRtNfce;
+    property CClassTribRtNfce: string read FCClassTribRtNfce write FCClassTribRtNfce;
+    property RtParamBcVlProd: Boolean read FRtParamBcVlProd write FRtParamBcVlProd;
+    property RtParamBcVlFrete: Boolean read FRtParamBcVlFrete write FRtParamBcVlFrete;
+    property RtParamBcVlSeg: Boolean read FRtParamBcVlSeg write FRtParamBcVlSeg;
+    property RtParamBcVlDesp: Boolean read FRtParamBcVlDesp write FRtParamBcVlDesp;
+    property RtParamBcII: Boolean read FRtParamBcII write FRtParamBcII;
+    property RtParamBcIS: Boolean read FRtParamBcIS write FRtParamBcIS;
+    property RtParamBcDesconto: Boolean read FRtParamBcDesconto write FRtParamBcDesconto;
+    property RtParamBcPis: Boolean read FRtParamBcPis write FRtParamBcPis;
+    property RtParamBcCofins: Boolean read FRtParamBcCofins write FRtParamBcCofins;
+    property RtParamBcIcms: Boolean read FRtParamBcIcms write FRtParamBcIcms;
+    property RtParamBcIcmsDest: Boolean read FRtParamBcIcmsDest write FRtParamBcIcmsDest;
+    property RtParamBcFcp: Boolean read FRtParamBcFcp write FRtParamBcFcp;
+    property RtParamBcFcpDest: Boolean read FRtParamBcFcpDest write FRtParamBcFcpDest;
+    property RtParamBcIcmsMono: Boolean read FRtParamBcIcmsMono write FRtParamBcIcmsMono;
+    property RtParamBcIssqn: Boolean read FRtParamBcIssqn write FRtParamBcIssqn;
   end;
 
   TRPNFeEntityResponsavelTecnico = class
@@ -667,6 +745,8 @@ begin
   FSenha := ASource.Senha;
   FIdToken := ASource.IdToken;
   FCscToken := ASource.CscToken;
+  FNumeroSerie := ASource.NumeroSerie;
+  FTipo := ASource.Tipo;
 end;
 
 function TRPNFeEntityCertificadoDigital.SetArquivoPfx(
@@ -693,6 +773,19 @@ function TRPNFeEntityCertificadoDigital.SetSenha(AValue: string): TRPNFeEntityCe
 begin
   Result := Self;
   FSenha := AValue;
+end;
+
+function TRPNFeEntityCertificadoDigital.SetNumeroSerie(
+  AValue: string): TRPNFeEntityCertificadoDigital;
+begin
+  Result := Self;
+  FNumeroSerie := AValue;
+end;
+
+function TRPNFeEntityCertificadoDigital.SetTipo(AValue: Integer): TRPNFeEntityCertificadoDigital;
+begin
+  Result := Self;
+  FTipo := AValue;
 end;
 
 { TRPNFeEntityNFeNotaEletronica }

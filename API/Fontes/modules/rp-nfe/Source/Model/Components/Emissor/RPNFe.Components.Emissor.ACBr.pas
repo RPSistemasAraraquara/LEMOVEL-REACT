@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.DateUtils,
+  System.SyncObjs,
   ACBrNFe,
   ACBrDFeSSL,
   ACBrDFeException,
@@ -50,7 +51,21 @@ type
     function ACBr: TACBrNFe;
   end;
 
+// O TACBrNFe e o FastReport do emissor sao UM UNICO componente compartilhado
+// por todas as threads da API. Emissao e impressao simultaneas colidem
+// (EAbort do FastReport / travamentos). Todo uso do emissor deve ser
+// serializado por este lock (reentrante na mesma thread).
+function EmissorLock: TCriticalSection;
+
 implementation
+
+var
+  GEmissorLock: TCriticalSection;
+
+function EmissorLock: TCriticalSection;
+begin
+  Result := GEmissorLock;
+end;
 
 { TRPNFeComponentsEmissorACBr }
 
@@ -101,18 +116,49 @@ end;
 
 procedure TRPNFeComponentsEmissorACBr.ConfigurarCertificado(AConfig: TRPNFeEntityConfiguracao);
 begin
-  if FileExists(AConfig.CertificadoDigital.ArquivoPfx) then
+  // CSC/IdCSC valem para A1 e A3: sem eles a NFC-e sai sem QR Code valido.
+  ACBr.Configuracoes.Geral.IdCSC := AConfig.CertificadoDigital.IdToken;
+  ACBr.Configuracoes.Geral.CSC := AConfig.CertificadoDigital.CscToken;
+
+  if AConfig.CertificadoDigital.Tipo = 3 then
   begin
+    // A3: certificado em token/cartao pelo repositorio do Windows (WinCrypt).
+    // ConfiguracaoGeral inicializa SSL como OpenSSL; para A3 e preciso sobrescrever.
+    if Trim(AConfig.CertificadoDigital.NumeroSerie) = EmptyStr then
+      raise EACBrDFeException.Create(
+        'Certificado digital A3 sem numero de serie informado.');
+
+    ACBr.Configuracoes.Geral.SSLLib := TSSLLib.libWinCrypt;
+    ACBr.Configuracoes.Geral.SSLCryptLib := TSSLCryptLib.cryWinCrypt;
+    ACBr.Configuracoes.Geral.SSLHttpLib := TSSLHttpLib.httpWinHttp;
+
+    ACBr.Configuracoes.Certificados.ArquivoPFX := EmptyStr;
+    ACBr.Configuracoes.Certificados.DadosPFX := EmptyStr;
+    ACBr.Configuracoes.Certificados.Senha := AConfig.CertificadoDigital.Senha;
+    ACBr.Configuracoes.Certificados.NumeroSerie := AConfig.CertificadoDigital.NumeroSerie;
+  end
+  else
+  begin
+    // A1: certificado em arquivo .pfx assinado via OpenSSL (comportamento atual).
+    // Sem ele o ACBr nao assina nem carrega o CSC. Falha explicita em vez de silenciosa.
+    if not FileExists(AConfig.CertificadoDigital.ArquivoPfx) then
+      raise EACBrDFeException.CreateFmt(
+        'Certificado digital A1 nao encontrado: %s',
+        [AConfig.CertificadoDigital.ArquivoPfx]);
+
+    ACBr.Configuracoes.Geral.SSLLib := TSSLLib.libOpenSSL;
+    ACBr.Configuracoes.Geral.SSLCryptLib := TSSLCryptLib.cryOpenSSL;
+    ACBr.Configuracoes.Geral.SSLHttpLib := TSSLHttpLib.httpOpenSSL;
+
+    ACBr.Configuracoes.Certificados.NumeroSerie := EmptyStr;
     ACBr.Configuracoes.Certificados.ArquivoPFX := AConfig.CertificadoDigital.ArquivoPfx;
     ACBr.Configuracoes.Certificados.DadosPFX := EmptyStr;
     ACBr.Configuracoes.Certificados.Senha := AConfig.CertificadoDigital.Senha;
-    ACBr.Configuracoes.Geral.IdCSC := AConfig.CertificadoDigital.IdToken;
-    ACBr.Configuracoes.Geral.CSC := AConfig.CertificadoDigital.CscToken;
-
-    ACBr.SSL.DescarregarCertificado;
-    if (StartOfTheDay(ACBr.SSL.CertDataVenc) < StartOfTheDay(Now)) then
-      raise EACBrDFeException.CreateFmt('Certificado vencido em %s', [ACBr.SSL.CertDataVenc.Format('dd/MM/yyyy')]);
   end;
+
+  ACBr.SSL.DescarregarCertificado;
+  if (StartOfTheDay(ACBr.SSL.CertDataVenc) < StartOfTheDay(Now)) then
+    raise EACBrDFeException.CreateFmt('Certificado vencido em %s', [ACBr.SSL.CertDataVenc.Format('dd/MM/yyyy')]);
 end;
 
 function TRPNFeComponentsEmissorACBr.Configuracao(AConfig: TRPNFeEntityConfiguracao): TRPNFeComponentsEmissorACBr;
@@ -174,5 +220,11 @@ begin
     .Replace('versao=' + '''', 'versao="')
     .Replace('''' + '>', '">');
 end;
+
+initialization
+  GEmissorLock := TCriticalSection.Create;
+
+finalization
+  GEmissorLock.Free;
 
 end.

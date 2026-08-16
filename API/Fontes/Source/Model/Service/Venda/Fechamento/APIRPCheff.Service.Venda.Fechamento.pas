@@ -25,12 +25,14 @@ type
     FConfiguracao         : TAPIRPCheffEntityConfiguracaoMesa;
     FComponents           : TAPIRPCheffComponents;
     FDAO                  : TAPIRPCheffDAOFactory;
+    FNotaFiscalAviso      : string;
 
     procedure InicializarValores;
     procedure CarregarVenda;
     procedure ValidarTotalDeItens;
 
     procedure ExecuteCommands;
+    procedure EmitirNotaAposCommit;
   public
     destructor Destroy; override;
 
@@ -49,6 +51,10 @@ type
 
     function Fechamento(AValue: TAPIRPCheffEntityVendaPostFechamento): TAPIRPCheffServiceVendaFechamento; overload;
     function Fechamento: TAPIRPCheffEntityVendaPostFechamento; overload;
+
+    // Aviso quando a NFC-e nao pode ser emitida no fechamento (venda fecha
+    // mesmo assim). Vazio = sem aviso. Lido pelo controller para responder.
+    property NotaFiscalAviso: string read FNotaFiscalAviso write FNotaFiscalAviso;
     procedure Execute;
   end;
 
@@ -168,7 +174,35 @@ begin
     FDAO.Rollback;
     raise;
   end;
+
+  // Emissao da NFC-e DEPOIS do commit, fora da transacao: a chamada a SEFAZ
+  // (segundos) nao pode segurar locks do banco, e um erro de SQL na emissao
+  // nao pode abortar a transacao do fechamento (Commit em transacao abortada
+  // vira rollback silencioso com HTTP 202 = caixa furado). Se a emissao
+  // falhar, a venda JA esta fechada e fica com pendencia fiscal (aviso ao
+  // operador) - exatamente a semantica desejada.
+  EmitirNotaAposCommit;
 end;
+
+procedure TAPIRPCheffServiceVendaFechamento.EmitirNotaAposCommit;
+{$IFNDEF LINUX}
+var
+  LEmitirNota: TAPIRPCheffServiceVendaFechamentoCommandEmitirNota;
+begin
+  LEmitirNota := TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.Create(Self, nil);
+  try
+    LogFechamento(Format('venda %d emitir nota (pos-commit) inicio', [FFechamento.idVenda]));
+    LEmitirNota.Execute(FFechamento);
+    LogFechamento(Format('venda %d emitir nota (pos-commit) fim (aviso: %s)',
+      [FFechamento.idVenda, FNotaFiscalAviso]));
+  finally
+    LEmitirNota.Free;
+  end;
+end;
+{$ELSE}
+begin
+end;
+{$ENDIF}
 
 procedure TAPIRPCheffServiceVendaFechamento.ExecuteCommands;
 var
@@ -191,7 +225,7 @@ begin
       .AddCommand(TAPIRPCheffServiceVendaFechamentoCommandMovimentaComposicao.Create(Self, @FContext))
       .AddCommand(TAPIRPCheffServiceVendaFechamentoCommandFinalizarVenda.Create(Self, @FContext))
       .AddCommand(TAPIRPCheffServiceVendaFechamentoCommandAtualizarItens.Create(Self, @FContext));
-     // .AddCommand(TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.Create(Self, @FContext));
+    // EmitirNota NAO entra no invoker: roda apos o Commit (EmitirNotaAposCommit).
     LInvoker.Execute(FFechamento);
   finally
     FreeAndNil(LInvoker);
@@ -223,6 +257,7 @@ end;
 procedure TAPIRPCheffServiceVendaFechamento.InicializarValores;
 begin
   FIdEncerraVenda := 0;
+  FNotaFiscalAviso := '';
 end;
 
 procedure TAPIRPCheffServiceVendaFechamento.ValidarTotalDeItens;

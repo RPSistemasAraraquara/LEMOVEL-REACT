@@ -23,7 +23,10 @@ type
   public
     function ExibirImagem(AValue: Boolean): TAPIRPCheffDAOProduto;
     function BuscarImagem(AIdProduto: Integer): TMemoryStream;
-    function Buscar(AIdProduto: Integer): TAPIRPCheffEntityProduto;
+    // ACarregarOpcionais=False pula o SELECT da lista de opcionais (o
+    // lancamento de item nunca a usa - os opcionais gravados vem do payload);
+    // a promocao continua carregada sempre.
+    function Buscar(AIdProduto: Integer; ACarregarOpcionais: Boolean = True): TAPIRPCheffEntityProduto;
     function Lista: TObjectList<TAPIRPCheffEntityProduto>; overload;
     function Lista(AIdCategoria: Integer): TObjectList<TAPIRPCheffEntityProduto>; overload;
   end;
@@ -239,7 +242,7 @@ begin
     Result := CompactarImagemJpeg(FQuery.DataSet.FieldByName('imagem_db').AsBytes);
 end;
 
-function TAPIRPCheffDAOProduto.Buscar(AIdProduto: Integer): TAPIRPCheffEntityProduto;
+function TAPIRPCheffDAOProduto.Buscar(AIdProduto: Integer; ACarregarOpcionais: Boolean): TAPIRPCheffEntityProduto;
 begin
   SelectProdutos;
   FQuery.SQL('where emp_001 = :idEmpresa')
@@ -254,9 +257,10 @@ begin
     Result.promocao := TAPIRPCheffDAOFactory(FactoryDAO)
       .IdEmpresa(FIdEmpresa)
       .PromocaoDAO.Buscar(Result.idProduto);
-    Result.opcionais := TAPIRPCheffDAOFactory(FactoryDAO)
-      .IdEmpresa(FIdEmpresa)
-      .OpcionalDAO.Lista(Result.idProduto);
+    if ACarregarOpcionais then
+      Result.opcionais := TAPIRPCheffDAOFactory(FactoryDAO)
+        .IdEmpresa(FIdEmpresa)
+        .OpcionalDAO.Lista(Result.idProduto);
   end;
 end;
 

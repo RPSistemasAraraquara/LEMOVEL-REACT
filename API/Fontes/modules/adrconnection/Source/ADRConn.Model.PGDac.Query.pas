@@ -19,7 +19,8 @@ uses
 type
   TADRConnModelPgDACQuery = class(TInterfacedObject, IADRQuery)
   private
-    [Weak]
+    // RP fix: [Unsafe] no lugar de [Weak] - ver ADRConn.Model.QueryParam
+    [Unsafe]
     FConnection: IADRConnection;
     FQuery: TPgQuery;
     FGenerator: IADRGenerator;
@@ -76,6 +77,17 @@ type
   end;
 
 implementation
+
+uses
+  ADRConn.Model.PgDAC.Connection;
+
+// Prefixo curto do SQL para o log de diagnostico.
+function ResumoSQL(const ASql: string): string;
+begin
+  Result := ASql.Replace(#13, ' ').Replace(#10, ' ').Trim;
+  if Length(Result) > 90 then
+    Result := Copy(Result, 1, 90);
+end;
 
 { TADRConnModelPgDACQuery }
 
@@ -205,6 +217,7 @@ var
   I: Integer;
   LParams: TParams;
 begin
+  ADRConnLog('exec inicio: ' + ResumoSQL(FSQL.Text));
   FQueryParams.ValidateParameters;
   LQuery := TPgQuery.Create(nil);
   try
@@ -219,9 +232,11 @@ begin
       end;
 
       LQuery.ExecSQL;
+      ADRConnLog('exec fim');
     except
       on E: Exception do
       begin
+        ADRConnLog('exec EXCECAO: ' + E.Message);
         if not TryHandleException(E) then
           raise;
 
@@ -287,6 +302,7 @@ var
   LQuery: TPgQuery;
   LParams: TParams;
 begin
+  ADRConnLog('open inicio: ' + ResumoSQL(FSQL.Text));
   try
     LQuery := TPgQuery.Create(nil);
     try
@@ -299,6 +315,7 @@ begin
         LQuery.ParamByName(LParams[I].Name).Value := LParams[I].Value;
       end;
       LQuery.Open;
+      ADRConnLog('open fim');
       Result := LQuery;
     except
       on E: Exception do

@@ -24,6 +24,8 @@ import {
   printSaleContent,
   resolveMachineType
 } from '../services/vendaPrint';
+import { loadStoredMachineSettings } from '../services/machineSettingsDb';
+import { formatCpfCnpj, isValidCpfCnpj, onlyDigits } from '../utils/document';
 import { Colors, Radius, Space } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
 import {
@@ -169,6 +171,51 @@ export const SaleClosureScreen: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [printProcessingVisible, setPrintProcessingVisible] = useState(false);
   const [printProcessingMessage, setPrintProcessingMessage] = useState('');
+  // CPF/CNPJ na NFC-e: modal de digitacao com validacao de digito verificador.
+  const [cpfNotaVisible, setCpfNotaVisible] = useState(false);
+  const [cpfNotaValor, setCpfNotaValor] = useState('');
+  const [cpfNotaErro, setCpfNotaErro] = useState('');
+  const cpfNotaResolverRef = useRef<((digits: string) => void) | null>(null);
+  const cpfNotaInputRef = useRef<TextInput>(null);
+
+  // Foca o campo depois que o overlay montou (o teclado sobe porque o campo
+  // esta na janela principal da Activity, igual aos demais campos da tela).
+  useEffect(() => {
+    if (!cpfNotaVisible) {
+      return;
+    }
+    const timer = setTimeout(() => cpfNotaInputRef.current?.focus(), 250);
+    return () => clearTimeout(timer);
+  }, [cpfNotaVisible]);
+
+  const promptCpfCnpjNota = () =>
+    new Promise<string>((resolve) => {
+      cpfNotaResolverRef.current = resolve;
+      setCpfNotaValor('');
+      setCpfNotaErro('');
+      setCpfNotaVisible(true);
+    });
+
+  const confirmarCpfNota = () => {
+    const digits = onlyDigits(cpfNotaValor);
+    if (!isValidCpfCnpj(digits)) {
+      setCpfNotaErro(
+        digits.length <= 11
+          ? 'CPF inválido. Confira os números digitados.'
+          : 'CNPJ inválido. Confira os números digitados.'
+      );
+      return;
+    }
+    setCpfNotaVisible(false);
+    cpfNotaResolverRef.current?.(digits);
+    cpfNotaResolverRef.current = null;
+  };
+
+  const emitirSemCpfNota = () => {
+    setCpfNotaVisible(false);
+    cpfNotaResolverRef.current?.('');
+    cpfNotaResolverRef.current = null;
+  };
   const [paymentPickerVisible, setPaymentPickerVisible] = useState(false);
   const [paymentPickerLineIndex, setPaymentPickerLineIndex] = useState<number | null>(null);
   const [paymentProcessingVisible, setPaymentProcessingVisible] = useState(false);
@@ -199,6 +246,10 @@ export const SaleClosureScreen: React.FC = () => {
   const [cobrarTaxaGarcom, setCobrarTaxaGarcom] = useState(false);
   const activePaymentTokenRef = useRef<string | null>(null);
   const paymentSelectionBusyRef = useRef(false);
+  // Trava contra toques repetidos no botao "Imprimir" da pre-visualizacao,
+  // que hoje dispara um novo job de impressao a cada clique.
+  const previewPrintLockRef = useRef(false);
+  const [previewPrinting, setPreviewPrinting] = useState(false);
   const loadDataPromiseRef = useRef<Promise<void> | null>(null);
   const loadDataKeyRef = useRef('');
 
@@ -432,6 +483,54 @@ export const SaleClosureScreen: React.FC = () => {
   const hidePrintProcessing = () => {
     setPrintProcessingVisible(false);
     setPrintProcessingMessage('');
+  };
+
+  // Reemissao de NFC-e de venda fechada sem nota + impressao do DANFCe na
+  // maquininha. Retorna true quando a nota foi emitida (mesmo se a impressao
+  // falhar - a nota ja esta autorizada na SEFAZ).
+  const reemitirNfceComImpressao = async (idVendaReemitir: number): Promise<boolean> => {
+    try {
+      showPrintProcessing('Reemitindo NFC-e...');
+      const resultado = await api.reemitirNfce(idVendaReemitir);
+      logSyncDiagnostic(`reemissao nfce ok idVenda=${idVendaReemitir} numero=${resultado.numero}`);
+      hidePrintProcessing();
+
+      try {
+        showPrintProcessing('Imprimindo NFC-e...');
+        await executeSalePrint({
+          idVenda: idVendaReemitir,
+          appSettings,
+          usarRotaMaquininha: true
+        });
+        hidePrintProcessing();
+        await new Promise<void>((resolve) => {
+          Alert.alert('NFC-e', 'NFC-e emitida e impressa com sucesso. 🎉', [{ text: 'OK', onPress: () => resolve() }], { cancelable: false });
+        });
+      } catch (printError: any) {
+        hidePrintProcessing();
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            'NFC-e',
+            `NFC-e emitida com sucesso, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
+            [{ text: 'OK', onPress: () => resolve() }],
+            { cancelable: false }
+          );
+        });
+      }
+      return true;
+    } catch (error: any) {
+      hidePrintProcessing();
+      logSyncDiagnostic(`reemissao nfce falhou idVenda=${idVendaReemitir}: ${error?.message || 'erro'}`, 2);
+      await new Promise<void>((resolve) => {
+        Alert.alert(
+          'NFC-e não emitida',
+          error?.message || 'Não foi possível reemitir a NFC-e.',
+          [{ text: 'OK', onPress: () => resolve() }],
+          { cancelable: false }
+        );
+      });
+      return false;
+    }
   };
 
   const showSweetAlert = (
@@ -1042,7 +1141,59 @@ export const SaleClosureScreen: React.FC = () => {
       logSyncDiagnostic(
         `fluxo fechamento final enviar idVenda=${idVenda} pagamentos=${linhas.length} totalPago=${totalPago.toFixed(2)} liquido=${totalLiquido.toFixed(2)} troco=${troco.toFixed(2)} taxa=${valorTaxaServico.toFixed(2)}`
       );
-      await api.closeSale({
+      // Pergunta fiscal SO quando a integracao NFC-e da empresa esta
+      // habilitada (empresas.integracao_nfce, sincronizado para o SQLite).
+      // Desabilitada: nem mostra o dialogo - segue direto como Nao Fiscal (1)
+      // com a impressao normal do cupom nao fiscal.
+      const integracaoNfce = await loadStoredMachineSettings()
+        .then((stored) => (stored ? stored.integracaoNfce : appSettings.integracaoNfce))
+        .catch(() => appSettings.integracaoNfce);
+
+      if (!integracaoNfce) {
+        logSyncDiagnostic(`fluxo fechamento final integracao_nfce desabilitada idVenda=${idVenda} - nao fiscal direto`);
+      }
+
+      // Venda aprovada: pergunta como emitir (1 = Nao Fiscal, 2 = Fiscal).
+      // Ordem: "Emitir NFC-e" fica como acao principal (botao da direita).
+      const opcaoFiscal = !integracaoNfce
+        ? 1
+        : await new Promise<number>((resolve) => {
+            Alert.alert(
+              'Venda aprovada com sucesso! 🎉',
+              'Deseja emitir a nota fiscal (NFC-e) desta venda?',
+              [
+                { text: 'Não Fiscal', onPress: () => resolve(1) },
+                { text: 'Emitir NFC-e', onPress: () => resolve(2) }
+              ],
+              { cancelable: false }
+            );
+          });
+
+      // NFC-e aceita: pergunta se o consumidor quer CPF/CNPJ na nota.
+      // "Sim" abre o campo com validacao de digito verificador; "Nao" emite
+      // direto sem identificacao.
+      let cpfCnpjNota = '';
+      if (opcaoFiscal === 2) {
+        const desejaCpfNota = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'CPF na nota',
+            'Deseja informar CPF/CNPJ na nota?',
+            [
+              { text: 'Não', onPress: () => resolve(false) },
+              { text: 'Sim', onPress: () => resolve(true) }
+            ],
+            { cancelable: false }
+          );
+        });
+        if (desejaCpfNota) {
+          cpfCnpjNota = await promptCpfCnpjNota();
+        }
+        logSyncDiagnostic(
+          `fluxo fechamento final cpf na nota idVenda=${idVenda} informado=${cpfCnpjNota ? 'sim' : 'nao'}`
+        );
+      }
+
+      const closeResult = await api.closeSale({
         idVenda,
         idUsuario,
         numeroCouvertMasculino: parseInteger(masc),
@@ -1054,34 +1205,46 @@ export const SaleClosureScreen: React.FC = () => {
         CobrarTaxaGarcom: cobrarTaxaGarcom,
         pagamentos: linhas,
         impressoraInterna: false,
-        imprimirPreFechamentoMobile: false
+        imprimirPreFechamentoMobile: false,
+        opcaoFiscal,
+        cpfCnpjNota
       }, {
         accept: 'application/json',
         numeroColunas: appSettings.impressaoColunas,
         impressaoInterna: false,
         tipoMaquina: resolveMachineType(appSettings, true)
       });
+      const nfceAviso = typeof closeResult === 'string' ? closeResult.trim() : '';
       logSyncDiagnostic(`fluxo fechamento final api ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
 
       let closePrintMessage = '';
-      if (printOnlyAtClose) {
+      // NFC-e emitida: imprime o DANFCe na maquininha mesmo que a impressao de
+      // fechamento esteja desligada (o servidor devolve o cupom fiscal com QR
+      // Code quando a venda tem chave eletronica).
+      const nfceEmitida = opcaoFiscal === 2 && !nfceAviso;
+      if (printOnlyAtClose || nfceEmitida) {
         try {
           showPrintProcessing(
-            usePagBankPrinter || useStoneCieloOrGetNetPrinter
-              ? 'Processando impressão do fechamento...'
-              : 'Enviando impressão do fechamento...'
+            nfceEmitida
+              ? 'Imprimindo NFC-e...'
+              : usePagBankPrinter || useStoneCieloOrGetNetPrinter
+                ? 'Processando impressão do fechamento...'
+                : 'Enviando impressão do fechamento...'
           );
           await executeSalePrint({
             idVenda,
             appSettings,
             usarRotaMaquininha: true
           });
-          closePrintMessage =
-            usePagBankPrinter || useStoneCieloOrGetNetPrinter
+          closePrintMessage = nfceEmitida
+            ? ' NFC-e impressa.'
+            : usePagBankPrinter || useStoneCieloOrGetNetPrinter
               ? ' Impressão enviada para a maquininha.'
               : ' Impressão enviada com sucesso.';
         } catch (printError: any) {
-          closePrintMessage = ` Venda fechada, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`;
+          closePrintMessage = nfceEmitida
+            ? ` Venda fechada e NFC-e emitida, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`
+            : ` Venda fechada, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`;
         } finally {
           hidePrintProcessing();
         }
@@ -1089,12 +1252,47 @@ export const SaleClosureScreen: React.FC = () => {
 
       refreshDashboard().catch(() => null);
       setActionStatus({
-        kind: 'success',
-        message: closePrintMessage
-          ? `Venda fechada com sucesso.${closePrintMessage}`
-          : 'Venda fechada com sucesso.'
+        kind: nfceAviso ? 'info' : 'success',
+        message: nfceAviso
+          ? `Venda fechada. ${nfceAviso}`
+          : closePrintMessage
+            ? `Venda fechada com sucesso.${closePrintMessage}`
+            : 'Venda fechada com sucesso.'
       });
       logSyncDiagnostic(`fluxo fechamento final fim ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
+      // NFC-e nao emitida: oferece a reemissao NA HORA (antes de navegar,
+      // senao a tela desmonta e os modais de progresso somem). O operador
+      // pode tentar quantas vezes precisar ou deixar para depois.
+      if (nfceAviso) {
+        let tentarReemitir = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Atenção — NFC-e',
+            `A venda foi fechada, mas a nota fiscal não foi emitida.\n\n${nfceAviso}`,
+            [
+              { text: 'Depois', onPress: () => resolve(false) },
+              { text: 'Reemitir agora', onPress: () => resolve(true) }
+            ],
+            { cancelable: false }
+          );
+        });
+        while (tentarReemitir) {
+          const reemitiu = await reemitirNfceComImpressao(idVenda);
+          if (reemitiu) {
+            break;
+          }
+          tentarReemitir = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'NFC-e não emitida',
+              'Deseja tentar reemitir novamente?',
+              [
+                { text: 'Depois', onPress: () => resolve(false) },
+                { text: 'Tentar de novo', onPress: () => resolve(true) }
+              ],
+              { cancelable: false }
+            );
+          });
+        }
+      }
       goToInitial();
     } catch (error: any) {
       logSyncDiagnostic(
@@ -1377,6 +1575,7 @@ export const SaleClosureScreen: React.FC = () => {
   }
 
   return (
+    <View style={styles.screenRoot}>
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {mode !== 'pre' ? <ScreenRouteLabel /> : null}
 
@@ -1568,8 +1767,14 @@ export const SaleClosureScreen: React.FC = () => {
                 </ScrollView>
                 <View style={styles.previewActions}>
                   <Pressable
-                    style={styles.previewBtn}
+                    style={[styles.previewBtn, previewPrinting ? styles.primaryBtnDisabled : null]}
+                    disabled={previewPrinting}
                     onPress={async () => {
+                      if (previewPrintLockRef.current) {
+                        return;
+                      }
+                      previewPrintLockRef.current = true;
+                      setPreviewPrinting(true);
                       try {
                         setActionStatus({ kind: 'info', message: 'Enviando impressão...' });
                         if (usePagBankPrinter || useStoneCieloOrGetNetPrinter) {
@@ -1594,10 +1799,12 @@ export const SaleClosureScreen: React.FC = () => {
                         showSweetAlert('Erro', error?.message || 'Falha ao imprimir.', 'error');
                       } finally {
                         hidePrintProcessing();
+                        previewPrintLockRef.current = false;
+                        setPreviewPrinting(false);
                       }
                     }}
                   >
-                    <Text style={styles.previewBtnText}>Imprimir</Text>
+                    <Text style={styles.previewBtnText}>{previewPrinting ? 'Imprimindo...' : 'Imprimir'}</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.previewBtn, styles.previewBtnSecondary]}
@@ -1841,10 +2048,64 @@ export const SaleClosureScreen: React.FC = () => {
         }
       />
     </ScrollView>
+
+    {cpfNotaVisible ? (
+      // Overlay INLINE (mesma janela da Activity) em vez de <Modal>: no
+      // Android de maquininha (Stone/Sunmi) o teclado nao se conecta a
+      // janela separada que o Modal cria - nos campos da tela ele funciona.
+      <View style={styles.cpfNotaOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>CPF/CNPJ na nota</Text>
+          <Text style={styles.cpfNotaHint}>
+            Digite o CPF (11 dígitos) ou CNPJ (14 dígitos) do consumidor.
+          </Text>
+          <TextInput
+            ref={cpfNotaInputRef}
+            style={styles.cpfNotaInput}
+            value={formatCpfCnpj(cpfNotaValor)}
+            onChangeText={(text) => {
+              setCpfNotaValor(onlyDigits(text));
+              if (cpfNotaErro) {
+                setCpfNotaErro('');
+              }
+            }}
+            placeholder="000.000.000-00"
+            placeholderTextColor={Colors.textMuted}
+            keyboardType="numeric"
+            maxLength={18}
+            showSoftInputOnFocus
+          />
+          {cpfNotaErro ? <Text style={styles.cpfNotaErro}>{cpfNotaErro}</Text> : null}
+          <Pressable style={styles.cpfNotaConfirm} onPress={confirmarCpfNota}>
+            <Text style={styles.cpfNotaConfirmText}>Confirmar</Text>
+          </Pressable>
+          <Pressable style={[styles.modalOption, styles.modalCancel]} onPress={emitirSemCpfNota}>
+            <Text style={styles.modalCancelText}>Emitir sem CPF</Text>
+          </Pressable>
+        </View>
+      </View>
+    ) : null}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#f6f8fc'
+  },
+  cpfNotaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 32, 56, 0.55)',
+    justifyContent: 'center',
+    padding: Space.md,
+    zIndex: 1000,
+    elevation: 24
+  },
   container: {
     flex: 1,
     backgroundColor: '#f6f8fc'
@@ -2376,6 +2637,42 @@ const styles = StyleSheet.create({
   modalCancelText: {
     color: Colors.warning,
     fontWeight: '700'
+  },
+  cpfNotaHint: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginBottom: 10
+  },
+  cpfNotaInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(27, 79, 114, 0.2)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#f8fbff',
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 8
+  },
+  cpfNotaErro: {
+    color: Colors.danger,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8
+  },
+  cpfNotaConfirm: {
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: Colors.primary,
+    alignItems: 'center'
+  },
+  cpfNotaConfirmText: {
+    color: '#ffffff',
+    fontWeight: '800'
   },
   processingCard: {
     width: '84%',

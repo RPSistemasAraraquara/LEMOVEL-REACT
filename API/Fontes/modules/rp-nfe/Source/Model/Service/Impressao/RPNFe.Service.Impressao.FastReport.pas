@@ -31,6 +31,10 @@ begin
   try
     LACBr.DANFE := LDanfe;
     LDanfe.Sistema := 'RP Sistemas';
+    // DANFeNFCe5_00 (bobina 80mm): unico template cujos memos largos (chave de
+    // acesso, URL, colunas) cabem inteiros na PAGINA - os 58mm/72mm do desktop
+    // contam com o papel maior da impressora POS80 e clipam no export de
+    // imagem. A nitidez vem da exportacao em 300 DPI (helper).
     LDanfe.FastFile := ExtractFilePath(GetModuleName(HInstance)) + 'report\DANFeNFCe5_00.fr3';
     LACBr.NotasFiscais.Clear;
     LACBr.NotasFiscais.LoadFromString(FXml);

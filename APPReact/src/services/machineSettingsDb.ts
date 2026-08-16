@@ -7,6 +7,9 @@ export type StoredMachineSettings = {
   utilizaMaquininhaStone: boolean;
   tipoIntegracao: StoredMachineIntegration;
   modeloMaquininha: string;
+  // Emissao de NFC-e habilitada para a empresa (empresas.integracao_nfce no
+  // Postgres); alimentado pelo "Sincronizar tudo". Default false.
+  integracaoNfce: boolean;
 };
 
 export type StoredGetNetTransaction = {
@@ -66,6 +69,7 @@ type MachineSettingsRow = {
   modelo_maquininha: string | null;
   ultima_transacao_getnet_json?: string | null;
   subsellers_getnet_json?: string | null;
+  integracao_nfce?: number | null;
 };
 
 const DATABASE_NAME = 'rpcheff-local.db';
@@ -131,6 +135,7 @@ async function ensureSchemaAsync(): Promise<void> {
           modelo_maquininha TEXT NOT NULL DEFAULT 'false',
           ultima_transacao_getnet_json TEXT,
           subsellers_getnet_json TEXT,
+          integracao_nfce INTEGER NOT NULL DEFAULT 0,
           atualizado_em TEXT
         );
       `);
@@ -142,6 +147,13 @@ async function ensureSchemaAsync(): Promise<void> {
       }
       try {
         await db.execAsync(`ALTER TABLE ${TABLE_NAME} ADD COLUMN subsellers_getnet_json TEXT;`);
+      } catch {
+        // Coluna já existente em bases atualizadas.
+      }
+      try {
+        // Migração p/ clientes existentes: default 0 (= false) preserva o
+        // comportamento até a primeira sincronização alimentar o valor real.
+        await db.execAsync(`ALTER TABLE ${TABLE_NAME} ADD COLUMN integracao_nfce INTEGER NOT NULL DEFAULT 0;`);
       } catch {
         // Coluna já existente em bases atualizadas.
       }
@@ -167,7 +179,7 @@ export async function loadStoredMachineSettings(): Promise<StoredMachineSettings
     }
 
     const row = await db.getFirstAsync<MachineSettingsRow>(
-      `SELECT utiliza_maquininha, tipo_integracao, modelo_maquininha, ultima_transacao_getnet_json FROM ${TABLE_NAME} WHERE id = 1`
+      `SELECT utiliza_maquininha, tipo_integracao, modelo_maquininha, ultima_transacao_getnet_json, integracao_nfce FROM ${TABLE_NAME} WHERE id = 1`
     );
 
     if (!row) {
@@ -180,7 +192,8 @@ export async function loadStoredMachineSettings(): Promise<StoredMachineSettings
     return {
       utilizaMaquininhaStone,
       tipoIntegracao,
-      modeloMaquininha: String(row.modelo_maquininha || (utilizaMaquininhaStone ? tipoIntegracao : 'false'))
+      modeloMaquininha: String(row.modelo_maquininha || (utilizaMaquininhaStone ? tipoIntegracao : 'false')),
+      integracaoNfce: Number(row.integracao_nfce || 0) === 1
     };
   } catch {
     return null;
@@ -270,17 +283,66 @@ export async function saveStoredMachineSettings(settings: StoredMachineSettings)
           utiliza_maquininha,
           tipo_integracao,
           modelo_maquininha,
+          integracao_nfce,
           atualizado_em
-        ) VALUES (1, ?, ?, ?, ?)
+        ) VALUES (1, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           utiliza_maquininha = excluded.utiliza_maquininha,
           tipo_integracao = excluded.tipo_integracao,
           modelo_maquininha = excluded.modelo_maquininha,
+          integracao_nfce = excluded.integracao_nfce,
           atualizado_em = excluded.atualizado_em
       `,
       settings.utilizaMaquininhaStone ? 1 : 0,
       normalizeIntegration(settings.tipoIntegracao),
       String(settings.modeloMaquininha || 'false'),
+      settings.integracaoNfce ? 1 : 0,
+      new Date().toISOString()
+    );
+  } catch {
+    // Mantém a experiência do app mesmo se o espelho SQLite falhar.
+  }
+}
+
+// Atualiza SO o flag integracao_nfce (alimentado pelo "Sincronizar tudo"),
+// preservando as demais configuracoes da maquininha.
+export async function saveStoredIntegracaoNfce(ativo: boolean): Promise<void> {
+  if (!isSupportedPlatform()) {
+    return;
+  }
+
+  try {
+    await ensureSchemaAsync();
+    const db = await getDatabaseAsync();
+    if (!db) {
+      return;
+    }
+
+    const current = (await loadStoredMachineSettings()) || {
+      utilizaMaquininhaStone: false,
+      tipoIntegracao: 'nenhum' as StoredMachineIntegration,
+      modeloMaquininha: 'false',
+      integracaoNfce: false
+    };
+
+    await db.runAsync(
+      `
+        INSERT INTO ${TABLE_NAME} (
+          id,
+          utiliza_maquininha,
+          tipo_integracao,
+          modelo_maquininha,
+          integracao_nfce,
+          atualizado_em
+        ) VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          integracao_nfce = excluded.integracao_nfce,
+          atualizado_em = excluded.atualizado_em
+      `,
+      current.utilizaMaquininhaStone ? 1 : 0,
+      normalizeIntegration(current.tipoIntegracao),
+      String(current.modeloMaquininha || 'false'),
+      ativo ? 1 : 0,
       new Date().toISOString()
     );
   } catch {
@@ -303,7 +365,8 @@ export async function saveStoredGetNetTransaction(transaction: StoredGetNetTrans
     const current = (await loadStoredMachineSettings()) || {
       utilizaMaquininhaStone: false,
       tipoIntegracao: 'nenhum' as StoredMachineIntegration,
-      modeloMaquininha: 'false'
+      modeloMaquininha: 'false',
+      integracaoNfce: false
     };
 
     await db.runAsync(
@@ -349,7 +412,8 @@ export async function saveStoredGetNetSubsellers(payload: StoredGetNetSubsellers
     const current = (await loadStoredMachineSettings()) || {
       utilizaMaquininhaStone: false,
       tipoIntegracao: 'nenhum' as StoredMachineIntegration,
-      modeloMaquininha: 'false'
+      modeloMaquininha: 'false',
+      integracaoNfce: false
     };
 
     const currentTx = await loadStoredGetNetTransaction();

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  BackHandler,
   FlatList,
   Modal,
   PermissionsAndroid,
@@ -13,7 +14,7 @@ import {
   ScrollView
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CommonActions, RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { CommonActions, RouteProp, useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { CategoryChip } from '../components/CategoryChip';
 import { MemoFoodCard } from '../components/FoodCard';
 import { useApp } from '../context/AppContext';
@@ -625,15 +626,17 @@ export const MenuScreen: React.FC = () => {
         return;
       }
 
-      let currentTable = launchTable;
-      try {
-        if (!currentTable.idVenda) {
-          const refreshed = await openTableByCard(currentTable.idMesa, currentTable.nomeMesaComanda, currentTable.tipo);
-          currentTable = refreshed;
-          setActiveTable(refreshed);
-        }
-      } catch (error: unknown) {
-        logSyncDiagnostic(`menu abrir venda antes do lancamento falhou: ${getLogErrorMessage(error)}`, 2);
+      const currentTable = launchTable;
+      // Performance: nao espera a abertura da venda aqui - so AQUECE a
+      // request (deduplicada no AppContext): a tela de lancamento dispara a
+      // abertura dela e compartilha esta mesma promise. Quem escreve o
+      // activeTable e SO o caminho guardado do ItemLaunchScreen - escrever
+      // aqui podia chegar atrasado e apontar o lancamento para a mesa errada.
+      if (!currentTable.idVenda) {
+        void openTableByCard(currentTable.idMesa, currentTable.nomeMesaComanda, currentTable.tipo)
+          .catch((error: unknown) => {
+            logSyncDiagnostic(`menu abrir venda antes do lancamento falhou: ${getLogErrorMessage(error)}`, 2);
+          });
       }
 
       const itemCategoryId = Number(item.idCategoria || 0);
@@ -812,6 +815,20 @@ export const MenuScreen: React.FC = () => {
       // sem envio nesta tela; envio ocorre apenas na Inicial.
     }
   };
+
+  // Botao voltar do Android no Cardapio: vai direto para a tela principal
+  // (Inicial), como o botao "Voltar" da tela, em vez do comportamento padrao
+  // das abas (que trocaria para a primeira aba, "Mesas em andamento").
+  useFocusEffect(
+    useCallback(() => {
+      const onHardwareBack = () => {
+        void goToInitial();
+        return true;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+      return () => subscription.remove();
+    }, [])
+  );
 
   const openPendingItems = () => {
     const params = activeTable?.idVenda ? { idVenda: activeTable.idVenda } : undefined;

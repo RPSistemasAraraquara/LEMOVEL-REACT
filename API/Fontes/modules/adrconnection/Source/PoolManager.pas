@@ -25,6 +25,13 @@ type
     function GetRefCount: Integer;
     function IsIdle(out AIdleTime: TDateTime): Boolean;
     function Acquire: T;
+    // Aquisicao atomica: incrementa o RefCount SOMENTE se ainda houver vaga.
+    // Usada pelo TryGetItem para que selecao e aquisicao sejam uma operacao
+    // unica - sem isso, duas threads podem levar o mesmo item (mesma conexao).
+    function TryAcquire(AMaxRefCount: Integer): Boolean;
+    // Leitura da instancia SEM incrementar o RefCount (o item ja vem
+    // adquirido do TryGetItem).
+    function Instance: T;
     procedure Release;
     constructor Create(AInstance: T; const AInstanceOwner: Boolean = True);
     destructor Destroy; override;
@@ -70,6 +77,28 @@ begin
     Result := FInstance;
   finally
     FMultiReadExclusiveWriteSynchronizer.EndWrite
+  end;
+end;
+
+function TPoolItem<T>.TryAcquire(AMaxRefCount: Integer): Boolean;
+begin
+  FMultiReadExclusiveWriteSynchronizer.BeginWrite;
+  try
+    Result := FRefCount < AMaxRefCount;
+    if Result then
+      Inc(FRefCount);
+  finally
+    FMultiReadExclusiveWriteSynchronizer.EndWrite;
+  end;
+end;
+
+function TPoolItem<T>.Instance: T;
+begin
+  FMultiReadExclusiveWriteSynchronizer.BeginRead;
+  try
+    Result := FInstance;
+  finally
+    FMultiReadExclusiveWriteSynchronizer.EndRead;
   end;
 end;
 
@@ -138,7 +167,10 @@ begin
   try
     for I := 0 to Pred(FPoolItemList.Count) do
     begin
-      if FPoolItemList.Items[I].GetRefCount < FMaxRefCountPerItem then
+      // Selecao + aquisicao ATOMICAS (TryAcquire incrementa o RefCount sob o
+      // lock do item): sem isso duas threads levavam o MESMO item com
+      // RefCount=0 e usavam a mesma conexao simultaneamente.
+      if FPoolItemList.Items[I].TryAcquire(FMaxRefCountPerItem) then
       begin
         Result := FPoolItemList.Items[I];
         Break;
@@ -146,17 +178,18 @@ begin
     end;
     if Result = nil then
     begin
-      try
-        LInstance := nil;
-        LInstanceOwner := False;
-        DoGetInstance(LInstance, LInstanceOwner);
-      finally
-        if LInstance <> nil then
-        begin
-          LPoolItem := TPoolItem<T>.Create(LInstance, LInstanceOwner);
-          Result := LPoolItem;
-          FPoolItemList.Add(LPoolItem);
-        end;
+      LInstance := nil;
+      LInstanceOwner := False;
+      // Sem try/finally aqui de proposito: se DoGetInstance falhar (banco
+      // fora do ar), NENHUM item meio-construido pode entrar na lista -
+      // um item com conexao nil envenenaria o pool ate reiniciar a API.
+      DoGetInstance(LInstance, LInstanceOwner);
+      if LInstance <> nil then
+      begin
+        LPoolItem := TPoolItem<T>.Create(LInstance, LInstanceOwner);
+        LPoolItem.TryAcquire(FMaxRefCountPerItem);
+        Result := LPoolItem;
+        FPoolItemList.Add(LPoolItem);
       end;
     end;
   finally

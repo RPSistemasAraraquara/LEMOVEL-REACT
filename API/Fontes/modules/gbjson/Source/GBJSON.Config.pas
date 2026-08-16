@@ -92,4 +92,9 @@ begin
     FreeAndNil(FInstance);
 end;
 
+initialization
+  // RP fix: cria o singleton no boot (thread principal). A criacao preguicosa
+  // em GetInstance nao tinha lock e podia duplicar/corromper sob concorrencia.
+  TGBJSONConfig.GetInstance;
+
 end.

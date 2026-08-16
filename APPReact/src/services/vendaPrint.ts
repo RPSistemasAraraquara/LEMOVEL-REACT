@@ -35,6 +35,15 @@ const stripPrinterMarkup = (value: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+// Comando de imagem (ex.: DANFCe da NFC-e em base64) precisa chegar bruto aos
+// modulos nativos para ser impresso como bitmap - nao pode ser achatado para
+// texto.
+export const contentHasImageCommand = (raw: string): boolean => {
+  const base = String(raw || '').trim();
+  if (!base.startsWith('[') && !base.startsWith('{')) return false;
+  return /"type"\s*:\s*"image"/i.test(base);
+};
+
 export const parsePrintCommandsToText = (raw: string): string => {
   const extractLines = (payload: unknown): string[] => {
     if (!payload) return [];
@@ -301,7 +310,10 @@ export const printSaleContent = async ({
     machineType === 'tmpPlugPag' &&
     provider === 'pagbank'
   ) {
-    const printableContent = parsePrintCommandsToText(normalizedContent);
+    // DANFCe (NFC-e): manda o JSON bruto com a imagem para o modulo nativo.
+    const printableContent = contentHasImageCommand(normalizedContent)
+      ? normalizedContent.trim()
+      : parsePrintCommandsToText(normalizedContent);
     if (!printableContent.trim()) {
       throw new Error('Conteúdo de impressão vazio para PagBank.');
     }

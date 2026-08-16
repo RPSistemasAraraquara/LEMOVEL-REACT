@@ -51,6 +51,15 @@ end;
 
 destructor TAPIRPCheffComponentConnection.Destroy;
 begin
+  // Sanitiza antes de devolver ao pool: transacao aberta/abortada deixada por
+  // um fluxo com erro NAO pode vazar para o proximo dono da conexao.
+  if Assigned(FConnection) then
+  try
+    if FConnection.Connected and FConnection.InTransaction then
+      FConnection.Rollback;
+  except
+  end;
+
   if Assigned(FPoolItem) then
     FPoolItem.Release;
   inherited;
@@ -65,7 +74,9 @@ begin
     if not Assigned(FPoolItem) then
       FPoolItem := GetPoolItem;
 
-    LPoolConnection := FPoolItem.Acquire;
+    // O item ja vem ADQUIRIDO do pool (TryGetItem incrementa o RefCount de
+    // forma atomica); Instance apenas le, sem incrementar de novo.
+    LPoolConnection := FPoolItem.Instance;
     FConnection := LPoolConnection.Connection;
     if not FConnection.Connected then
     try
@@ -78,13 +89,27 @@ begin
         raise;
       end;
     end;
+
+    // Defesa em profundidade: se um dono anterior vazou transacao, encerra
+    // antes de entregar a conexao a esta requisicao.
+    try
+      if FConnection.Connected and FConnection.InTransaction then
+        FConnection.Rollback;
+    except
+    end;
   end;
   Result := FConnection;
 end;
 
 initialization
+  // MaxIdleSeconds ENORME de proposito: a thread de limpeza do PoolManager
+  // destruia conexoes ociosas ha 30s+ na janela entre GetPoolItem (que escolhe
+  // um item com RefCount=0) e o Acquire (que incrementa o RefCount) - o worker
+  // ficava com uma conexao morta e congelava no primeiro SQL ("idle in
+  // transaction" no Postgres), esgotando o pool e derrubando a API inteira.
+  // Com o Postgres local, manter as conexoes abertas nao custa nada.
   TADRConnectionPoolBuilder.New
-    .MaxIdleSeconds(30)
+    .MaxIdleSeconds(31536000)
     .MinPoolCount(3)
     .OnGetConnection(CreateConnection)
     .Build;

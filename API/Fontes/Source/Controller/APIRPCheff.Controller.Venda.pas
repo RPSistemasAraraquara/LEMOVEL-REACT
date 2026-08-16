@@ -56,6 +56,12 @@ type
     [SwagResponse(202)]
     procedure FecharVenda;
 
+    [SwagPOST('{idVenda}/nfce/reemitir', 'Reemitir NFC-e de venda fechada sem nota')]
+    [SwagParamPath('idVenda', 'Id da Venda')]
+    [SwagResponse(200)]
+    [SwagResponse(400)]
+    procedure ReemitirNFCe;
+
     [SwagPATCH('{idVenda}/nome', 'Atualizar Nome Mesa/Comanda')]
     [SwagParamPath('idVenda', 'Id da Venda')]
     [SwagParamBody('nomeMesaComanda', TAPIRPCheffEntityVendaPatchNomeMesaComanda)]
@@ -91,7 +97,9 @@ type
 implementation
 
 uses
-  System.Classes;
+  System.Classes,
+  System.NetEncoding,
+  APIRPCheff.Service.Venda.ReemitirNota;
 
 { TAPIRPCheffControllerVenda }
 
@@ -296,6 +304,11 @@ begin
       .Fechamento(LFechamento)
       .Execute;
 
+    // NFC-e nao-fatal: se nao emitiu, avisa o app (venda ja foi fechada).
+    if Controller.Service.VendaFechamentoService.NotaFiscalAviso <> '' then
+      FResponse.AddHeader('x-nfce-aviso',
+        TNetEncoding.URL.Encode(Controller.Service.VendaFechamentoService.NotaFiscalAviso));
+
     if Pos('text/plain', LAccept) > 0 then
       ConsultarTextPlain;
     FResponse.Status(202);
@@ -307,6 +320,59 @@ begin
       begin
       end;
     end;
+  end;
+end;
+
+procedure TAPIRPCheffControllerVenda.ReemitirNFCe;
+var
+  LIdEmpresa: Integer;
+  LIdVenda: Integer;
+  LCpfCnpjNota: string;
+  LBody: TJSONObject;
+  LService: TAPIRPCheffServiceVendaReemitirNota;
+  LResposta: TJSONObject;
+begin
+  LIdEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
+  LIdVenda := FRequest.Params.Field('idVenda').AsInteger;
+
+  // Body opcional: {"cpfCnpjNota":"..."} sobrepoe o CPF gravado no fechamento.
+  LCpfCnpjNota := '';
+  if FRequest.Body <> '' then
+  begin
+    LBody := TJSONObject.ParseJSONValue(FRequest.Body) as TJSONObject;
+    try
+      if Assigned(LBody) then
+        LCpfCnpjNota := LBody.GetValue<string>('cpfCnpjNota', '');
+    finally
+      LBody.Free;
+    end;
+  end;
+
+  LService := TAPIRPCheffServiceVendaReemitirNota.Create;
+  try
+    try
+      LService
+        .DAO(Controller.DAO.IdEmpresa(LIdEmpresa))
+        .Components(Controller.Components)
+        .IdVenda(LIdVenda)
+        .CpfCnpjNota(LCpfCnpjNota)
+        .Execute;
+
+      LResposta := TJSONObject.Create;
+      LResposta.AddPair('chave', LService.Chave);
+      LResposta.AddPair('numero', TJSONNumber.Create(LService.Numero));
+      LResposta.AddPair('mensagem', 'NFC-e emitida com sucesso.');
+      FResponse.Send<TJSONObject>(LResposta).Status(200);
+    except
+      on E: Exception do
+      begin
+        LResposta := TJSONObject.Create;
+        LResposta.AddPair('error', E.Message);
+        FResponse.Send<TJSONObject>(LResposta).Status(400);
+      end;
+    end;
+  finally
+    FreeAndNil(LService);
   end;
 end;
 

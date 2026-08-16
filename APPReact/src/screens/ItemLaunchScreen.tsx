@@ -162,7 +162,24 @@ const goToReturnScreen = (navigation: Nav, returnTo: ReturnTarget, returnCategor
   );
 };
 
-const goToProducts = (navigation: Nav, returnCategoryId?: number) => {
+const goToProducts = (navigation: Nav, returnCategoryId?: number, veioDoCardapio = false) => {
+  // Performance: quando a tela de lancamento foi EMPILHADA a partir do
+  // Cardapio, goBack() volta para a aba ja montada (estado e scroll intactos)
+  // em vez de remontar Inicial + Tabs + grid de produtos inteiros a cada item
+  // adicionado. A categoria de retorno ja e restaurada pelo
+  // lastLaunchedCategoryContext gravado antes de navegar. O reset continua
+  // como fallback para pilhas fora do padrao.
+  if (veioDoCardapio) {
+    try {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+        return;
+      }
+    } catch (error: unknown) {
+      void error;
+    }
+  }
+
   const tabParams =
     typeof returnCategoryId === 'number'
       ? ({ screen: 'Cardapio', params: { selectedCategoryId: returnCategoryId } } as const)
@@ -1109,7 +1126,7 @@ export const ItemLaunchScreen: React.FC = () => {
         setSelectedFractionIndex(null);
         setFlavorCount(1);
         setFractionSearchByIndex({});
-        goToProducts(navigation, returnCategoryId);
+        goToProducts(navigation, returnCategoryId, returnTo === 'Cardapio');
         return;
       }
 
@@ -1126,7 +1143,7 @@ export const ItemLaunchScreen: React.FC = () => {
         opcionais: opc
       });
 
-      goToProducts(navigation, returnCategoryId);
+      goToProducts(navigation, returnCategoryId, returnTo === 'Cardapio');
     } catch (error: unknown) {
       Alert.alert('Erro', error instanceof Error ? error.message : 'Não foi possível adicionar o item.');
     }

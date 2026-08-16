@@ -16,6 +16,7 @@ type
     FutilizaConsumacaoMinima   : Boolean;
     FconsumacaoMinima          : Currency;
     FpermiteTrocoTodasAsFormas : Boolean;
+    FintegracaoNfce            : Boolean;
   public
     property idEmpresa: Integer read FidEmpresa write FidEmpresa;
     property tempoConsumo: Integer read FtempoConsumo write FtempoConsumo;
@@ -28,6 +29,7 @@ type
     property utilizaConsumacaoMinima: Boolean read FutilizaConsumacaoMinima write FutilizaConsumacaoMinima;
     property consumacaoMinima: Currency read FconsumacaoMinima write FconsumacaoMinima;
     property permiteTrocoTodasAsFormas: Boolean read FpermiteTrocoTodasAsFormas write FpermiteTrocoTodasAsFormas;
+    property integracaoNfce: Boolean read FintegracaoNfce write FintegracaoNfce;
   end;
 
   TAPIRPCheffEntityConfiguracaoComanda = class(TAPIRPCheffEntityConfiguracaoMesaComanda)

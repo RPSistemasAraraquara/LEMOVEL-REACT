@@ -182,6 +182,8 @@ const normalizeBaseUrl = (value: string) => {
 const AUTO_REFRESH_INTERVAL_MS = 7000;
 const AUTO_REFRESH_THROTTLE_MS = 1200;
 const AUTO_MENU_REFRESH_THROTTLE_MS = 5000;
+// Mantido no valor original (4,5s): com TTL maior, pagamento parcial lancado
+// por OUTRO terminal demorava ate 2 ciclos do auto-refresh para aparecer.
 const PARTIAL_PAYMENT_TOTAL_TTL_MS = 4500;
 const PARTIAL_PAYMENT_TOTAL_CONCURRENCY = 3;
 const INITIAL_SCREEN_MODE_STORAGE_KEY = '@rpcheff_mobile:last_initial_screen_mode';
@@ -227,6 +229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartRef = useRef<CartItem[]>([]);
   const activeTableRef = useRef<TableOrder | null>(null);
   const userRef = useRef<UserProfile | null>(null);
+  const openTableInFlightRef = useRef<Map<string, Promise<TableOrder>>>(new Map());
   const isSyncRunningRef = useRef(false);
   const syncErrorCountRef = useRef(0);
   const pendingSyncErrorCountRef = useRef(0);
@@ -1262,6 +1265,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     nomeMesaComanda?: string,
     tableTypeHint?: 'mesa' | 'comanda'
   ) => {
+    // Abertura deduplicada: o Cardapio dispara a abertura em segundo plano e o
+    // Lancamento dispara a dele logo em seguida - sem isso sao DOIS POSTs de
+    // abertura correndo contra o check-then-insert do servidor (duas vendas
+    // abertas na mesma mesa). Chamadas concorrentes da mesma mesa compartilham
+    // a MESMA promise; ao concluir (ou falhar), a proxima chamada cria outra.
+    const inFlightKey = `${tableTypeHint || appSettings.modoExibicao || 'mesa'}:${tableId}`;
+    const inFlight = openTableInFlightRef.current.get(inFlightKey);
+    if (inFlight) {
+      return inFlight;
+    }
+    const task = openTableByCardInner(tableId, nomeMesaComanda, tableTypeHint);
+    openTableInFlightRef.current.set(inFlightKey, task);
+    try {
+      return await task;
+    } finally {
+      openTableInFlightRef.current.delete(inFlightKey);
+    }
+  };
+
+  const openTableByCardInner = async (
+    tableId: number,
+    nomeMesaComanda?: string,
+    tableTypeHint?: 'mesa' | 'comanda'
+  ) => {
     const nomeInformado = String(nomeMesaComanda || '').trim();
     let mode = appSettings.modoExibicao || 'mesa';
     if (tableTypeHint) {
@@ -1384,7 +1411,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       logSyncDiagnostic(`fluxo pendencias itens enviados idVenda=${table.idVenda}`);
       clearCart();
-      await refreshDashboard();
+      // Performance: os itens ja foram confirmados pelo POST e o carrinho ja
+      // foi limpo - a atualizacao do painel roda em segundo plano (o
+      // auto-refresh periodico cobriria de qualquer forma).
+      void refreshDashboard().catch(() => null);
       retryPendingAfterFailureRef.current = false;
       logSyncDiagnostic(`fluxo pendencias fim ok idVenda=${table.idVenda} em ${Date.now() - startedAt}ms`);
       return true;
