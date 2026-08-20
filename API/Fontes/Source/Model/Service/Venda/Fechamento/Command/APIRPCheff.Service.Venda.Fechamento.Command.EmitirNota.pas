@@ -19,6 +19,7 @@ type
     class(TAPIRPCheffServiceVendaFechamentoCommand)
   private
     function DeveEmitirNota(const AFechamento: TAPIRPCheffEntityVendaPostFechamento): Boolean;
+    function DeveImprimirNaImpressoraWindows(const AFechamento: TAPIRPCheffEntityVendaPostFechamento): Boolean;
     procedure Imprimir(const ANota: TRPNFeEntityNFeNotaEletronica);
   public
     // Publica (class function) para a reemissao usar a MESMA traducao de
@@ -55,6 +56,12 @@ begin
   end;
 end;
 
+function TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.DeveImprimirNaImpressoraWindows(
+  const AFechamento: TAPIRPCheffEntityVendaPostFechamento): Boolean;
+begin
+  Result := not (AFechamento.tipoMaquina in [tmpStone, tmpPlugPag, tmpCielo]);
+end;
+
 procedure TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.Execute(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
 var
   LNotaEletronica: TRPNFeEntityNFeNotaEletronica;
@@ -64,9 +71,8 @@ begin
     Exit;
 
   // A emissao NAO pode derrubar o fechamento: se a SEFAZ rejeitar ou faltar
-  // certificado/rede, a venda fecha mesmo assim e registramos um aviso para o
-  // operador reemitir depois. (A venda fica sem VEN_038/VEN_SATSTATUS=23, que
-  // ja sinaliza pendencia fiscal no banco.)
+  // certificado/rede, a venda fecha mesmo assim e retorna aviso para o app.
+  // O botao "Emitir depois" grava a NFC-e em contingencia para envio posterior.
   try
     FParent.Components.RPNFe.Service.EmissaoService
       .Configuracao(APP_RESOURCES.NFE_XML_CONFIGURACAO)
@@ -80,12 +86,14 @@ begin
       .CertArquivo(APP_RESOURCES.NFCE_CERT_ARQUIVO)
       .CertSenha(APP_RESOURCES.NFCE_CERT_SENHA)
       .CertSerie(APP_RESOURCES.NFCE_CERT_SERIE)
+      .Contingencia(False)
       .IdVenda(FParent.Venda.idVenda);
 
     LNotaEletronica := FParent.Components.RPNFe.Service.EmissaoService.Execute;
     try
       try
-        Imprimir(LNotaEletronica);
+        if DeveImprimirNaImpressoraWindows(AFechamento) then
+          Imprimir(LNotaEletronica);
       except
       end;
     finally
@@ -93,7 +101,9 @@ begin
     end;
   except
     on E: Exception do
+    begin
       FParent.NotaFiscalAviso := TraduzirErroEmissao(E.Message);
+    end;
   end;
 end;
 

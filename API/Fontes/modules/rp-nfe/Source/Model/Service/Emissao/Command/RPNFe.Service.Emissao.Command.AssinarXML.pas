@@ -52,6 +52,21 @@ begin
   begin
     LMotivo := LMotivo.Replace(#$D#$A, ' ').Replace(#$D, ' ').Replace(#$A, ' ');
     Log('XML Inválido: %s', [LMotivo]);
+
+    if FParent.Contingencia then
+    begin
+      if (Pos('NCM', UpperCase(LMotivo)) > 0) or
+         (Pos('CFOP', UpperCase(LMotivo)) > 0) or
+         (Pos('GTIN', UpperCase(LMotivo)) > 0) or
+         (Pos('CEAN', UpperCase(LMotivo)) > 0) or
+         (Pos('CST', UpperCase(LMotivo)) > 0) or
+         (Pos('CSOSN', UpperCase(LMotivo)) > 0) then
+      begin
+        Log('Contingencia offline: erro fiscal cadastral mantido para correcao e envio posterior.');
+        Exit;
+      end;
+    end;
+
     raise Exception.Create(LMotivo);
   end;
 

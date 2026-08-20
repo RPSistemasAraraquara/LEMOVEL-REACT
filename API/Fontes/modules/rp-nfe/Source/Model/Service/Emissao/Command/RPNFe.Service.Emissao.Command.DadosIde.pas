@@ -62,8 +62,8 @@ var
   LNFe: TNFe;
 begin
   inherited;
-  if FParent.Components.Emissor.ACBr.NotasFiscais.Count = 0 then
-    FParent.Components.Emissor.ACBr.NotasFiscais.Add;
+  FParent.Components.Emissor.ACBr.NotasFiscais.Clear;
+  FParent.Components.Emissor.ACBr.NotasFiscais.Add;
 
   LNFe := FParent.Components.Emissor.ACBr.NotasFiscais.Items[0].NFe;
   LNFe.Ide.natOp := 'VENDA';
@@ -71,6 +71,14 @@ begin
   LNFe.Ide.dEmi := Now;
   LNFe.Ide.tpNF := tnSaida;
   LNFe.Ide.tpEmis := teNormal;
+  FParent.Components.Emissor.ACBr.Configuracoes.Geral.FormaEmissao := teNormal;
+  if FParent.Contingencia then
+  begin
+    LNFe.Ide.tpEmis := teOffLine;
+    LNFe.Ide.dhCont := Now;
+    LNFe.Ide.xJust := FParent.Configuracao.JustificativaContingencia;
+    FParent.Components.Emissor.ACBr.Configuracoes.Geral.FormaEmissao := teOffLine;
+  end;
   LNFe.Ide.cUF := UFtoCUF(FParent.Empresa.UF);
   LNFe.Ide.cMunFG := StrToInt(FParent.Empresa.CodigoIBGE.Replace('.', EmptyStr));
   LNFe.Ide.finNFe := fnNormal;

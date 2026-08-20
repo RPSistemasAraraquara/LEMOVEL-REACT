@@ -22,6 +22,7 @@ type
     procedure CarregarConfiguracao;
     procedure CarregarVenda;
     procedure CalcularTaxaServico;
+    procedure ValidarVenda;
   public
     destructor Destroy; override;
 
@@ -102,6 +103,7 @@ end;
 procedure TAPIRPCheffServiceVendaPreFechamento.Execute;
 begin
   CarregarVenda;
+  ValidarVenda;
   CarregarConfiguracao;
   FDAO.VendaDAO.PreFechamento(FPatch);
   CalcularTaxaServico;
@@ -111,6 +113,18 @@ function TAPIRPCheffServiceVendaPreFechamento.Patch(const AValue: TAPIRPCheffEnt
 begin
   Result := Self;
   FPatch := AValue;
+end;
+
+procedure TAPIRPCheffServiceVendaPreFechamento.ValidarVenda;
+begin
+  if not Assigned(FVenda) then
+    raise Exception.CreateFmt('Venda %d nao encontrada.', [FPatch.idVenda]);
+
+  if FVenda.situacao <> svPendente then
+    raise EConflictError.CreateFmt(
+      'Venda %d nao pode ser pre-fechada porque esta com situacao %s.',
+      [FPatch.idVenda, FVenda.situacao.Description]
+    );
 end;
 
 end.

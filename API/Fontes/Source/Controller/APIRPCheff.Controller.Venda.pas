@@ -47,6 +47,7 @@ type
     [SwagParamBody('preFechamento', TAPIRPCheffEntityVendaPatchPreFechamento)]
     [SwagProduces('text/plain')]
     [SwagResponse(202)]
+    [SwagResponse(409)]
     procedure ExecutarPreFechamento;
 
     [SwagPOST('{idVenda}/fechamento', 'Fechamento da venda')]
@@ -54,6 +55,7 @@ type
     [SwagParamBody('fechamento', TAPIRPCheffEntityVendaPostFechamento)]
     [SwagProduces('text/plain')]
     [SwagResponse(202)]
+    [SwagResponse(409)]
     procedure FecharVenda;
 
     [SwagPOST('{idVenda}/nfce/reemitir', 'Reemitir NFC-e de venda fechada sem nota')]
@@ -61,6 +63,12 @@ type
     [SwagResponse(200)]
     [SwagResponse(400)]
     procedure ReemitirNFCe;
+
+    [SwagPOST('{idVenda}/nfce/emitirDepois', 'Emitir NFC-e em contingencia para envio posterior')]
+    [SwagParamPath('idVenda', 'Id da Venda')]
+    [SwagResponse(200)]
+    [SwagResponse(400)]
+    procedure EmitirNFCeDepois;
 
     [SwagPATCH('{idVenda}/nome', 'Atualizar Nome Mesa/Comanda')]
     [SwagParamPath('idVenda', 'Id da Venda')]
@@ -261,9 +269,17 @@ begin
     if (LPreFechamento.numeroPessoas < LPreFechamento.NumeroCouvert) then
       LPreFechamento.numeroPessoas := LPreFechamento.NumeroCouvert;
 
-    Controller.Service.VendaPreFechamentoService
-      .Patch(LPreFechamento)
-      .Execute;
+    try
+      Controller.Service.VendaPreFechamentoService
+        .Patch(LPreFechamento)
+        .Execute;
+    except
+      on E: EConflictError do
+      begin
+        FResponse.Status(409);
+        raise;
+      end;
+    end;
     if Pos('text/plain', LAccept) > 0 then
       ConsultarTextPlain;
     FResponse.Status(202);
@@ -294,15 +310,24 @@ begin
   try
     LFechamento.idEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
     LFechamento.idVenda := LIdVenda;
+    LFechamento.tipoMaquina := LTipoMaquina;
     if BloquearImpressoraWindows(LTipoMaquina) then
       LFechamento.impressoraInterna := False;
     LIdUsuarioHeader := Self.IdUsuario;
     if LIdUsuarioHeader > 0 then
       LFechamento.idUsuario := LIdUsuarioHeader;
 
-    Controller.Service.VendaFechamentoService
-      .Fechamento(LFechamento)
-      .Execute;
+    try
+      Controller.Service.VendaFechamentoService
+        .Fechamento(LFechamento)
+        .Execute;
+    except
+      on E: EConflictError do
+      begin
+        FResponse.Status(409);
+        raise;
+      end;
+    end;
 
     // NFC-e nao-fatal: se nao emitiu, avisa o app (venda ja foi fechada).
     if Controller.Service.VendaFechamentoService.NotaFiscalAviso <> '' then
@@ -328,12 +353,14 @@ var
   LIdEmpresa: Integer;
   LIdVenda: Integer;
   LCpfCnpjNota: string;
+  LTipoMaquina: TRPTipoMaquinaPagamento;
   LBody: TJSONObject;
   LService: TAPIRPCheffServiceVendaReemitirNota;
   LResposta: TJSONObject;
 begin
   LIdEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
   LIdVenda := FRequest.Params.Field('idVenda').AsInteger;
+  LTipoMaquina := TipoMaquinaPagamentoRequest;
 
   // Body opcional: {"cpfCnpjNota":"..."} sobrepoe o CPF gravado no fechamento.
   LCpfCnpjNota := '';
@@ -355,6 +382,7 @@ begin
         .DAO(Controller.DAO.IdEmpresa(LIdEmpresa))
         .Components(Controller.Components)
         .IdVenda(LIdVenda)
+        .TipoMaquina(LTipoMaquina)
         .CpfCnpjNota(LCpfCnpjNota)
         .Execute;
 
@@ -362,6 +390,65 @@ begin
       LResposta.AddPair('chave', LService.Chave);
       LResposta.AddPair('numero', TJSONNumber.Create(LService.Numero));
       LResposta.AddPair('mensagem', 'NFC-e emitida com sucesso.');
+      FResponse.Send<TJSONObject>(LResposta).Status(200);
+    except
+      on E: Exception do
+      begin
+        LResposta := TJSONObject.Create;
+        LResposta.AddPair('error', E.Message);
+        FResponse.Send<TJSONObject>(LResposta).Status(400);
+      end;
+    end;
+  finally
+    FreeAndNil(LService);
+  end;
+end;
+
+procedure TAPIRPCheffControllerVenda.EmitirNFCeDepois;
+var
+  LIdEmpresa: Integer;
+  LIdVenda: Integer;
+  LCpfCnpjNota: string;
+  LMensagemErro: string;
+  LBody: TJSONObject;
+  LService: TAPIRPCheffServiceVendaEmitirNotaContingencia;
+  LResposta: TJSONObject;
+begin
+  LIdEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
+  LIdVenda := FRequest.Params.Field('idVenda').AsInteger;
+
+  LCpfCnpjNota := '';
+  LMensagemErro := '';
+  if FRequest.Body <> '' then
+  begin
+    LBody := TJSONObject.ParseJSONValue(FRequest.Body) as TJSONObject;
+    try
+      if Assigned(LBody) then
+      begin
+        LCpfCnpjNota := LBody.GetValue<string>('cpfCnpjNota', '');
+        LMensagemErro := LBody.GetValue<string>('mensagemErro', '');
+      end;
+    finally
+      LBody.Free;
+    end;
+  end;
+
+  LService := TAPIRPCheffServiceVendaEmitirNotaContingencia.Create;
+  try
+    try
+      LService
+        .DAO(Controller.DAO.IdEmpresa(LIdEmpresa))
+        .Components(Controller.Components)
+        .IdVenda(LIdVenda)
+        .IdUsuario(Self.IdUsuario)
+        .CpfCnpjNota(LCpfCnpjNota)
+        .MensagemErroOriginal(LMensagemErro)
+        .Execute;
+
+      LResposta := TJSONObject.Create;
+      LResposta.AddPair('chave', LService.Chave);
+      LResposta.AddPair('numero', TJSONNumber.Create(LService.Numero));
+      LResposta.AddPair('mensagem', 'NFC-e em contingência gravada para envio posterior.');
       FResponse.Send<TJSONObject>(LResposta).Status(200);
     except
       on E: Exception do

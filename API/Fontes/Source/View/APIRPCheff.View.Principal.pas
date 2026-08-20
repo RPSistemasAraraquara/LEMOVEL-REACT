@@ -278,12 +278,23 @@ begin
 end;
 
 procedure TAPIRPCheffViewPrincipal.FormCreate(Sender: TObject);
+var
+  LIndex: Integer;
 begin
   PageControl1.ActivePage := TabConfiguracaoAPI;
   FController := TAPIRPCheffController.Create;
   CarregarCodigosPagina;
   MontarListaImpressoras;
   CarregarConfiguracoes;
+  for LIndex := 1 to ParamCount do
+  begin
+    if SameText(ParamStr(LIndex), '--start') or SameText(ParamStr(LIndex), '/start') then
+    begin
+      SalvarConfiguracoes;
+      StartServer;
+      Break;
+    end;
+  end;
   GerenciarInformacoes;
   //LerConfiguracaoNFe;
 end;

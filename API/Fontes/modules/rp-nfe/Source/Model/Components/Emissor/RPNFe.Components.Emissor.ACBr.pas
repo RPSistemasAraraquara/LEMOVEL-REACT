@@ -182,6 +182,7 @@ begin
 
   ForceDirectories(AConfig.PathSchemas);
   ForceDirectories(AConfig.PathNFe);
+  ForceDirectories(AConfig.PathNFeContingencia);
   ForceDirectories(AConfig.PathLog);
   ConfigurarCertificado(AConfig);
 end;

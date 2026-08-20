@@ -2,7 +2,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
   Left = 0
   Top = 0
   BorderStyle = bsDialog
-  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 18.0.0.3'
+  Caption = 'RP Cheff Gar'#231'om API Vers'#227'o 18.0.0.4'
   ClientHeight = 537
   ClientWidth = 629
   Color = clBtnFace
@@ -29,7 +29,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
         Left = 0
         Top = 0
         Width = 621
-        Height = 218
+        Height = 380
         Align = alClient
         Caption = 'Impressora'
         TabOrder = 0
@@ -257,7 +257,7 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
       end
     end
     object TabNFe: TTabSheet
-      Caption = 'NFe'
+      Caption = 'NFC-e'
       ImageIndex = 2
       object LblConfiguracaoNFe: TLabel
         Left = 6
@@ -279,6 +279,89 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
         Height = 15
         Caption = 'Arquivo XML de Configura'#231#227'o'
       end
+      object Label12: TLabel
+        Left = 9
+        Top = 95
+        Width = 163
+        Height = 15
+        Caption = 'Diret'#243'rio dos Schemas (NFC-e)'
+      end
+      object LblNFCeSobreposicao: TLabel
+        Left = 9
+        Top = 150
+        Width = 311
+        Height = 15
+        Caption = 'Sobreposi'#231#227'o Fiscal NFC-e (opcional - vazio/0 usa o XML)'
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object LblNFCeIdCSC: TLabel
+        Left = 9
+        Top = 172
+        Width = 36
+        Height = 15
+        Caption = 'ID CSC'
+      end
+      object LblNFCeCSC: TLabel
+        Left = 199
+        Top = 172
+        Width = 22
+        Height = 15
+        Caption = 'CSC'
+      end
+      object LblNFCeAmbiente: TLabel
+        Left = 459
+        Top = 172
+        Width = 52
+        Height = 15
+        Caption = 'Ambiente'
+      end
+      object LblNFCeSerie: TLabel
+        Left = 9
+        Top = 226
+        Width = 25
+        Height = 15
+        Caption = 'S'#233'rie'
+      end
+      object LblNFCeNumero: TLabel
+        Left = 99
+        Top = 226
+        Width = 99
+        Height = 15
+        Caption = 'N'#250'mero (pr'#243'ximo)'
+      end
+      object LblNFCeCertTipo: TLabel
+        Left = 239
+        Top = 226
+        Width = 102
+        Height = 15
+        Caption = 'Tipo do Certificado'
+      end
+      object LblNFCeCertArquivo: TLabel
+        Left = 9
+        Top = 280
+        Width = 145
+        Height = 15
+        Caption = 'Arquivo do Certificado (A1)'
+      end
+      object LblNFCeCertSenha: TLabel
+        Left = 9
+        Top = 334
+        Width = 57
+        Height = 15
+        Caption = 'Senha (A1)'
+      end
+      object LblNFCeCertSerie: TLabel
+        Left = 259
+        Top = 334
+        Width = 113
+        Height = 15
+        Caption = 'N'#250'mero de S'#233'rie (A3)'
+      end
       object EdtNFeArquivoConfiguracao: TEdit
         Left = 9
         Top = 59
@@ -295,13 +378,6 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
         TabOrder = 1
         OnClick = BtnNFeProcurarArquivoConfiguracaoClick
       end
-      object Label12: TLabel
-        Left = 9
-        Top = 95
-        Width = 158
-        Height = 15
-        Caption = 'Diret'#243'rio dos Schemas (NFe)'
-      end
       object EdtNFeDiretorioSchemas: TEdit
         Left = 9
         Top = 114
@@ -317,82 +393,6 @@ object APIRPCheffViewPrincipal: TAPIRPCheffViewPrincipal
         Caption = '...'
         TabOrder = 3
         OnClick = BtnNFeProcurarDiretorioSchemasClick
-      end
-      object LblNFCeSobreposicao: TLabel
-        Left = 9
-        Top = 150
-        Width = 292
-        Height = 15
-        Caption = 'Sobreposi'#231#227'o Fiscal NFC-e (opcional - vazio/0 usa o XML)'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -12
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
-      end
-      object LblNFCeIdCSC: TLabel
-        Left = 9
-        Top = 172
-        Width = 37
-        Height = 15
-        Caption = 'ID CSC'
-      end
-      object LblNFCeCSC: TLabel
-        Left = 199
-        Top = 172
-        Width = 24
-        Height = 15
-        Caption = 'CSC'
-      end
-      object LblNFCeAmbiente: TLabel
-        Left = 459
-        Top = 172
-        Width = 52
-        Height = 15
-        Caption = 'Ambiente'
-      end
-      object LblNFCeSerie: TLabel
-        Left = 9
-        Top = 226
-        Width = 29
-        Height = 15
-        Caption = 'S'#233'rie'
-      end
-      object LblNFCeNumero: TLabel
-        Left = 99
-        Top = 226
-        Width = 99
-        Height = 15
-        Caption = 'N'#250'mero (pr'#243'ximo)'
-      end
-      object LblNFCeCertTipo: TLabel
-        Left = 239
-        Top = 226
-        Width = 100
-        Height = 15
-        Caption = 'Tipo do Certificado'
-      end
-      object LblNFCeCertArquivo: TLabel
-        Left = 9
-        Top = 280
-        Width = 148
-        Height = 15
-        Caption = 'Arquivo do Certificado (A1)'
-      end
-      object LblNFCeCertSenha: TLabel
-        Left = 9
-        Top = 334
-        Width = 59
-        Height = 15
-        Caption = 'Senha (A1)'
-      end
-      object LblNFCeCertSerie: TLabel
-        Left = 259
-        Top = 334
-        Width = 116
-        Height = 15
-        Caption = 'N'#250'mero de S'#233'rie (A3)'
       end
       object EdtNFCeIdCSC: TEdit
         Left = 9

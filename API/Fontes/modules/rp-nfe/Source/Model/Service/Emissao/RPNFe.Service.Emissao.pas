@@ -35,6 +35,7 @@ type
     FCertArquivo: string;
     FCertSenha: string;
     FCertSerie: string;
+    FContingencia: Boolean;
     FObservers: TObjectList<TRPNFeServiceEmissaoObserver>;
 
     procedure CarregarVenda;
@@ -69,6 +70,8 @@ type
     function CertArquivo(const AValue: string): TRPNFeServiceEmissao;
     function CertSenha(const AValue: string): TRPNFeServiceEmissao;
     function CertSerie(const AValue: string): TRPNFeServiceEmissao;
+    function Contingencia(AValue: Boolean): TRPNFeServiceEmissao; overload;
+    function Contingencia: Boolean; overload;
 
     function Execute: TRPNFeEntityNFeNotaEletronica;
 
@@ -311,6 +314,17 @@ function TRPNFeServiceEmissao.CertSerie(const AValue: string): TRPNFeServiceEmis
 begin
   Result := Self;
   FCertSerie := AValue;
+end;
+
+function TRPNFeServiceEmissao.Contingencia(AValue: Boolean): TRPNFeServiceEmissao;
+begin
+  Result := Self;
+  FContingencia := AValue;
+end;
+
+function TRPNFeServiceEmissao.Contingencia: Boolean;
+begin
+  Result := FContingencia;
 end;
 
 constructor TRPNFeServiceEmissao.Create;

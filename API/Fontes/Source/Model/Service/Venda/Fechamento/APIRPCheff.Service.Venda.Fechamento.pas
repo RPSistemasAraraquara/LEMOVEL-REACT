@@ -29,6 +29,7 @@ type
 
     procedure InicializarValores;
     procedure CarregarVenda;
+    procedure BloquearVendaParaFechamento;
     procedure ValidarTotalDeItens;
 
     procedure ExecuteCommands;
@@ -94,8 +95,11 @@ begin
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FFechamento.idVenda]);
 
-    if FVenda.situacao = svFinalizada then
-      raise Exception.CreateFmt('Venda %d j'#225' est'#225' finalizada.', [FFechamento.idVenda]);
+    if not (FVenda.situacao in [svPendente, svPreFechamento]) then
+      raise EConflictError.CreateFmt(
+        'Venda %d nao pode ser fechada porque esta com situacao %s.',
+        [FFechamento.idVenda, FVenda.situacao.Description]
+      );
 
     FreeAndNil(FVendaItens);
 
@@ -110,6 +114,11 @@ begin
   finally
     FreeAndNil(LServiceConsultaVenda);
   end;
+end;
+
+procedure TAPIRPCheffServiceVendaFechamento.BloquearVendaParaFechamento;
+begin
+  FDAO.VendaDAO.BloquearVendaParaFechamento(FFechamento);
 end;
 
 function TAPIRPCheffServiceVendaFechamento.Components: TAPIRPCheffComponents;
@@ -168,6 +177,7 @@ begin
   CarregarVenda;
   FDAO.StartTransaction;
   try
+    BloquearVendaParaFechamento;
     ExecuteCommands;
     FDAO.Commit;
   except

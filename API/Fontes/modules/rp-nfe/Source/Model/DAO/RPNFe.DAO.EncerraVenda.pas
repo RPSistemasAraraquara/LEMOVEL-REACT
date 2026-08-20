@@ -13,20 +13,29 @@ type
   protected
     function DataSetToEntity(ADataSet: TDataSet): TRPNFeEntityEncerraVenda; override;
   public
-    procedure AtualizarStatusSAT(AIdVenda, AStatus: Integer);
+    procedure AtualizarStatusSAT(AIdEmpresa, AIdVenda, AStatus: Integer);
   end;
 
 implementation
 
 { TRPNFeDAOEncerraVenda }
 
-procedure TRPNFeDAOEncerraVenda.AtualizarStatusSAT(AIdVenda, AStatus: Integer);
+procedure TRPNFeDAOEncerraVenda.AtualizarStatusSAT(AIdEmpresa, AIdVenda, AStatus: Integer);
 begin
-  Query.SQL('update encerraVenda set ven_satStatus = :status')
-    .SQL('where ven_001 = :idVenda')
-    .ParamAsInteger('status', AStatus)
-    .ParamAsInteger('idVenda', AIdVenda)
-    .ExecSQL;
+  StartTransaction;
+  try
+    Query.SQL('update encerraVenda set ven_satStatus = :status')
+      .SQL('where ven_001 = :idVenda')
+      .SQL('and emp_001 = :idEmpresa')
+      .ParamAsInteger('status', AStatus)
+      .ParamAsInteger('idVenda', AIdVenda)
+      .ParamAsInteger('idEmpresa', AIdEmpresa)
+      .ExecSQL;
+    Commit;
+  except
+    Rollback;
+    raise;
+  end;
 end;
 
 function TRPNFeDAOEncerraVenda.DataSetToEntity(ADataSet: TDataSet): TRPNFeEntityEncerraVenda;

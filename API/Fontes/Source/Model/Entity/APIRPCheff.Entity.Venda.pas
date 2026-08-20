@@ -199,6 +199,7 @@ type
     FCobrarTaxaGarcom            : Boolean;
     FopcaoFiscal                 : Integer;
     FcpfCnpjNota                 : string;
+    FtipoMaquina                 : TRPTipoMaquinaPagamento;
   public
     constructor Create;
     destructor Destroy; override;
@@ -231,6 +232,8 @@ type
     // CPF/CNPJ do consumidor para a NFC-e (so digitos; vazio = sem
     // identificacao). Validado no app; gravado em encerravenda.ven_cpfconsum.
     property cpfCnpjNota: string read FcpfCnpjNota write FcpfCnpjNota;
+    [SwagIgnore]
+    property tipoMaquina: TRPTipoMaquinaPagamento read FtipoMaquina write FtipoMaquina;
 
   end;
 
@@ -339,6 +342,7 @@ begin
   Fpagamentos := TObjectList<TAPIRPCheffEntityVendaPostFechamentoPagamento>.Create;
   FimprimirPreFechamentoMobile := False;
   FimpressoraInterna := False;
+  FtipoMaquina := tmpNenhum;
 end;
 
 destructor TAPIRPCheffEntityVendaPostFechamento.Destroy;

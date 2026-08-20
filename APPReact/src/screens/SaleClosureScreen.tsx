@@ -116,6 +116,18 @@ const toDisplayStatus = (value?: string): string => {
   return 'Sem situação';
 };
 
+const isSaleStateConflictMessage = (message: string): boolean => {
+  const normalized = normalizeSaleStatus(message).toLowerCase();
+  return (
+    normalized.includes('nao pode ser pre-fechada') ||
+    normalized.includes('nao pode ser fechada') ||
+    normalized.includes('ja esta finalizada') ||
+    normalized.includes('ja foi fechada') ||
+    normalized.includes('situacao finalizada') ||
+    normalized.includes('situacao pre-fechamento')
+  );
+};
+
 const ClosureSection = ({
   eyebrow,
   title,
@@ -491,7 +503,9 @@ export const SaleClosureScreen: React.FC = () => {
   const reemitirNfceComImpressao = async (idVendaReemitir: number): Promise<boolean> => {
     try {
       showPrintProcessing('Reemitindo NFC-e...');
-      const resultado = await api.reemitirNfce(idVendaReemitir);
+      const resultado = await api.reemitirNfce(idVendaReemitir, {
+        tipoMaquina: resolveMachineType(appSettings, true)
+      });
       logSyncDiagnostic(`reemissao nfce ok idVenda=${idVendaReemitir} numero=${resultado.numero}`);
       hidePrintProcessing();
 
@@ -533,6 +547,68 @@ export const SaleClosureScreen: React.FC = () => {
     }
   };
 
+  const emitirNfceDepois = async (idVendaEmitirDepois: number, mensagemErro = ''): Promise<boolean> => {
+    try {
+      showPrintProcessing('Gravando NFC-e para envio posterior...');
+      const resultado = await api.emitirNfceDepois(idVendaEmitirDepois, mensagemErro);
+      hidePrintProcessing();
+      logSyncDiagnostic(`nfce contingencia gravada idVenda=${idVendaEmitirDepois} numero=${resultado.numero}`);
+
+      try {
+        showPrintProcessing('Imprimindo NFC-e em contingência...');
+        await executeSalePrint({
+          idVenda: idVendaEmitirDepois,
+          appSettings,
+          usarRotaMaquininha: true
+        });
+        hidePrintProcessing();
+        setActionStatus({
+          kind: 'success',
+          message: `NFC-e em contingência gravada e impressa. Nº ${resultado.numero}.`
+        });
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            'NFC-e',
+            `NFC-e em contingência gravada e impressa.\nNúmero: ${resultado.numero}`,
+            [{ text: 'OK', onPress: () => resolve() }],
+            { cancelable: false }
+          );
+        });
+      } catch (printError: any) {
+        hidePrintProcessing();
+        setActionStatus({
+          kind: 'success',
+          message: `NFC-e em contingência gravada. Impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`
+        });
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            'NFC-e',
+            `NFC-e em contingência gravada, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
+            [{ text: 'OK', onPress: () => resolve() }],
+            { cancelable: false }
+          );
+        });
+      }
+
+      return true;
+    } catch (error: any) {
+      hidePrintProcessing();
+      logSyncDiagnostic(
+        `nfce contingencia falhou idVenda=${idVendaEmitirDepois}: ${error?.message || 'erro'}`,
+        2
+      );
+      await new Promise<void>((resolve) => {
+        Alert.alert(
+          'NFC-e não gravada',
+          error?.message || 'Não foi possível gravar a NFC-e para envio posterior.',
+          [{ text: 'OK', onPress: () => resolve() }],
+          { cancelable: false }
+        );
+      });
+      return false;
+    }
+  };
+
   const showSweetAlert = (
     title: string,
     message: string,
@@ -560,6 +636,45 @@ export const SaleClosureScreen: React.FC = () => {
     setFem(String(minimumCouvert.feminino));
     setActionStatus({ kind: 'error', message: reductionMessage });
     showSweetAlert('Atenção', reductionMessage, 'warning');
+    return false;
+  };
+
+  const ensureFinalSaleStillOpen = async (): Promise<boolean> => {
+    if (mode !== 'final' || !idVenda) {
+      return true;
+    }
+
+    setActionStatus({ kind: 'info', message: 'Conferindo situação atual da venda...' });
+    const latestSale = await api.getSale(idVenda, false);
+    const latestStatus = normalizeSaleStatus(latestSale?.situacao || '');
+    const canCloseLatestSale =
+      Boolean(latestSale) &&
+      (latestStatus.includes('pendente') || latestStatus.includes('prefechamento'));
+
+    if (canCloseLatestSale) {
+      setSale((current) =>
+        current
+          ? {
+              ...current,
+              situacao: latestSale?.situacao ?? current.situacao
+            }
+          : latestSale
+      );
+      setActionStatus({ kind: 'info', message: 'Fechando venda...' });
+      return true;
+    }
+
+    if (latestSale) {
+      setSale(latestSale);
+    }
+    refreshDashboard().catch(() => null);
+    loadData().catch(() => null);
+
+    const message = latestSale
+      ? `Venda #${idVenda} não pode ser fechada porque está com situação ${toDisplayStatus(latestSale.situacao)}.`
+      : `Venda ${idVenda} não encontrada.`;
+    setActionStatus({ kind: 'error', message });
+    Alert.alert('Atenção', message);
     return false;
   };
 
@@ -868,7 +983,11 @@ export const SaleClosureScreen: React.FC = () => {
     );
     setActionStatus({ kind: 'info', message: mode === 'pre' ? 'Salvando pré-fechamento...' : 'Fechando venda...' });
     try {
-    if (mode === 'pre') {
+      if (!(await ensureFinalSaleStillOpen())) {
+        return;
+      }
+
+      if (mode === 'pre') {
       if (!idUsuario || idUsuario <= 0) {
         setActionStatus({ kind: 'error', message: 'Usuário não identificado para executar pré-fechamento.' });
         Alert.alert('Atenção', 'Usuário não identificado para executar pré-fechamento.');
@@ -1260,16 +1379,21 @@ export const SaleClosureScreen: React.FC = () => {
             : 'Venda fechada com sucesso.'
       });
       logSyncDiagnostic(`fluxo fechamento final fim ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
-      // NFC-e nao emitida: oferece a reemissao NA HORA (antes de navegar,
-      // senao a tela desmonta e os modais de progresso somem). O operador
-      // pode tentar quantas vezes precisar ou deixar para depois.
+      // NFC-e nao emitida: oferece a reemissao NA HORA ou grava a contingencia
+      // antes de navegar, para a venda aparecer no envio posterior do desktop.
       if (nfceAviso) {
         let tentarReemitir = await new Promise<boolean>((resolve) => {
           Alert.alert(
             'Atenção — NFC-e',
             `A venda foi fechada, mas a nota fiscal não foi emitida.\n\n${nfceAviso}`,
             [
-              { text: 'Depois', onPress: () => resolve(false) },
+              {
+                text: 'Emitir depois',
+                onPress: async () => {
+                  await emitirNfceDepois(idVenda, nfceAviso);
+                  resolve(false);
+                }
+              },
               { text: 'Reemitir agora', onPress: () => resolve(true) }
             ],
             { cancelable: false }
@@ -1285,7 +1409,13 @@ export const SaleClosureScreen: React.FC = () => {
               'NFC-e não emitida',
               'Deseja tentar reemitir novamente?',
               [
-                { text: 'Depois', onPress: () => resolve(false) },
+                {
+                  text: 'Emitir depois',
+                  onPress: async () => {
+                    await emitirNfceDepois(idVenda, nfceAviso);
+                    resolve(false);
+                  }
+                },
                 { text: 'Tentar de novo', onPress: () => resolve(true) }
               ],
               { cancelable: false }
@@ -1295,12 +1425,18 @@ export const SaleClosureScreen: React.FC = () => {
       }
       goToInitial();
     } catch (error: any) {
+      const errorMessage = error?.message || 'Não foi possível concluir a operação.';
+      const saleStateConflict = isSaleStateConflictMessage(errorMessage);
       logSyncDiagnostic(
-        `fluxo fechamento salvar erro idVenda=${idVenda} modo=${mode}: ${error?.message || 'erro desconhecido'}`,
+        `fluxo fechamento salvar erro idVenda=${idVenda} modo=${mode}: ${errorMessage}`,
         2
       );
-      setActionStatus({ kind: 'error', message: error?.message || 'Não foi possível concluir a operação.' });
-      Alert.alert('Erro', error?.message || 'Não foi possível concluir a operação.');
+      if (saleStateConflict) {
+        refreshDashboard().catch(() => null);
+        loadData().catch(() => null);
+      }
+      setActionStatus({ kind: 'error', message: errorMessage });
+      Alert.alert(saleStateConflict ? 'Atenção' : 'Erro', errorMessage);
     } finally {
       setSaving(false);
     }
@@ -2700,5 +2836,3 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   }
 });
-
-

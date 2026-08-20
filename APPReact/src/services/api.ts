@@ -573,9 +573,7 @@ const fallbackTables: TableOrder[] = [
 ];
 
 export const defaultMobileSettings: MobileAppSettings = {
-  // TESTE LOCAL: apontando para a maquina do dev (192.168.15.35:9000).
-  // >>> REVERTER para 'https://mobile.rpfood.com.br' antes de gerar producao <<<
-  baseUrl: 'http://192.168.15.35:9000',
+  baseUrl: 'https://mobile.rpfood.com.br',
   empresaId: 1,
   terminalImpressao: 'PB3S249E76533',
   numeroMaquina: '1',
@@ -5016,12 +5014,20 @@ export class ApiClient {
   // Reemite a NFC-e de uma venda FECHADA que ficou sem nota (rejeicao da
   // SEFAZ, queda de rede). O servidor aloca numeracao nova e valida se a
   // venda ja tem nota autorizada. Nao-idempotente: sem retry automatico.
-  async reemitirNfce(idVenda: number): Promise<{ chave: string; numero: number }> {
+  async reemitirNfce(
+    idVenda: number,
+    options: { tipoMaquina?: MachinePaymentType } = {}
+  ): Promise<{ chave: string; numero: number }> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (options.tipoMaquina) {
+      headers.tipoMaquina = options.tipoMaquina;
+    }
+    const queryMachine = options.tipoMaquina ? `?tipoMaquina=${encodeURIComponent(options.tipoMaquina)}` : '';
     const { response, payload } = await this.request(
-      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/nfce/reemitir`,
+      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/nfce/reemitir${queryMachine}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: '{}',
         timeoutMs: 120000,
         noRetry: true
@@ -5029,6 +5035,30 @@ export class ApiClient {
     );
     if (!response.ok) {
       throw new Error(extractApiErrorMessage(payload, 'Não foi possível reemitir a NFC-e.'));
+    }
+    const data = (payload || {}) as Record<string, unknown>;
+    return {
+      chave: sanitizeText(data.chave, ''),
+      numero: parseNumber(data.numero, 0)
+    };
+  }
+
+  async emitirNfceDepois(idVenda: number, mensagemErro = ''): Promise<{ chave: string; numero: number }> {
+    const requestPayload = mensagemErro.trim()
+      ? { mensagemErro: mensagemErro.trim() }
+      : {};
+    const { response, payload } = await this.request(
+      `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}/nfce/emitirDepois`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+        timeoutMs: 120000,
+        noRetry: true
+      }
+    );
+    if (!response.ok) {
+      throw new Error(extractApiErrorMessage(payload, 'Não foi possível gravar a NFC-e para envio posterior.'));
     }
     const data = (payload || {}) as Record<string, unknown>;
     return {

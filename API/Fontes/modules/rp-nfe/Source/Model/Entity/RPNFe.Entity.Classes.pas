@@ -96,6 +96,7 @@ type
     FNumeroTentativasEmissao: Integer;
     FIntervaloEntreTentativas: Integer;
     FUtilizaResponsavelTecnico: Boolean;
+    FJustificativaContingencia: string;
     function GetTimeout: Integer;
   public
     constructor Create;
@@ -117,6 +118,7 @@ type
     property RetirarAcentos: Boolean read FRetirarAcentos write FRetirarAcentos;
     property NumeroTentativasEmissao: Integer read FNumeroTentativasEmissao write FNumeroTentativasEmissao;
     property IntervaloEntreTentativas: Integer read FIntervaloEntreTentativas write FIntervaloEntreTentativas;
+    property JustificativaContingencia: string read FJustificativaContingencia write FJustificativaContingencia;
     property PathSchemas: string read FPathSchemas write FPathSchemas;
     property PathLog: string read FPathLog write FPathLog;
     property PathNFe: string read FPathNFe write FPathNFe;
@@ -621,6 +623,7 @@ begin
   FRetirarAcentos := ASource.RetirarAcentos;
   FNumeroTentativasEmissao := ASource.NumeroTentativasEmissao;
   FIntervaloEntreTentativas := ASource.IntervaloEntreTentativas;
+  FJustificativaContingencia := ASource.JustificativaContingencia;
   FTimeout := ASource.Timeout;
   FModelo := ASource.Modelo;
   FPathNFe := ASource.PathNFe;
@@ -638,6 +641,7 @@ begin
   FProducao := False;
   FTimeout := 0;
   FModelo := 65;
+  FJustificativaContingencia := 'Problemas com a conexao de internet';
   LPathNFe := ExtractFilePath(GetModuleName(HInstance)) + 'NFe\';
   FPathSchemas := LPathNFe + 'Schemas\';
   FPathNFe := LPathNFe + 'Xml\NFe\';

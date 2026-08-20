@@ -20,6 +20,7 @@ type
     FOnSetNota: TProc<TRPNFeEntityNFeNotaEletronica>;
 
     function EmitirNota: TRPNFeEntityNFeNotaEletronica;
+    function EmitirContingencia: TRPNFeEntityNFeNotaEletronica;
     procedure SalvarRetorno;
     procedure SalvarXMLAutorizado(ANota: TRPNFeEntityNFeNotaEletronica);
   public
@@ -46,10 +47,17 @@ var
   LStatus: Integer;
 begin
   FNotaFiscal := FParent.Components.Emissor.ACBr.NotasFiscais[0];
+  if FParent.Contingencia then
+  begin
+    Result := EmitirContingencia;
+    Exit;
+  end;
+
   Result := TRPNFeEntityNFeNotaEletronica.Create;
   try
     Result.Serie := FNotaFiscal.NFe.Ide.serie;
     Result.NumeroNFe := FNotaFiscal.NFe.Ide.nNF;
+    Result.Modelo := FNotaFiscal.NFe.Ide.modelo;
     Result.Contingencia := False;
     Result.Erro := not FParent.Components.Emissor.ACBr.Enviar(1, False, True, False);
     if not Result.Erro then
@@ -94,6 +102,27 @@ begin
   Result.Motivo := LMotivo;
 end;
 
+function TRPNFeServiceEmissaoCommandEnviarNota.EmitirContingencia: TRPNFeEntityNFeNotaEletronica;
+begin
+  Result := TRPNFeEntityNFeNotaEletronica.Create;
+  try
+    Result.Serie := FNotaFiscal.NFe.Ide.serie;
+    Result.NumeroNFe := FNotaFiscal.NFe.Ide.nNF;
+    Result.Modelo := FNotaFiscal.NFe.Ide.modelo;
+    Result.Contingencia := True;
+    Result.Erro := False;
+    Result.DataAutorizacao := Now;
+    Result.ChaveNFe := Copy(FNotaFiscal.NFe.infNFe.ID, 4, 44);
+    Result.Protocolo := EmptyStr;
+    Result.Status := 0;
+    Result.Motivo := 'NFC-e emitida em contingencia offline.';
+    SalvarXMLAutorizado(Result);
+  except
+    FreeAndNil(Result);
+    raise;
+  end;
+end;
+
 procedure TRPNFeServiceEmissaoCommandEnviarNota.Execute;
 var
   LNotaEletronica: TRPNFeEntityNFeNotaEletronica;
@@ -130,6 +159,7 @@ procedure TRPNFeServiceEmissaoCommandEnviarNota.SalvarXMLAutorizado(ANota: TRPNF
 var
   LXml: string;
   LPath: string;
+  LBasePath: string;
   LDataEmissao: TDateTime;
 begin
   if ANota.Erro then
@@ -138,18 +168,27 @@ begin
   // O Xml da nota alimenta a impressao do DANFCe e a gravacao no banco: a
   // atribuicao NAO pode depender do sucesso da gravacao em disco.
   LXml := FNotaFiscal.XMLAssinado;
+  if Trim(LXml) = EmptyStr then
+    LXml := FNotaFiscal.GerarXML;
   LXml := FParent.Components.Emissor.FormatXmlContent(LXml);
+  if Trim(LXml) = EmptyStr then
+    raise Exception.Create('XML da NFC-e nao foi gerado.');
   ANota.Xml := LXml;
 
   try
     // Mesmo caminho/nome do desktop (uEmissorNFCe.CaminhoXMLVendaAutorizada):
     // <PathNFe>\yyyymm\<chave44>-nfe.xml. O desktop cancela/reimprime a partir
     // deste arquivo, entao o padrao precisa bater.
+    LBasePath := FParent.Configuracao.PathNFe;
+    if ANota.Contingencia then
+      LBasePath := FParent.Configuracao.PathNFeContingencia;
+
     LDataEmissao := ANota.DataAutorizacao;
     if LDataEmissao = 0 then
       LDataEmissao := Now;
-    LPath := Format('%s%s\%s-nfe.xml', [FParent.Configuracao.PathNFe,
+    LPath := Format('%s%s\%s-nfe.xml', [LBasePath,
       FormatDateTime('yyyymm', LDataEmissao), ANota.ChaveNFe]);
+    ANota.XmlPath := LPath;
 
     FParent.Components.Arquivos.Salvar(LXml, LPath);
   except

@@ -44,6 +44,9 @@ begin
           Result.RetirarAcentos := LoadBoolField(LDataSet, 'CKNFCERETIRARACENTOS');
           Result.NumeroTentativasEmissao := LoadIntField(LDataSet, 'EDNFCETENTATIVAS');
           Result.IntervaloEntreTentativas := LoadIntField(LDataSet, 'EDNFCEINTERVALO');
+          Result.JustificativaContingencia := Trim(LoadStrField(LDataSet, 'EDNFCEJUSTIFICATIVACONTINGENCIA'));
+          if Length(Result.JustificativaContingencia) < 15 then
+            Result.JustificativaContingencia := 'Problemas com a conexao de internet';
           Result.UtilizaResponsavelTecnico := LoadBoolField(LDataSet, 'CKUTILIZARCSRT');
           Result.CertificadoDigital.ArquivoPfx := LoadStrField(LDataSet, 'EDNFCECAMINHOCERTIFICADO');
           Result.CertificadoDigital.Senha := LoadStrField(LDataSet, 'EDNFCESENHACERTIFICADO');
@@ -82,7 +85,7 @@ begin
     Result.First;
   end
   else
-    raise Exception.Create('Não encontrado o arquivo CONFIGURACAO.XML na pasta da aplicação.');
+    raise Exception.Create('Nao encontrado o arquivo CONFIGURACAO.XML na pasta da aplicacao.');
 end;
 
 function TRPNFeDAOConfiguracao.LoadIntField(const ADataSet: TDataSet;

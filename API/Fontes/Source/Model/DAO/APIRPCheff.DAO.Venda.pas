@@ -24,8 +24,11 @@ type
     procedure AtualizarNomeMesaComanda(AIdVenda: Integer; ANome: string);
     procedure AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer); overload;
     procedure AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer; AValor, AValorTaxa, APercentualTaxa: Currency); overload;
+    procedure BloquearVendaParaFechamento(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
     procedure FinalizarVenda(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
     function AtualizarNumeroCupom(AIdVenda: Integer): Integer;
+    procedure RegistrarErroNFCeContingencia(AIdVenda, ANumeroNFCe, ASerieNFCe,
+      AIdUsuario: Integer; const ATipoErro, AMensagemErro: string);
     function Buscar(AIdVenda: Integer): TAPIRPCheffEntityVenda;
     function BuscarLote(const AIds: TArray<Integer>): TObjectList<TAPIRPCheffEntityVenda>;
     function BuscarComMesaAguardandoLimpeza(ANumeroMesa: Integer): TAPIRPCheffEntityVenda;
@@ -66,6 +69,33 @@ begin
   except
     Rollback;
     raise;
+  end;
+end;
+
+procedure TAPIRPCheffDAOVenda.BloquearVendaParaFechamento(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
+var
+  LDataSet: TDataSet;
+  LSituacao: TRPCheffSituacaoVenda;
+begin
+  LDataSet := Query.SQL('select sit_001 from venda')
+    .SQL('where ven_001 = :ven_001 and emp_001 = :emp_001')
+    .SQL('for update')
+    .ParamAsInteger('ven_001', AFechamento.idVenda)
+    .ParamAsInteger('emp_001', AFechamento.idEmpresa)
+    .OpenDataSet;
+  try
+    if LDataSet.RecordCount <= 0 then
+      raise Exception.CreateFmt('Venda %d nao encontrada.', [AFechamento.idVenda]);
+
+    LSituacao := svNull;
+    LSituacao.FromDBValue(LDataSet.FieldByName('sit_001').AsInteger);
+    if not (LSituacao in [svPendente, svPreFechamento]) then
+      raise EConflictError.CreateFmt(
+        'Venda %d nao pode ser fechada porque esta com situacao %s.',
+        [AFechamento.idVenda, LSituacao.Description]
+      );
+  finally
+    FreeAndNil(LDataSet);
   end;
 end;
 
@@ -123,6 +153,41 @@ begin
       .ParamAsInteger('cupom', Result)
       .ParamAsInteger('idEmpresa', FIdEmpresa)
       .ParamAsInteger('idVenda', AIdVenda)
+      .ExecSQL;
+    Commit;
+  except
+    Rollback;
+    raise;
+  end;
+end;
+
+procedure TAPIRPCheffDAOVenda.RegistrarErroNFCeContingencia(AIdVenda,
+  ANumeroNFCe, ASerieNFCe, AIdUsuario: Integer; const ATipoErro,
+  AMensagemErro: string);
+begin
+  StartTransaction;
+  try
+    Query.SQL('insert into nfce_contingencia_erros (')
+      .SQL('  id_empresa, data, numero_nfce, serie_nfce, id_venda,')
+      .SQL('  id_material, id_usuario, tipo_erro, mensagem_erro')
+      .SQL(')')
+      .SQL('select :idEmpresa, current_timestamp, :numeroNFCe, :serieNFCe, :idVenda,')
+      .SQL('  null, :idUsuario, :tipoErro, :mensagemErro')
+      .SQL('where not exists (')
+      .SQL('  select 1 from nfce_contingencia_erros')
+      .SQL('  where id_empresa = :idEmpresa')
+      .SQL('    and id_venda = :idVenda')
+      .SQL('    and numero_nfce = :numeroNFCe')
+      .SQL('    and serie_nfce = :serieNFCe')
+      .SQL('    and tipo_erro = :tipoErro')
+      .SQL(')')
+      .ParamAsInteger('idEmpresa', FIdEmpresa)
+      .ParamAsInteger('numeroNFCe', ANumeroNFCe)
+      .ParamAsInteger('serieNFCe', ASerieNFCe)
+      .ParamAsInteger('idVenda', AIdVenda)
+      .ParamAsInteger('idUsuario', AIdUsuario)
+      .ParamAsString('tipoErro', ATipoErro, True)
+      .ParamAsString('mensagemErro', AMensagemErro, True)
       .ExecSQL;
     Commit;
   except
@@ -525,9 +590,33 @@ begin
 end;
 
 procedure TAPIRPCheffDAOVenda.PreFechamento(APreFechamento: TAPIRPCheffEntityVendaPatchPreFechamento);
+var
+  LDataSet: TDataSet;
+  LSituacao: TRPCheffSituacaoVenda;
 begin
   StartTransaction;
   try
+    LDataSet := Query.SQL('select sit_001 from venda')
+      .SQL('where ven_001 = :ven_001 and emp_001 = :emp_001')
+      .SQL('for update')
+      .ParamAsInteger('ven_001', APreFechamento.idVenda)
+      .ParamAsInteger('emp_001', APreFechamento.idEmpresa)
+      .OpenDataSet;
+    try
+      if LDataSet.RecordCount <= 0 then
+        raise Exception.CreateFmt('Venda %d nao encontrada.', [APreFechamento.idVenda]);
+
+      LSituacao := svNull;
+      LSituacao.FromDBValue(LDataSet.FieldByName('sit_001').AsInteger);
+      if LSituacao <> svPendente then
+        raise EConflictError.CreateFmt(
+          'Venda %d nao pode ser pre-fechada porque esta com situacao %s.',
+          [APreFechamento.idVenda, LSituacao.Description]
+        );
+    finally
+      FreeAndNil(LDataSet);
+    end;
+
     Query.SQL('update venda set sit_001 = 21, nro_pessoas = :nro_pessoas,')
       .SQL('nro_couvert_f = :nro_couvert_f, nro_couvert_m = :nro_couvert_m,')
       .SQL('dat_001_2 = :data, usu_001_2 = :idUsuario, ')

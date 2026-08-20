@@ -16,7 +16,7 @@ type
   protected
     function DataSetToEntity(ADataSet: TDataSet): TRPNFeEntityVenda; override;
   public
-    procedure AtualizarEmissao(AIdVenda: Integer; ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
+    procedure AtualizarEmissao(AIdEmpresa, AIdVenda: Integer; ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
     function Buscar(AIdVenda: Integer): TRPNFeEntityVenda;
     function Xml(const AIdVenda: Integer): string;
   end;
@@ -25,21 +25,31 @@ implementation
 
 { TRPNFeDAOVenda }
 
-procedure TRPNFeDAOVenda.AtualizarEmissao(AIdVenda: Integer; ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
+procedure TRPNFeDAOVenda.AtualizarEmissao(AIdEmpresa, AIdVenda: Integer; ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
 begin
-  Query.SQL('update venda set ven_036 = :serie, ven_038 = :chaveNFe, ven_037 = :dataEmissao, ')
-    .SQL('numero_cupom = :numNFe, serie_cupom = :serie, nfce_contingencia = :contingencia,')
-    .SQL('tipoFiscal = :tipoFiscal, xml_cfe = :xml')
-    .SQL('where ven_001 = :idVenda')
-    .ParamAsInteger('idVenda', AIdVenda)
-    .ParamAsInteger('serie', ANotaEletronica.Serie)
-    .ParamAsString('chaveNFe', ANotaEletronica.ChaveNFe)
-    .ParamAsDateTime('dataEmissao', ANotaEletronica.DataAutorizacao)
-    .ParamAsInteger('numNFe', ANotaEletronica.NumeroNFe)
-    .ParamAsBoolean('contingencia', ANotaEletronica.Contingencia)
-    .ParamAsString('tipoFiscal', ANotaEletronica.ModeloDescription, True)
-    .ParamAsString('xml', ANotaEletronica.Xml, True)
-    .ExecSQL;
+  StartTransaction;
+  try
+    Query.SQL('update venda set ven_036 = :serie, ven_038 = :chaveNFe, ven_037 = :dataEmissao, ')
+      .SQL('numero_cupom = :numNFe, serie_cupom = :serie, nfce_contingencia = :contingencia,')
+      .SQL('tipoFiscal = :tipoFiscal, xml_cfe = :xml,')
+      .SQL('nfce_contingencia_enviada = false, nfce_inutilizada = false')
+      .SQL('where ven_001 = :idVenda')
+      .SQL('and emp_001 = :idEmpresa')
+      .ParamAsInteger('idEmpresa', AIdEmpresa)
+      .ParamAsInteger('idVenda', AIdVenda)
+      .ParamAsInteger('serie', ANotaEletronica.Serie)
+      .ParamAsString('chaveNFe', ANotaEletronica.ChaveNFe)
+      .ParamAsDateTime('dataEmissao', ANotaEletronica.DataAutorizacao)
+      .ParamAsInteger('numNFe', ANotaEletronica.NumeroNFe)
+      .ParamAsBoolean('contingencia', ANotaEletronica.Contingencia)
+      .ParamAsString('tipoFiscal', ANotaEletronica.ModeloDescription, True)
+      .ParamAsString('xml', ANotaEletronica.Xml, True)
+      .ExecSQL;
+    Commit;
+  except
+    Rollback;
+    raise;
+  end;
 end;
 
 function TRPNFeDAOVenda.Buscar(AIdVenda: Integer): TRPNFeEntityVenda;

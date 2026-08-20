@@ -407,11 +407,143 @@ public class RPCheffStoneModule extends ReactContextBaseJavaModule implements Ac
       throw new RemoteException("Serviço Positivo indisponível.");
     }
 
+    String receiptImageBase64 = extractReceiptImageBase64(content);
+    if (!receiptImageBase64.trim().isEmpty()) {
+      printPositivoImageReceipt(receiptImageBase64);
+      return;
+    }
+
     try {
       printPositivoBitmapReceipt(content);
     } catch (Throwable bitmapError) {
       printPositivoTextReceipt(content);
     }
+  }
+
+  private String extractReceiptImageBase64(String content) {
+    String raw = safePreserve(content).trim();
+    if (!raw.startsWith("[") && !raw.startsWith("{")) {
+      return "";
+    }
+
+    try {
+      Object parsed = new JSONTokener(raw).nextValue();
+      return findReceiptImageBase64(parsed);
+    } catch (JSONException ignored) {
+      return "";
+    }
+  }
+
+  private String findReceiptImageBase64(Object payload) throws JSONException {
+    if (payload == null || payload == JSONObject.NULL) {
+      return "";
+    }
+
+    if (payload instanceof JSONArray) {
+      JSONArray array = (JSONArray) payload;
+      for (int index = 0; index < array.length(); index++) {
+        String found = findReceiptImageBase64(array.opt(index));
+        if (!found.trim().isEmpty()) {
+          return found;
+        }
+      }
+      return "";
+    }
+
+    if (payload instanceof JSONObject) {
+      JSONObject command = (JSONObject) payload;
+      if (command.has("commands")) {
+        return findReceiptImageBase64(command.optJSONArray("commands"));
+      }
+      if (command.has("data")) {
+        return findReceiptImageBase64(command.optJSONArray("data"));
+      }
+
+      if ("image".equals(safeLower(command.optString("type")))) {
+        String imageBase64 = safePreserve(command.optString("imagePath"));
+        if (imageBase64.trim().isEmpty()) {
+          imageBase64 = safePreserve(command.optString("imageData"));
+        }
+        return imageBase64;
+      }
+    }
+
+    return "";
+  }
+
+  private void printPositivoImageReceipt(String imageBase64) throws RemoteException {
+    List<Bitmap> bitmaps = buildPositivoImageBitmapChunks(imageBase64);
+    if (bitmaps.isEmpty()) {
+      throw new RemoteException("Imagem de impressão vazia para Stone L400.");
+    }
+
+    try {
+      callXchengPrinterInit(positivoPrinterService, new XchengPrinterCallbackBinder(null));
+      printNextPositivoBitmapChunk(bitmaps, 0);
+    } catch (Throwable error) {
+      recycleBitmaps(bitmaps);
+      if (error instanceof RemoteException) {
+        throw (RemoteException) error;
+      }
+      throw new RemoteException(error.getMessage() == null ? "Falha ao imprimir NFC-e na Stone L400." : error.getMessage());
+    }
+  }
+
+  private List<Bitmap> buildPositivoImageBitmapChunks(String imageBase64) throws RemoteException {
+    List<Bitmap> chunks = new ArrayList<>();
+    Bitmap source = null;
+    Bitmap scaled = null;
+
+    try {
+      String raw = normalizeBase64Image(imageBase64);
+      if (raw.isEmpty()) {
+        throw new RemoteException("Imagem de impressão vazia para Stone L400.");
+      }
+
+      byte[] bytes = Base64.decode(raw, Base64.DEFAULT);
+      source = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+      if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0) {
+        throw new RemoteException("Imagem de impressão inválida para Stone L400.");
+      }
+
+      int targetWidth = SUNMI_PAPER_WIDTH;
+      int targetHeight = Math.max(1, Math.round(source.getHeight() * (targetWidth / (float) source.getWidth())));
+      if (source.getWidth() == targetWidth && source.getHeight() == targetHeight) {
+        scaled = source.copy(Bitmap.Config.ARGB_8888, false);
+      } else {
+        scaled = Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
+      }
+      if (scaled == null || scaled.getWidth() <= 0 || scaled.getHeight() <= 0) {
+        throw new RemoteException("Falha ao preparar imagem da NFC-e para Stone L400.");
+      }
+
+      int offsetY = 0;
+      while (offsetY < scaled.getHeight()) {
+        int chunkHeight = Math.min(POSITIVO_BITMAP_CHUNK_MAX_HEIGHT, scaled.getHeight() - offsetY);
+        chunks.add(Bitmap.createBitmap(scaled, 0, offsetY, targetWidth, chunkHeight));
+        offsetY += chunkHeight;
+      }
+      chunks.add(renderBlankReceiptBitmap(POSITIVO_BOTTOM_FEED_HEIGHT));
+      return chunks;
+    } catch (RemoteException error) {
+      recycleBitmaps(chunks);
+      throw error;
+    } catch (Throwable error) {
+      recycleBitmaps(chunks);
+      throw new RemoteException(error.getMessage() == null ? "Imagem de impressão inválida para Stone L400." : error.getMessage());
+    } finally {
+      recycleBitmap(scaled);
+      recycleBitmap(source);
+    }
+  }
+
+  private String normalizeBase64Image(String value) {
+    String normalized = safePreserve(value).trim();
+    int markerIndex = safeLower(normalized).indexOf("base64,");
+    if (markerIndex >= 0) {
+      return normalized.substring(markerIndex + "base64,".length()).trim();
+    }
+    return normalized;
   }
 
   private void printPositivoBitmapReceipt(String content) throws RemoteException, JSONException {

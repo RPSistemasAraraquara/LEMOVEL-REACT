@@ -868,17 +868,23 @@ public class RPCheffCieloModule extends ReactContextBaseJavaModule implements Ac
     }
 
     try {
+      if (image.getWidth() <= 0 || image.getHeight() <= 0) {
+        return 0;
+      }
+
       float maxWidth = receiptWidth * STRUCTURED_IMAGE_MAX_WIDTH_RATIO;
-      float scale = image.getWidth() > maxWidth ? (maxWidth / image.getWidth()) : 1f;
+      float scale = maxWidth / (float) image.getWidth();
       float scaledWidth = image.getWidth() * scale;
       float scaledHeight = image.getHeight() * scale;
       float left = (receiptWidth - scaledWidth) / 2f;
+      Paint imagePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+      imagePaint.setAntiAlias(false);
 
       canvas.drawBitmap(
         image,
         null,
         new RectF(left, currentY, left + scaledWidth, currentY + scaledHeight),
-        null
+        imagePaint
       );
 
       return Math.max(1, Math.round(scaledHeight + STRUCTURED_RECEIPT_LINE_SPACING_PX));
