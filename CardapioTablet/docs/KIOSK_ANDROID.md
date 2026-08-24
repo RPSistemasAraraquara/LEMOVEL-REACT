@@ -1,0 +1,33 @@
+# Kiosk Android
+
+O Cardapio Tablet entra em tela cheia ao abrir.
+
+Para impedir que o cliente saia usando a combinacao do Android, o tablet precisa estar em modo gerenciado, com este app como Device Owner ou por MDM. Sem isso, o Android permite apenas screen pinning, que mostra ao usuario como desafixar o app.
+
+Por seguranca, o app nao inicia o screen pinning comum. Ele so inicia Lock Task quando consegue configurar o modo gerenciado. Assim a tela do Android ensinando o atalho de saida nao aparece para o cliente.
+
+## Provisionamento por ADB
+
+Use em tablet recem-resetado, sem conta Google e sem outro administrador ativo:
+
+```powershell
+adb shell dpm set-device-owner br.com.sistemalechef.cardapiotablet/.TabletDeviceAdminReceiver
+adb shell monkey -p br.com.sistemalechef.cardapiotablet -c android.intent.category.LAUNCHER 1
+adb shell dumpsys activity activities | findstr /i "LockTask mLockTask"
+```
+
+O estado esperado depois de abrir o app e:
+
+```text
+LOCK_TASK_MODE_LOCKED
+```
+
+Neste estado, a saida do modo kiosk fica restrita ao botao `Fechar APP`, disponivel apenas depois da autorizacao do garcom na tela de configuracao.
+
+Na tela de configuracao do tablet, o card `Modo Kiosk Seguro` consulta o Android:
+
+- `Ativo`: tablet em Lock Task seguro.
+- `Inativo`: falta Device Owner ou MDM.
+- `Inseguro`: Android esta em screen pinning comum (`PINNED`), que nao deve ser usado com cliente.
+
+Se o comando `set-device-owner` falhar por tablet ja provisionado, sera necessario resetar o dispositivo ou aplicar a politica por MDM.

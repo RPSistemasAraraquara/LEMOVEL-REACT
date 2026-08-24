@@ -66,6 +66,7 @@ begin
       Result.consumacaoMinimaComanda      := ADataSet.FieldByName('consumacao_minima_comanda').AsCurrency;
       Result.permiteTrocoTodasAsFormas    := ADataSet.FieldByName('b_permite_troco_todas_formas').AsBoolean;
       Result.utilizaRPMovel               := ADataSet.FieldByName('utiliza_rp_movel').AsBoolean;
+      Result.utilizaCardapioTablet        := ADataSet.FieldByName('utiliza_cardapiotablet').AsBoolean;
       Result.utilizaIntegracaoStone       := ADataSet.FieldByName('rp_movel_integracao_stone').AsBoolean;
       Result.UtilizaFichaIndividualMesa   :=ADataSet.FieldByName('imprime_ficha_individual_mesa').AsBoolean;
       Result.UtilizaFichaIndividualComanda:=ADataSet.FieldByName('imprime_ficha_individual_comanda').AsBoolean;
@@ -91,6 +92,7 @@ procedure TAPIRPCheffDAOEmpresa.Select;
 begin
   Query.SQL('select emp_001, emp_007, cep_004, emp_003, emp_013, tel_princ, celular, ')
     .SQL('  b_controle_opc, b_casa_noturna, casa_controle, utiliza_rp_movel,')
+    .SQL('  coalesce(utiliza_cardapiotablet, false) as utiliza_cardapiotablet,')
     .SQL('  taxa_adicional_mesa, couvert_mesa, couvert_obrig_mesa, valor_couvert_masc_mesa,')
     .SQL('  valor_couvert_fem_mesa, consumacao_mesa, consumacao_minima_mesa,')
     .SQL('  taxa_adicional_comanda, couvert_comanda, couvert_obrig_comanda,')

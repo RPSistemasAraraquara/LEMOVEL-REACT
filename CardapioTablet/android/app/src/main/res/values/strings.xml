@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_name">Cardapio Tablet</string>
+  <string name="tablet_device_admin_description">Permite executar o Cardapio Tablet em modo kiosk gerenciado.</string>
+</resources>

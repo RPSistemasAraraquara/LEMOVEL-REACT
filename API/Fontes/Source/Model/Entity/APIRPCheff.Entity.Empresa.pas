@@ -35,6 +35,7 @@ type
     Fcelular                             : string;
     FcasaControle                        : TRPCheffTipoCasaControle;
     FutilizaRPMovel                      : Boolean;
+    FutilizaCardapioTablet               : Boolean;
     FutilizaIntegracaoStone              : Boolean;
     FUtilizaFichaIndividualMesa          : Boolean;
     FUtilizaFichaIndividualComanda       : Boolean;
@@ -70,6 +71,7 @@ type
     property atualizaCustoMaterialComposicao: Boolean     read FatualizaCustoMaterialComposicao         write FatualizaCustoMaterialComposicao;
     property consideraRedimentoEntradaComposicao: Boolean read FconsideraRedimentoEntradaComposicao     write FconsideraRedimentoEntradaComposicao;
     property utilizaRPMovel: Boolean                      read FutilizaRPMovel                          write FutilizaRPMovel;
+    property utilizaCardapioTablet: Boolean               read FutilizaCardapioTablet                   write FutilizaCardapioTablet;
     property utilizaIntegracaoStone: Boolean              read FutilizaIntegracaoStone                  write FutilizaIntegracaoStone;
     property UtilizaFichaIndividualMesa: Boolean          read FUtilizaFichaIndividualMesa              write FUtilizaFichaIndividualMesa;
     property UtilizaFichaIndividualComanda: Boolean       read FUtilizaFichaIndividualComanda           write FUtilizaFichaIndividualComanda;
@@ -93,6 +95,7 @@ begin
   FcouvertObrigatorioComanda := False;
   FconsumacaoComanda         := False;
   FpermiteTrocoTodasAsFormas := False;
+  FutilizaCardapioTablet     := False;
   FutilizaIntegracaoCielo    := False;
   FutilizaIntegracaoPagBank  := False;
 end;
