@@ -1,0 +1,7392 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+:root {
+  --rpfood-bottom-nav-height: 58px;
+  --rpfood-bottom-nav-total-height: calc(var(--rpfood-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+}
+
+@supports (min-height: 100dvh) {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+}
+
+body {
+  background: #ffffff;
+  color: #617085;
+  font-family: "Poppins", sans-serif;
+}
+
+body.rpfood-standalone-open {
+  overflow: hidden;
+}
+
+body.rpfood-standalone-mode {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.rpfood-standalone-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 24px)
+    calc(env(safe-area-inset-right, 0px) + 24px)
+    calc(env(safe-area-inset-bottom, 0px) + 24px)
+    calc(env(safe-area-inset-left, 0px) + 24px);
+  background:
+    radial-gradient(circle at top left, rgba(255, 146, 54, 0.22), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(9, 20, 34, 0.72), transparent 34%),
+    linear-gradient(160deg, #0c111d 0%, #121a2d 42%, #1d293a 70%, #ff7a1a 165%);
+  background-size: 140% 140%;
+  animation: rpfoodLaunchBgShift 9s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.rpfood-standalone-launch__particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.rpfood-standalone-launch__particle {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  opacity: 0.18;
+  animation-name: rpfoodLaunchParticleFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  filter: blur(0.2px);
+}
+
+.rpfood-standalone-launch__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 122, 26, 0.2), transparent 18%),
+    radial-gradient(circle at 80% 25%, rgba(255, 255, 255, 0.08), transparent 16%),
+    radial-gradient(circle at 50% 85%, rgba(255, 122, 26, 0.1), transparent 22%);
+  filter: blur(3px);
+  opacity: 0.88;
+  animation: rpfoodLaunchBackdropPulse 7s ease-in-out infinite;
+}
+
+.rpfood-standalone-launch::before,
+.rpfood-standalone-launch::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(22px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.rpfood-standalone-launch::before {
+  width: 32vw;
+  height: 32vw;
+  min-width: 220px;
+  min-height: 220px;
+  top: -8vw;
+  left: -8vw;
+  background: rgba(255, 122, 26, 0.12);
+}
+
+.rpfood-standalone-launch::after {
+  width: 26vw;
+  height: 26vw;
+  min-width: 180px;
+  min-height: 180px;
+  right: -6vw;
+  bottom: -6vw;
+  background: rgba(9, 20, 34, 0.34);
+}
+
+.rpfood-standalone-launch.is-visible {
+  opacity: 1;
+}
+
+.rpfood-standalone-launch__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  color: #fff;
+  width: min(100%, 360px);
+  animation: rpfoodLaunchFloat 3.6s ease-in-out infinite;
+}
+
+.rpfood-standalone-launch__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 300px);
+  padding: 22px 18px 18px;
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(18, 26, 45, 0.9) 0%, rgba(10, 16, 28, 0.82) 100%);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 22px 50px rgba(2, 6, 14, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rpfood-standalone-launch__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.rpfood-standalone-launch__brand::before {
+  content: none;
+}
+
+.rpfood-standalone-launch__logo {
+  width: min(92px, 24vw);
+  height: min(92px, 24vw);
+  border-radius: 20px;
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.34),
+    0 0 0 6px rgba(255, 122, 26, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  object-fit: cover;
+  flex-shrink: 0;
+  animation: rpfoodLaunchLogoIn 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rpfood-standalone-launch__brand-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: center;
+}
+
+.rpfood-standalone-launch__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-standalone-launch__title {
+  font-size: clamp(1rem, 2.8vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: #fff;
+}
+
+.rpfood-standalone-launch__subtitle {
+  font-size: clamp(0.92rem, 1.7vw, 1rem);
+  line-height: 1.45;
+  opacity: 0.95;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-standalone-launch__progress {
+  width: min(100%, 240px);
+  height: 10px;
+  border-radius: 999px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.rpfood-standalone-launch__progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, #ffb15c 0%, #ff932b 38%, #ff7a1a 62%, #ff5b00 100%);
+  background-size: 200% 100%;
+  box-shadow: 0 0 20px rgba(255, 122, 26, 0.45);
+  transition: transform 90ms linear;
+  transform-origin: left center;
+}
+
+@keyframes rpfoodLaunchLogoIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.76) translateY(8px) rotate(-3deg);
+    filter: blur(8px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(0) rotate(1deg);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes rpfoodLaunchFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes rpfoodLaunchParticleFloat {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.12;
+  }
+
+  50% {
+    transform: translateY(-18px) scale(1.12);
+    opacity: 0.42;
+  }
+}
+
+@keyframes rpfoodLaunchBgShift {
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+
+  50% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes rpfoodLaunchBackdropPulse {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpfood-standalone-launch {
+    animation: none;
+  }
+
+  .rpfood-standalone-launch__backdrop {
+    animation: none;
+  }
+
+  .rpfood-standalone-launch__content {
+    animation: none;
+  }
+
+  .rpfood-standalone-launch__logo,
+  .rpfood-standalone-launch__particle {
+    animation: none;
+  }
+
+  .rpfood-standalone-launch__progress span {
+    animation: none;
+    transform: scaleX(0.7);
+  }
+}
+
+body.rpfood-item-open {
+  padding-bottom: 190px;
+}
+
+body.rpfood-checkout-open {
+  padding-bottom: 196px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.rpfood-login-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.rpfood-back-button,
+.rpfood-link-button {
+  border: none;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.rpfood-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #d6e1eb;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: #1b4f72;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 18px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-back-button:hover:not(:disabled),
+.rpfood-back-button:focus-visible {
+  background: linear-gradient(180deg, #fdfefe 0%, #eaf3f9 100%);
+  box-shadow: 0 12px 24px rgba(27, 79, 114, 0.14);
+  transform: translateY(-1px);
+}
+
+.rpfood-link-button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-weight: 700;
+}
+
+.rpfood-link-button:hover:not(:disabled),
+.rpfood-link-button:focus-visible {
+  background: rgba(27, 79, 114, 0.14);
+  transform: translateY(-1px);
+}
+
+.rpfood-back-button:disabled,
+.rpfood-link-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.rpfood-login-status {
+  min-height: 20px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+a {
+  color: inherit;
+}
+
+.rpfood-smart-image {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Sem largura/altura inline: quem manda no tamanho e o card, via CSS. */
+.rpfood-smart-image--fluid {
+  width: 100%;
+  height: auto;
+}
+
+/*
+ * A altura do SmartImage fluido vem do aspect-ratio inline. O Safari so passou
+ * a suportar aspect-ratio no 15: sem ele o wrapper colapsa para 0 e a imagem
+ * some, porque o <img> dentro e position:absolute. Este fallback garante uma
+ * altura minima nesses navegadores.
+ */
+@supports not (aspect-ratio: 1 / 1) {
+  .rpfood-smart-image--fluid {
+    min-height: 96px;
+  }
+}
+
+.rpfood-smart-image__placeholder,
+.rpfood-smart-image__placeholder-img,
+.rpfood-smart-image__img,
+.rpfood-smart-image__error {
+  position: absolute;
+  inset: 0;
+}
+
+.rpfood-smart-image__placeholder {
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(242, 153, 74, 0.2), rgba(255, 255, 255, 0.9)),
+    linear-gradient(180deg, #f6f9fc 0%, #ffffff 100%);
+  filter: blur(14px);
+  transform: scale(1.08);
+  transition: opacity 0.25s ease;
+}
+
+.rpfood-smart-image__placeholder.is-hidden {
+  opacity: 0;
+}
+
+.rpfood-smart-image__placeholder-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(18px);
+  transform: scale(1.08);
+  opacity: 0.92;
+  transition: opacity 0.25s ease;
+}
+
+.rpfood-smart-image__placeholder-img.is-hidden {
+  opacity: 0;
+}
+
+.rpfood-smart-image__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.rpfood-smart-image__img.is-loaded {
+  opacity: 1;
+}
+
+.rpfood-smart-image__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(27, 79, 114, 0.08), rgba(27, 79, 114, 0.04)),
+    #f8fbff;
+  color: #56708a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.rpfood-cart-panel__media-image {
+  display: block;
+}
+
+.rpfood-item-image-box__smart-image {
+  display: block;
+  width: min(100%, 120px);
+  min-height: 96px;
+  aspect-ratio: 1 / 1;
+}
+
+.rpfood-item-image-box .rpfood-smart-image {
+  width: min(100%, 120px);
+  height: auto;
+  min-height: 96px;
+}
+
+.rpfood-item-image-box .rpfood-smart-image__img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.rpfood-scroll-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 0 4px 4px;
+  scroll-padding-inline: 4px;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  /*
+   * pan-x junto com pan-y: com apenas pan-y o navegador bloqueia o arrasto
+   * horizontal do dedo, e o carrossel nao rolava em Android/iOS (no desktop
+   * funcionava porque touch-action nao afeta o mouse). Com os dois eixos o
+   * proprio navegador decide: gesto vertical rola a pagina, horizontal rola o
+   * trilho, com inercia nativa.
+   */
+  touch-action: manipulation;
+  cursor: grab;
+}
+
+.rpfood-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.rpfood-scroll-row > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.rpfood-scroll-row:active {
+  cursor: grabbing;
+}
+
+.rpfood-destaque-card {
+  width: 300px;
+  min-width: 300px;
+}
+
+.rpfood-categoria-card {
+  width: 300px;
+  min-width: 300px;
+}
+
+.rpfood-home-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-height: 48px;
+  border: none;
+  border-radius: 16px;
+  padding: 0 20px;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%);
+  color: #fff;
+  box-shadow: 0 18px 30px rgba(255, 127, 17, 0.24);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.rpfood-home-search-btn:hover,
+.rpfood-home-search-btn:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 36px rgba(255, 127, 17, 0.3);
+}
+
+.rpfood-home-search-btn svg {
+  flex-shrink: 0;
+}
+
+.rpfood-destaque-card .card,
+.rpfood-categoria-card .card {
+  width: 100%;
+}
+
+.rpfood-destaque-card .card {
+  height: 200px;
+  min-height: 200px;
+}
+
+.rpfood-categoria-card .card {
+  height: auto;
+}
+
+.rpfood-destaque-card .card-body,
+.rpfood-categoria-card .card-body {
+  min-height: 178px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rpfood-destaque-card .card-body {
+  min-height: 142px;
+}
+
+.rpfood-categoria-card .card-body {
+  min-height: 0;
+  display: block;
+  text-align: center;
+}
+
+.rpfood-destaque-card img {
+  margin: 6px;
+  width: 110px !important;
+  height: 130px !important;
+  object-fit: contain !important;
+}
+
+.rpfood-categoria-card img {
+  object-fit: contain;
+}
+
+.rpfood-products-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 2px 2px 14px;
+}
+
+.rpfood-products-toolbar__copy {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.rpfood-products-toolbar__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rpfood-products-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 18px 0 12px;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.14), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: #1b4f72;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 14px 28px rgba(27, 79, 114, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+.rpfood-products-back:hover,
+.rpfood-products-back:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.36);
+  color: #d46c15;
+  box-shadow:
+    0 18px 34px rgba(27, 79, 114, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.rpfood-products-back__icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(27, 79, 114, 0.12), rgba(46, 134, 193, 0.16));
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+.rpfood-products-back__label {
+  white-space: nowrap;
+}
+
+.rpfood-products-page {
+  background:
+    radial-gradient(circle at top left, rgba(242, 153, 74, 0.12), transparent 24%),
+    linear-gradient(180deg, #f7fbff 0%, #ffffff 28%, #f7fbff 100%);
+}
+
+.rpfood-products-page__container {
+  max-width: 1500px;
+}
+
+.rpfood-products-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.84fr);
+  gap: 20px;
+  margin-bottom: 18px;
+  padding: 24px;
+  border-radius: 34px;
+  border: 1px solid rgba(242, 153, 74, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.22), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.98));
+  box-shadow:
+    0 26px 58px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.rpfood-products-hero__main {
+  min-width: 0;
+}
+
+.rpfood-products-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-products-hero__title {
+  margin: 14px 0 10px;
+  color: #26365a;
+  font-size: clamp(2rem, 4vw, 3.05rem);
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+.rpfood-products-hero__description {
+  margin: 0;
+  max-width: 660px;
+  color: #607289;
+  font-size: 1.02rem;
+  line-height: 1.72;
+}
+
+.rpfood-products-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rpfood-products-hero__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  box-shadow: 0 14px 28px rgba(255, 127, 17, 0.18);
+}
+
+.rpfood-products-hero__meta-chip--soft {
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  box-shadow: none;
+}
+
+.rpfood-products-search-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.12), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #f6fafe 100%);
+  box-shadow:
+    0 22px 44px rgba(27, 79, 114, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.rpfood-products-search-card__label {
+  color: #26365a;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-products-search-card__hint {
+  color: #75879f;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.rpfood-products-search.input-group {
+  align-items: center;
+  min-height: 64px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-products-search .input-group-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  border: none;
+  background: linear-gradient(180deg, rgba(27, 79, 114, 0.06), rgba(27, 79, 114, 0.03));
+}
+
+.rpfood-products-search .form-control {
+  min-height: 64px;
+  border: none;
+  background: transparent;
+  color: #26365a;
+  font-size: 1.02rem;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.rpfood-products-search .form-control::placeholder {
+  color: #95a4b8;
+  font-weight: 500;
+}
+
+.rpfood-products-alert {
+  border: 1px solid rgba(192, 57, 43, 0.12);
+  box-shadow: 0 16px 30px rgba(192, 57, 43, 0.08);
+}
+
+.rpfood-products-categories,
+.rpfood-products-grid-section {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.98));
+  box-shadow:
+    0 24px 50px rgba(27, 79, 114, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.rpfood-products-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.rpfood-products-section-heading h2 {
+  margin: 8px 0 0;
+  color: #26365a;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 800;
+  line-height: 1.04;
+}
+
+.rpfood-products-section-heading__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-products-section-heading__count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.rpfood-products-section-heading--compact {
+  margin-bottom: 18px;
+}
+
+.rpfood-products-categories__scroll {
+  padding: 0 clamp(20px, 3vw, 36px) 10px;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: clamp(20px, 3vw, 36px);
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  touch-action: manipulation;
+  cursor: grab;
+}
+
+.rpfood-products-categories .rpfood-categoria-card {
+  width: 200px;
+  min-width: 200px;
+}
+
+/* O card do trilho e dimensionado pelo CSS; o SmartImage entra como fluid para
+   nao ficar ancorado no canto com tamanho inline. */
+.rpfood-products-category-card .card-body .rpfood-smart-image {
+  width: 100%;
+  max-width: 104px;
+  margin: 0 auto;
+}
+
+/*
+ * O tema define `.card.dishe-bx img { width: 13.75rem; height: 9.063rem;
+ * object-fit: cover }`, que tem especificidade maior que a do SmartImage. A
+ * imagem ficava com 220x145 dentro de um wrapper de 132px: vazava o card e
+ * ainda era cortada pelo cover. Estes seletores sao mais especificos e devolvem
+ * o controle ao wrapper.
+ */
+.rpfood-categoria-card .card .rpfood-smart-image__img,
+.rpfood-categoria-card .card .rpfood-smart-image__placeholder-img {
+  width: 100%;
+  height: 100%;
+}
+
+.rpfood-categoria-card .card .rpfood-smart-image__img {
+  object-fit: contain;
+}
+
+.rpfood-products-category-card {
+  height: auto !important;
+  border: 1px solid rgba(27, 79, 114, 0.08) !important;
+  border-radius: 26px !important;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.16), transparent 40%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow:
+    0 18px 36px rgba(27, 79, 114, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.rpfood-products-category-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 24px 46px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.rpfood-products-category-card.is-active {
+  border-color: rgba(27, 79, 114, 0.28) !important;
+  box-shadow:
+    0 26px 48px rgba(27, 79, 114, 0.14),
+    0 0 0 4px rgba(46, 134, 193, 0.08);
+}
+
+.rpfood-products-category-card__footer {
+  padding: 2px 14px 18px;
+  text-align: center;
+}
+
+/* Reserva 2 linhas para o nome: sem isso as categorias de nome curto e longo
+   ficavam com o texto em alturas diferentes dentro do trilho. */
+.rpfood-products-category-card__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+  color: #26365a;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.rpfood-products-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* Uniformiza as linhas da grade: produtos com e sem descricao geravam linhas
+     de alturas diferentes. Com o preco ancorado na base, a sobra fica acima
+     dele e os valores continuam alinhados entre todos os cards. */
+  min-height: 268px;
+  overflow: hidden;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.14), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow:
+    0 20px 40px rgba(27, 79, 114, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rpfood-products-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(242, 153, 74, 0.24);
+  box-shadow:
+    0 28px 52px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.rpfood-products-card__media {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 10px 4px;
+}
+
+.rpfood-products-card__badges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+}
+
+/* Precisa de largura propria: o SmartImage fluido usa width:100% e, dentro de um
+   flex item shrink-to-fit, a porcentagem resolveria para zero. */
+.rpfood-products-card__media-frame {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.rpfood-products-card__media .rpfood-smart-image {
+  width: 100%;
+  max-width: 100px;
+}
+
+.rpfood-products-card__media img {
+  filter: drop-shadow(0 18px 22px rgba(27, 79, 114, 0.14));
+}
+
+.rpfood-products-card__tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  box-shadow: 0 6px 12px rgba(255, 127, 17, 0.2);
+}
+
+.rpfood-products-card__tag--soft {
+  background: rgba(27, 79, 114, 0.12);
+  color: #1b4f72;
+  box-shadow: none;
+}
+
+.rpfood-products-card__body {
+  flex: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px 10px;
+}
+
+.rpfood-products-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rpfood-products-card__body h3 {
+  margin: 0;
+  color: #26365a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rpfood-products-card__body p {
+  margin: 6px 0 0;
+  color: #6f8096;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rpfood-products-card__details {
+  margin-top: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1b4f72;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+/* Preco ancorado na base: sem isso os cards com descricao empurravam o valor
+   para baixo e ele ficava desalinhado em relacao aos vizinhos da mesma linha. */
+.rpfood-products-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding: 0 14px 14px;
+}
+
+.rpfood-products-card__price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rpfood-products-card__price span {
+  color: #8a99ac;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.rpfood-products-card__price strong {
+  color: #ff7f11;
+  font-size: 1.16rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rpfood-products-card__cta {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 10px 18px rgba(255, 127, 17, 0.22);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.rpfood-products-card__cta > span {
+  display: block;
+  margin-top: -0.12em;
+}
+
+.rpfood-products-card__cta:hover,
+.rpfood-products-card__cta:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 36px rgba(255, 127, 17, 0.3);
+}
+
+.rpfood-products-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 280px;
+  padding: 26px;
+  border-radius: 28px;
+  border: 1px dashed rgba(27, 79, 114, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.96));
+  text-align: center;
+}
+
+.rpfood-products-empty__icon {
+  width: 78px;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+}
+
+.rpfood-products-empty h3 {
+  margin: 0;
+  color: #26365a;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.rpfood-products-empty p {
+  max-width: 420px;
+  margin: 0;
+  color: #73849a;
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+.rpfood-products-modal {
+  border: none;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 28px 60px rgba(10, 17, 32, 0.22);
+}
+
+.rpfood-products-modal__header,
+.rpfood-products-modal__footer {
+  border: none;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.rpfood-products-modal__header {
+  padding: 18px 20px 0;
+}
+
+.rpfood-products-modal__header .modal-title {
+  color: #26365a;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.rpfood-products-modal__body {
+  padding: 16px 20px 8px;
+}
+
+.rpfood-products-modal__body p {
+  margin: 0;
+  color: #5f7087;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.rpfood-products-modal__footer {
+  padding: 12px 20px 20px;
+}
+
+.rpfood-products-modal__button {
+  min-width: 130px;
+  min-height: 46px;
+  border: none !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%) !important;
+  box-shadow: 0 18px 28px rgba(255, 127, 17, 0.22);
+  font-size: 0.92rem;
+  font-weight: 800 !important;
+}
+
+@media only screen and (max-width: 75rem) {
+  .rpfood-products-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media only screen and (max-width: 61.9375rem) {
+  .rpfood-products-hero,
+  .rpfood-products-categories,
+  .rpfood-products-grid-section {
+    padding: 16px;
+    border-radius: 24px;
+  }
+
+  .rpfood-products-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rpfood-products-card {
+    min-height: 300px;
+  }
+}
+
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-products-toolbar {
+    margin-bottom: 10px;
+  }
+
+  .rpfood-products-hero__title {
+    font-size: 2rem;
+  }
+
+  .rpfood-products-search .form-control {
+    font-size: 0.96rem;
+  }
+
+  .rpfood-products-card__media {
+    padding: 10px 10px 4px;
+  }
+
+  .rpfood-products-card__media .rpfood-smart-image {
+    max-width: 92px;
+  }
+
+  .rpfood-products-card__body {
+    padding: 0 12px 12px;
+  }
+
+  /* Card de 2 colunas e estreito: preco grande + botao 46px estourava a largura
+     e o "+" ficava cortado na borda. */
+  .rpfood-products-card__footer {
+    gap: 8px;
+    padding: 0 12px 12px;
+  }
+
+  .rpfood-products-card__price span {
+    font-size: 0.66rem;
+  }
+
+  .rpfood-products-card__price strong {
+    font-size: 1.05rem;
+  }
+
+  .rpfood-products-card__cta {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+    font-size: 1.4rem;
+    box-shadow: 0 8px 14px rgba(255, 127, 17, 0.24);
+  }
+
+  .rpfood-products-card {
+    /* Card estreito faz o titulo quebrar em 1 ou 2 linhas conforme o produto;
+       fixar o minimo mantem as duas colunas alinhadas. */
+    min-height: 288px;
+    border-radius: 20px;
+  }
+
+
+  .rpfood-products-card__body h3 {
+    font-size: 0.95rem;
+  }
+
+  .rpfood-products-card__body p {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .rpfood-home-featured-card__body p,
+  .rpfood-home-product-card__body p {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .rpfood-products-card__tag {
+    min-height: 22px;
+    padding: 0 7px;
+    font-size: 0.55rem;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.rpfood-history-page {
+  max-width: 1160px;
+  padding: 16px 14px 28px;
+}
+
+.rpfood-history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rpfood-history-toolbar__status {
+  color: #8a99ac;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rpfood-history-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.95fr);
+  gap: 18px;
+  padding: 26px 28px;
+  border-radius: 30px;
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.24), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.98));
+  box-shadow:
+    0 24px 56px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-history-hero__copy {
+  min-width: 0;
+}
+
+.rpfood-history-hero__eyebrow,
+.rpfood-history-empty__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-history-hero__title,
+.rpfood-history-empty__title {
+  margin: 14px 0 10px;
+  color: #26365a;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+.rpfood-history-hero__description,
+.rpfood-history-empty__description {
+  max-width: 640px;
+  margin: 0;
+  color: #66778f;
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+
+.rpfood-history-hero__stats {
+  display: grid;
+  gap: 12px;
+}
+
+.rpfood-history-hero__stat,
+.rpfood-history-metric {
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 16px 32px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-history-hero__stat strong,
+.rpfood-history-metric__value {
+  display: block;
+  margin-top: 8px;
+  color: #26365a;
+  font-size: 1.24rem;
+  font-weight: 800;
+}
+
+.rpfood-history-hero__stat-label,
+.rpfood-history-metric__label {
+  display: block;
+  color: #7a8ba3;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rpfood-history-metric__value.is-text {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.rpfood-history-feedback {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 18px;
+}
+
+.rpfood-history-feedback__item {
+  padding: 14px 18px;
+  border-radius: 18px;
+  font-weight: 700;
+}
+
+.rpfood-history-feedback__item.is-success {
+  background: rgba(28, 172, 120, 0.1);
+  color: #1d8c67;
+}
+
+.rpfood-history-feedback__item.is-error {
+  background: rgba(239, 83, 80, 0.1);
+  color: #c0392b;
+}
+
+.rpfood-history-list {
+  display: grid;
+  gap: 18px;
+}
+
+.rpfood-history-card,
+.rpfood-history-empty {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 253, 0.98));
+  box-shadow:
+    0 24px 48px rgba(27, 79, 114, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-history-card {
+  padding: 24px 24px 22px;
+}
+
+.rpfood-history-card__header,
+.rpfood-history-card__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rpfood-history-card__identity {
+  min-width: 0;
+}
+
+.rpfood-history-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-history-card__title {
+  margin: 12px 0 8px;
+  color: #26365a;
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.rpfood-history-card__subtitle {
+  margin: 0;
+  color: #66778f;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.rpfood-history-card__summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rpfood-history-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rpfood-history-chip.is-status {
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+}
+
+.rpfood-history-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.rpfood-history-items {
+  display: grid;
+  gap: 12px;
+}
+
+.rpfood-history-item {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.rpfood-history-item__image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 22px;
+  border: 1px solid rgba(242, 153, 74, 0.2);
+  background: #fff;
+  box-shadow: 0 14px 26px rgba(242, 153, 74, 0.12);
+}
+
+.rpfood-history-item__content {
+  min-width: 0;
+}
+
+.rpfood-history-item__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rpfood-history-item__title {
+  margin: 0;
+  color: #26365a;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.rpfood-history-item__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(46, 134, 193, 0.12);
+  color: #1b4f72;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.rpfood-history-item__meta,
+.rpfood-history-item__note {
+  margin: 6px 0 0;
+  color: #6d7d93;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.rpfood-history-item__note {
+  color: #8a99ac;
+}
+
+.rpfood-history-item__price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+
+.rpfood-history-item__price strong {
+  color: #ff7f11;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.rpfood-history-item__price span {
+  color: #8a99ac;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rpfood-history-card__footer {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-history-card__footer-copy {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: #67788f;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.rpfood-history-repeat-button {
+  min-width: 200px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f24f4f 0%, #ff8a00 100%);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 16px 30px rgba(255, 127, 17, 0.24);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.rpfood-history-repeat-button:hover:not(:disabled),
+.rpfood-history-repeat-button:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 34px rgba(255, 127, 17, 0.3);
+}
+
+.rpfood-history-repeat-button:disabled {
+  opacity: 0.72;
+  cursor: wait;
+  transform: none;
+  box-shadow: 0 12px 22px rgba(255, 127, 17, 0.18);
+}
+
+.rpfood-history-empty {
+  padding: 36px 32px;
+  text-align: center;
+}
+
+@media only screen and (max-width: 75rem) {
+  .rpfood-history-hero,
+  .rpfood-history-card__metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media only screen and (max-width: 61.9375rem) {
+  .rpfood-history-card__header,
+  .rpfood-history-card__footer,
+  .rpfood-history-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-history-card__summary {
+    justify-content: flex-start;
+  }
+
+  .rpfood-history-repeat-button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-history-page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .rpfood-history-hero,
+  .rpfood-history-card,
+  .rpfood-history-empty {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .rpfood-history-item {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .rpfood-history-item__image {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+
+  .rpfood-history-item__price {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+    text-align: left;
+    padding-left: 78px;
+  }
+
+  .rpfood-history-hero__title,
+  .rpfood-history-empty__title {
+    font-size: 1.72rem;
+  }
+}
+
+@media only screen and (max-width: 61.9375rem) {
+  .rpfood-destaque-card,
+  .rpfood-categoria-card {
+    width: 220px;
+  }
+
+  .rpfood-products-categories .rpfood-categoria-card {
+    width: 180px;
+    min-width: 180px;
+  }
+}
+
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-products-categories__scroll {
+    padding-inline: 16px;
+  }
+
+  /* Cabem ~2,5 categorias na tela do celular, sinalizando que da para arrastar. */
+  .rpfood-products-categories .rpfood-categoria-card {
+    width: 146px;
+    min-width: 146px;
+  }
+
+  .rpfood-products-category-card {
+    height: auto !important;
+  }
+
+  .rpfood-home-category-slide {
+    width: 224px;
+    min-width: 224px;
+  }
+}
+
+.rpfood-nav-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-decoration: none;
+  color: #1b4f72;
+  flex: 1;
+  padding: 4px 0 2px;
+  min-width: 0;
+  background: none;
+  border: none;
+  overflow: hidden;
+}
+
+.rpfood-nav-button svg {
+  flex-shrink: 0;
+}
+
+.rpfood-nav-button span {
+  display: block;
+  max-width: 100%;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.05;
+  margin-top: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rpfood-nav-button--small span {
+  font-size: 0.61rem;
+}
+
+.rpfood-bottom-nav {
+  position: relative;
+}
+
+.rpfood-bottom-nav-version {
+  position: absolute;
+  top: 3px;
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  color: rgba(27, 79, 114, 0.82);
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+/* Confirmacao rapida de item adicionado, logo acima da barra da sacola. */
+.rpfood-cart-toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--rpfood-bottom-nav-total-height) + 58px);
+  z-index: 1055;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: #1e7e46;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  animation: rpfoodCartToastIn 220ms ease-out;
+}
+
+.rpfood-cart-toast__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.rpfood-cart-toast__action {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 999px;
+}
+
+@keyframes rpfoodCartToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rpfood-cart-badge--pulse {
+  animation: rpfoodCartBadgePulse 620ms ease-out 2;
+}
+
+@keyframes rpfoodCartBadgePulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpfood-cart-toast,
+  .rpfood-cart-badge--pulse {
+    animation: none;
+  }
+}
+
+.rpfood-products-card__in-cart {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #1e7e46;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(30, 126, 70, 0.35);
+}
+
+.rpfood-cart-panel {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 56px;
+  bottom: calc(var(--rpfood-bottom-nav-total-height) + 56px);
+  left: 0;
+  right: 0;
+  z-index: 1049;
+  background: #fff;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.22);
+}
+
+.rpfood-cart-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.rpfood-cart-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+}
+
+.rpfood-cart-panel__footer {
+  padding: 12px 14px 14px;
+  border-top: 1px solid #eee;
+  background: #fff;
+  box-shadow: 0 -8px 18px rgba(255, 255, 255, 0.96);
+  flex-shrink: 0;
+}
+
+.rpfood-lazy-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: #8a99ac;
+  font-weight: 700;
+}
+
+.rpfood-cart-panel__hint {
+  margin: 8px 0 4px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgba(27, 79, 114, 0.07);
+  color: #4a5f78;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.rpfood-cart-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.rpfood-cart-item-actions__edit {
+  border: none;
+  background: transparent;
+  color: #1b4f72;
+  font-weight: 700;
+  padding: 0;
+}
+
+.rpfood-cart-item-actions__remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: #c0392b;
+  font-weight: 700;
+  padding: 0;
+}
+
+.rpfood-cart-clear {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(192, 57, 43, 0.4);
+  border-radius: 10px;
+  background: #fff;
+  color: #c0392b;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.rpfood-cart-clear:disabled {
+  opacity: 0.45;
+}
+
+.rpfood-item-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.rpfood-item-separator span {
+  background: #1b4f72;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.rpfood-item-separator hr {
+  flex: 1;
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 0;
+}
+
+.rpfood-accordion-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: inherit;
+}
+
+.rpfood-home-feedback {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.rpfood-home-feedback__ok,
+.rpfood-home-feedback__error {
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.rpfood-home-feedback__ok {
+  background: #eef9f0;
+  color: #2c7a4b;
+}
+
+.rpfood-home-feedback__error {
+  background: #fff2f0;
+  color: #c0392b;
+}
+
+.rpfood-home-page {
+  display: grid;
+  gap: 18px;
+  padding: 14px 2px 10px;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+.rpfood-home-hero {
+  display: block;
+  padding: 26px 24px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.24), transparent 34%),
+    radial-gradient(circle at left bottom, rgba(46, 134, 193, 0.12), transparent 28%),
+    linear-gradient(135deg, #fff8f2 0%, #ffffff 58%, #f6fbff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow:
+    0 26px 60px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-home-hero__main {
+  min-width: 0;
+}
+
+.rpfood-home-hero__eyebrow,
+.rpfood-home-section__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-home-hero__title {
+  margin: 16px 0 10px;
+  color: #23314d;
+  font-size: clamp(2.15rem, 5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.rpfood-home-hero__description {
+  max-width: 700px;
+  margin: 0;
+  color: #65758b;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.rpfood-home-hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rpfood-home-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  color: #1b4f72;
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: 0 12px 20px rgba(27, 79, 114, 0.06);
+}
+
+.rpfood-home-chip--status {
+  background: rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-home-chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rpfood-home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.rpfood-home-secondary-action {
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f7fc 100%);
+  color: #1b4f72;
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: 0 14px 24px rgba(27, 79, 114, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+/* Substitui o antigo banner gigante de repetir pedido: mesma acao, sem ocupar
+   meia tela e sem duplicar o atalho. */
+.rpfood-home-secondary-action--repeat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpfood-home-secondary-action__meta {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.1);
+  color: #4a5f78;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.rpfood-home-secondary-action:hover,
+.rpfood-home-secondary-action:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.34);
+  color: #d46c15;
+  box-shadow: 0 18px 30px rgba(27, 79, 114, 0.12);
+}
+
+.rpfood-home-hero__aside {
+  display: grid;
+  gap: 12px;
+}
+
+.rpfood-home-metric-card {
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 253, 0.96));
+  box-shadow:
+    0 18px 34px rgba(27, 79, 114, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-home-metric-card__label {
+  display: block;
+  color: #7a8ba3;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-home-metric-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #26365a;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.rpfood-home-metric-card p {
+  margin: 8px 0 0;
+  color: #718299;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.rpfood-home-section,
+.rpfood-home-menu-section {
+  display: grid;
+  gap: 14px;
+  overflow-x: hidden;
+  overflow-x: clip;
+  min-width: 0;
+}
+
+.rpfood-home-section__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rpfood-home-section__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rpfood-home-section__title {
+  margin: 12px 0 0;
+  color: #26365a;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.rpfood-home-section__link {
+  color: #1b4f72;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rpfood-home-featured-row,
+.rpfood-home-category-row {
+  padding: 0 clamp(18px, 3vw, 30px) 6px;
+  scroll-padding-inline: clamp(18px, 3vw, 30px);
+  scroll-snap-type: x proximity;
+}
+
+/* Slider horizontal: o trilho continua arrastavel, as setas sao um atalho. */
+.rpfood-rail-slider {
+  position: relative;
+  overflow-x: hidden;
+  overflow-x: clip;
+  /* Sem isso o min-width:auto de grid item deixa o trilho esticar ate caber
+     todos os cards, e ai o scroll horizontal nunca acontece. */
+  min-width: 0;
+}
+
+.rpfood-rail-slider__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1b4f72;
+  box-shadow: 0 8px 20px rgba(27, 79, 114, 0.18);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.rpfood-rail-slider__arrow--prev {
+  left: 4px;
+}
+
+.rpfood-rail-slider__arrow--next {
+  right: 4px;
+}
+
+.rpfood-rail-slider__arrow:hover:not(:disabled) {
+  color: #d46c15;
+  box-shadow: 0 12px 26px rgba(27, 79, 114, 0.24);
+}
+
+.rpfood-rail-slider__arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/*
+ * As setas ficam visiveis tambem no toque. Elas sao um caminho alternativo:
+ * se o gesto falhar em algum navegador, ainda da para navegar o carrossel.
+ */
+@media (hover: none), (max-width: 47.9375rem) {
+  .rpfood-rail-slider__arrow {
+    width: 34px;
+    height: 34px;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .rpfood-rail-slider__arrow--prev {
+    left: 0;
+  }
+
+  .rpfood-rail-slider__arrow--next {
+    right: 0;
+  }
+}
+
+.rpfood-home-featured-slide {
+  width: 244px;
+  min-width: 244px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rpfood-home-category-slide {
+  width: 284px;
+  min-width: 284px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rpfood-home-featured-card,
+.rpfood-home-category-card,
+.rpfood-home-product-card {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 253, 0.98));
+  box-shadow:
+    0 24px 42px rgba(27, 79, 114, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  touch-action: manipulation;
+}
+
+/* O valor precisa ficar proximo da altura real do card: enquanto os vizinhos
+   estao fora da tela, e ele que define a altura da linha do flex. */
+.rpfood-products-card,
+.rpfood-home-product-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* No celular sao 2 colunas e os cards ficam bem mais baixos. Um intrinsic-size
+   superestimado esticava a linha inteira do flex enquanto os vizinhos ainda
+   estavam fora da tela. */
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-products-card,
+  .rpfood-home-product-card {
+    contain-intrinsic-size: auto 240px;
+  }
+}
+
+/*
+ * Os cards dos carrosseis NAO usam content-visibility: como o trilho e flex com
+ * align-items: stretch, o contain-intrinsic-size dos cards fora da tela virava a
+ * altura de todos (cards de 232px esticavam para 320px).
+ */
+
+.rpfood-home-featured-card:hover,
+.rpfood-home-category-card:hover,
+.rpfood-home-product-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(242, 153, 74, 0.34);
+  box-shadow:
+    0 28px 48px rgba(27, 79, 114, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.rpfood-home-featured-card__media,
+.rpfood-home-category-card__media,
+.rpfood-home-product-card__media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(242, 153, 74, 0.18), transparent 42%),
+    linear-gradient(180deg, #fff9f4 0%, #ffffff 100%);
+}
+
+.rpfood-home-featured-card__media {
+  padding: 6px;
+}
+
+/*
+ * O trilho e flex com align-items: stretch, entao um unico card com titulo ou
+ * descricao de 2 linhas puxava a altura de todos. Travando em 1 linha os cards
+ * ficam iguais e proporcionais a largura.
+ */
+.rpfood-home-featured-card__body h3,
+.rpfood-home-featured-card__body p {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rpfood-home-featured-card__body {
+  padding: 10px 12px 12px;
+}
+
+/* Card em coluna com o preco ancorado na base: como o trilho estica todos os
+   cards para a mesma altura, sem isso os cards sem descricao ficavam com um
+   vazio embaixo do preco. */
+.rpfood-home-featured-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.rpfood-home-featured-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.rpfood-home-featured-card__footer {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.rpfood-home-featured-card__media .rpfood-smart-image {
+  width: 100%;
+  max-width: 112px;
+}
+
+.rpfood-home-featured-card__badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  min-height: 24px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ef5350 0%, #ff8a00 100%);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rpfood-home-featured-card__body,
+.rpfood-home-category-card__body,
+.rpfood-home-product-card__body {
+  padding: 14px;
+}
+
+.rpfood-home-featured-card__body h3,
+.rpfood-home-category-card__body h3,
+.rpfood-home-product-card__body h3 {
+  margin: 0;
+  color: #26365a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.rpfood-home-featured-card__body p,
+.rpfood-home-product-card__body p {
+  margin: 8px 0 0;
+  color: #708198;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rpfood-home-featured-card__footer,
+.rpfood-home-product-card__footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpfood-home-featured-card__footer strong,
+.rpfood-home-product-card__footer strong {
+  color: #ff7f11;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.rpfood-home-featured-card__footer span,
+.rpfood-home-product-card__footer span,
+.rpfood-home-category-card__body span {
+  color: #1b4f72;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.rpfood-home-category-card__media {
+  padding: 10px;
+}
+
+.rpfood-home-category-card__media .rpfood-smart-image {
+  width: 100%;
+  max-width: 112px;
+}
+
+.rpfood-home-category-card__body {
+  display: grid;
+  gap: 8px;
+}
+
+.rpfood-home-product-card {
+  height: 100%;
+  cursor: pointer;
+}
+
+.rpfood-home-product-card__media {
+  padding: 8px;
+}
+
+.rpfood-home-product-card__media .rpfood-smart-image {
+  width: 100%;
+  max-width: 100px;
+}
+
+/* Mesma logica do card de destaque: coluna com o preco ancorado na base, para
+   os cards da linha nao ficarem com um vazio embaixo do valor. */
+.rpfood-home-product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.rpfood-home-product-card__body {
+  flex: 1;
+}
+
+.rpfood-home-product-card__footer {
+  margin-top: auto;
+  padding: 0 12px 12px;
+}
+
+.rpfood-home-product-card__body {
+  padding: 8px 12px 0;
+}
+
+.rpfood-home-product-card__body h3 {
+  font-size: 0.94rem;
+}
+
+.rpfood-home-accordion {
+  display: grid;
+  gap: 14px;
+}
+
+.rpfood-home-accordion__item {
+  border: none !important;
+  background: none !important;
+}
+
+.rpfood-home-accordion__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 253, 0.98));
+  box-shadow: 0 18px 32px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-home-accordion__header.is-open {
+  border-color: rgba(242, 153, 74, 0.28);
+  box-shadow: 0 22px 36px rgba(27, 79, 114, 0.12);
+}
+
+.rpfood-home-accordion__count {
+  margin-left: auto;
+  color: #8a99ac;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rpfood-home-empty-category {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #8a99ac;
+  font-weight: 700;
+}
+
+@media only screen and (max-width: 61.9375rem) {
+  .rpfood-home-section__head,
+  .rpfood-home-hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-home-section__head-actions {
+    justify-content: space-between;
+  }
+
+  .rpfood-home-featured-slide {
+    width: 228px;
+    min-width: 228px;
+  }
+}
+
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-home-page {
+    gap: 16px;
+    padding-top: 10px;
+  }
+
+  .rpfood-home-hero,
+  .rpfood-home-featured-card,
+  .rpfood-home-category-card,
+  .rpfood-home-product-card {
+    border-radius: 22px;
+  }
+
+  .rpfood-home-hero {
+    padding: 20px 18px;
+  }
+
+  .rpfood-home-hero__title {
+    font-size: 2rem;
+  }
+
+  .rpfood-home-featured-slide {
+    width: 228px;
+    min-width: 228px;
+  }
+
+  .rpfood-home-category-slide {
+    width: 150px;
+    min-width: 150px;
+  }
+
+  /* Cards mais compactos no celular: a imagem acompanha a largura do card
+     em vez de ficar pequena e encostada no canto. */
+  .rpfood-home-featured-card__media,
+  .rpfood-home-category-card__media,
+  .rpfood-home-product-card__media {
+    padding: 10px;
+  }
+
+  .rpfood-home-category-card__media .rpfood-smart-image {
+    max-width: 100%;
+  }
+
+  .rpfood-home-product-card__media .rpfood-smart-image {
+    max-width: 112px;
+  }
+
+  .rpfood-home-featured-card__media .rpfood-smart-image {
+    max-width: 106px;
+  }
+
+  .rpfood-home-featured-card__body,
+  .rpfood-home-category-card__body,
+  .rpfood-home-product-card__body {
+    padding: 12px;
+  }
+
+  .rpfood-home-featured-card__body h3,
+  .rpfood-home-category-card__body h3,
+  .rpfood-home-product-card__body h3 {
+    font-size: 0.98rem;
+  }
+
+  .rpfood-home-featured-card__body p,
+  .rpfood-home-product-card__body p {
+    margin-top: 6px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .rpfood-home-featured-card__footer,
+  .rpfood-home-product-card__footer {
+    margin-top: 10px;
+  }
+
+  .rpfood-home-featured-card__footer strong,
+  .rpfood-home-product-card__footer strong {
+    font-size: 1.02rem;
+  }
+
+  .rpfood-home-product-card__footer {
+    padding: 0 12px 12px;
+  }
+
+  .rpfood-home-accordion__header {
+    flex-wrap: wrap;
+  }
+
+  .rpfood-home-accordion__count {
+    margin-left: 0;
+  }
+
+  .rpfood-home-section__head-actions {
+    flex-wrap: wrap;
+  }
+
+}
+
+#barraAcaoItemPedido {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--rpfood-bottom-nav-total-height) + 64px);
+  z-index: 1060;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #ececec;
+  border-radius: 16px;
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.14);
+}
+
+#barraAcaoItemPedido .btn {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.96rem;
+  font-weight: 700;
+  border-radius: 16px;
+  padding: 14px 12px;
+  border: none;
+}
+
+#barraAcaoItemPedido .btn-danger {
+  background: linear-gradient(135deg, #ef5350 0%, #f06b5d 100%);
+  box-shadow: 0 16px 28px rgba(239, 83, 80, 0.2);
+}
+
+#barraAcaoItemPedido .btn-primary {
+  background: linear-gradient(135deg, #ff7a18 0%, #ff9324 100%);
+  box-shadow: 0 18px 30px rgba(255, 122, 24, 0.22);
+}
+
+#barraAcaoItemPedido .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+#checkoutActionBar {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--rpfood-bottom-nav-total-height) + 6px);
+  z-index: 1052;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e6edf5;
+  box-shadow: 0 -8px 24px rgba(27, 79, 114, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+#checkoutActionBarResumo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+#checkoutActionBarMeta {
+  min-width: 0;
+}
+
+#checkoutActionBarMeta strong {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #f2994a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+#checkoutActionBarMeta span {
+  display: block;
+  color: #617085;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+#checkoutActionBarValor {
+  color: #1b4f72;
+  font-size: 1.28rem;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#checkoutActionButton {
+  width: 100%;
+  min-height: 54px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #ef5350 0%, #f57c00 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 12px 24px rgba(245, 124, 0, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+#checkoutActionButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(245, 124, 0, 0.28);
+}
+
+#checkoutActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.rpfood-checkout-screen {
+  background: #ffffff;
+  color: #617085;
+}
+
+.rpfood-checkout-content {
+  padding-bottom: 230px;
+  margin-left: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.rpfood-payment-screen__content {
+  padding-bottom: 120px;
+}
+
+.rpfood-checkout-container {
+  max-width: 100%;
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-top: 0;
+}
+
+.rpfood-checkout-hero {
+  margin-bottom: 16px;
+  padding: 22px 22px 20px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.16), transparent 32%),
+    linear-gradient(180deg, #fff9f3 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow: 0 20px 38px rgba(104, 67, 39, 0.08);
+}
+
+.rpfood-checkout-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-checkout-hero__title {
+  margin: 14px 0 8px;
+  color: #23314d;
+  font-size: clamp(1.7rem, 2.4vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.rpfood-checkout-hero__subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: #617085;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.rpfood-checkout-section {
+  margin-bottom: 16px;
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(217, 228, 239, 0.96);
+  box-shadow:
+    0 20px 42px rgba(15, 23, 42, 0.08),
+    0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.rpfood-checkout-section__header {
+  margin-bottom: 18px;
+}
+
+.rpfood-checkout-section__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-checkout-section__title {
+  margin: 12px 0 6px;
+  color: #23314d;
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.rpfood-checkout-section__subtitle {
+  margin: 0;
+  color: #617085;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.rpfood-checkout-section__inner {
+  min-width: 0;
+}
+
+.rpfood-delivery-card {
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow: 0 16px 30px rgba(104, 67, 39, 0.07);
+}
+
+.rpfood-delivery-card--trigger {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.rpfood-delivery-card--trigger:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.28);
+  box-shadow: 0 18px 32px rgba(104, 67, 39, 0.1);
+}
+
+.rpfood-delivery-card__body {
+  padding: 16px;
+}
+
+.rpfood-delivery-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rpfood-delivery-card__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-delivery-card__title {
+  margin: 0 0 4px;
+  color: #1b4f72;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rpfood-delivery-card__meta {
+  color: #617085;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.rpfood-delivery-card__summary {
+  min-width: 132px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 245, 233, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border: 1px solid rgba(242, 153, 74, 0.22);
+  box-shadow: 0 12px 20px rgba(242, 153, 74, 0.08);
+  text-align: right;
+}
+
+.rpfood-delivery-card__summary-label {
+  display: block;
+  color: #d46c15;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rpfood-delivery-card__summary-value {
+  display: block;
+  margin-top: 4px;
+  color: #1b4f72;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.rpfood-delivery-card__fee {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.rpfood-delivery-card__section-title {
+  margin: 0 0 12px;
+  color: #1b4f72;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-delivery-card__list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rpfood-delivery-card__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rpfood-delivery-card__list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-delivery-card__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.rpfood-delivery-card__item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.35);
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-delivery-card__item--active {
+  border-color: rgba(27, 79, 114, 0.16);
+  background: #f0f7ff;
+  box-shadow: inset 3px 0 0 #1b4f72;
+}
+
+.rpfood-delivery-card__item-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-delivery-card__item-title {
+  margin: 0 0 4px;
+  color: #1b4f72;
+  font-size: 0.94rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rpfood-delivery-card__item-meta {
+  color: #617085;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.rpfood-delivery-card__item-fee {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 245, 233, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border: 1px solid rgba(242, 153, 74, 0.22);
+  color: #d46c15;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 16px rgba(242, 153, 74, 0.08);
+}
+
+.rpfood-delivery-card__radio {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.rpfood-delivery-card__add {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1b4f72, #2e86c1 55%, #f2994a);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-delivery-card__add-icon {
+  margin-right: 8px;
+  vertical-align: -3px;
+}
+
+.rpfood-inline-address-form {
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.1), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  box-shadow: 0 18px 34px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-inline-address-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 0;
+}
+
+.rpfood-inline-address-form__title {
+  margin: 0;
+  color: #1b4f72;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-inline-address-form__close {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.rpfood-inline-address-form__body {
+  padding: 16px 18px 18px;
+}
+
+.rpfood-inline-address-form__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.rpfood-inline-address-form__actions .rpfood-primary-action,
+.rpfood-inline-address-form__actions .rpfood-secondary-action {
+  flex: 1;
+}
+
+.rpfood-pickup-card {
+  padding: 20px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.16), transparent 34%),
+    linear-gradient(180deg, #fff9f3 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow: 0 16px 30px rgba(104, 67, 39, 0.08);
+}
+
+.rpfood-pickup-card__header {
+  margin-bottom: 14px;
+}
+
+.rpfood-pickup-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-pickup-card__title {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: #23314d;
+  font-size: 1.26rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.rpfood-pickup-card__store {
+  color: #1b4f72;
+}
+
+.rpfood-pickup-card__divider {
+  font-size: 1rem;
+  color: #617085;
+}
+
+.rpfood-pickup-card__body {
+  display: grid;
+  gap: 6px;
+  color: #617085;
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+
+.rpfood-pickup-card__body p {
+  margin: 0;
+}
+
+.rpfood-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.rpfood-payment-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 96px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.06), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.rpfood-payment-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.28);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
+}
+
+.rpfood-payment-option--active {
+  border-color: rgba(242, 153, 74, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(27, 79, 114, 0.98), rgba(46, 134, 193, 0.94) 58%, rgba(242, 153, 74, 0.92) 120%);
+  box-shadow: 0 18px 34px rgba(27, 79, 114, 0.16);
+}
+
+.rpfood-payment-option__radio {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.rpfood-payment-option__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-payment-option__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.rpfood-payment-option__title {
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rpfood-payment-option__marker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.rpfood-payment-option__meta {
+  margin: 0;
+  color: #617085;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.rpfood-payment-option--active .rpfood-payment-option__title,
+.rpfood-payment-option--active .rpfood-payment-option__meta {
+  color: #fff;
+}
+
+.rpfood-payment-option--active .rpfood-payment-option__marker {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.rpfood-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rpfood-totals-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 0;
+}
+
+.rpfood-totals-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid rgba(217, 228, 239, 0.95);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-totals-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #f2994a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-totals-card strong {
+  display: block;
+  color: #23314d;
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.rpfood-totals-card--accent {
+  background: linear-gradient(135deg, #1b4f72 0%, #2e86c1 55%, #f2994a 120%);
+  border-color: transparent;
+}
+
+.rpfood-totals-card--accent span,
+.rpfood-totals-card--accent strong {
+  color: #fff;
+}
+
+.rpfood-order-card {
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.06);
+}
+
+.rpfood-order-card__main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rpfood-order-card__media {
+  flex-shrink: 0;
+}
+
+.rpfood-order-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-order-card__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpfood-order-card__title,
+.rpfood-order-card__price,
+.rpfood-order-card__detail-title,
+.rpfood-order-card__detail-value {
+  margin: 0;
+  color: #c86a17;
+  font-weight: 800;
+}
+
+.rpfood-order-card__title,
+.rpfood-order-card__price {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.rpfood-order-card__meta,
+.rpfood-order-card__note,
+.rpfood-order-card__detail-meta {
+  color: #617085;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.rpfood-order-card__total {
+  color: #23314d;
+  font-size: 0.96rem;
+}
+
+.rpfood-order-card__note {
+  margin-top: 8px;
+}
+
+.rpfood-order-card__detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(217, 228, 239, 0.95);
+}
+
+.rpfood-order-card__detail--option {
+  align-items: flex-start;
+}
+
+.rpfood-order-card__detail-media {
+  flex-shrink: 0;
+}
+
+.rpfood-order-card__detail-media img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.rpfood-order-card__detail-content {
+  min-width: 0;
+}
+
+.rpfood-order-card__detail-content--full {
+  width: 100%;
+}
+
+.rpfood-order-items-shell__empty {
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: rgba(248, 251, 255, 0.92);
+  border: 1px dashed rgba(27, 79, 114, 0.18);
+  color: #617085;
+  font-weight: 600;
+}
+
+.rpfood-pix-shell {
+  padding: 24px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.16), transparent 34%),
+    linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  box-shadow:
+    0 24px 48px rgba(27, 79, 114, 0.08),
+    0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.rpfood-pix-shell__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.rpfood-pix-shell__toolbar-button {
+  width: auto;
+  min-width: 280px;
+}
+
+.rpfood-pix-shell__toolbar-status {
+  color: #617085;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.rpfood-pix-shell__header {
+  margin-bottom: 20px;
+}
+
+.rpfood-pix-shell__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-pix-shell__title {
+  margin: 12px 0 6px;
+  color: #23314d;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.rpfood-pix-shell__subtitle {
+  margin: 0;
+  color: #617085;
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+
+.rpfood-pix-shell__qr {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.rpfood-pix-shell__qr-frame {
+  display: inline-grid;
+  place-items: center;
+  width: min(100%, 280px);
+  min-height: 280px;
+  padding: 22px;
+  border-radius: 28px;
+  background: #fff;
+  border: 1px solid rgba(217, 228, 239, 0.96);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.06);
+}
+
+.rpfood-pix-shell__qr-image {
+  width: min(100%, 220px);
+  height: auto;
+  object-fit: contain;
+}
+
+.rpfood-pix-shell__qr-fallback {
+  width: 220px;
+  min-height: 60px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #617085;
+  line-height: 1.6;
+}
+
+.rpfood-pix-shell__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #c86a17;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.rpfood-pix-shell__details {
+  display: grid;
+  gap: 14px;
+}
+
+.rpfood-pix-shell__detail-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid rgba(217, 228, 239, 0.95);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-pix-shell__detail-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #f2994a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-pix-shell__detail-value {
+  color: #23314d;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rpfood-pix-shell__detail-value--code {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.rpfood-pix-shell__detail-value a {
+  color: #1b4f72;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rpfood-pix-shell__detail-value a:hover {
+  text-decoration: underline;
+}
+
+.rpfood-pix-shell__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-pix-shell__fallback-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-pix-shell__fallback-label {
+  display: block;
+  color: #f2994a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-pix-shell__fallback-title {
+  display: block;
+  margin-top: 6px;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.rpfood-pix-shell__fallback-text {
+  margin: 8px 0 0;
+  color: #617085;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.rpfood-pix-shell__fallback-button {
+  width: auto;
+  min-width: 250px;
+  flex-shrink: 0;
+}
+
+.rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__toolbar-button {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 280px;
+  flex: 0 0 auto;
+}
+
+.rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__fallback-button {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 250px;
+  flex: 0 0 auto;
+}
+
+.rpfood-troco-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(242, 153, 74, 0.2), transparent 35%),
+    rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(6px);
+}
+
+.rpfood-troco-modal__dialog {
+  width: min(100%, 460px);
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fff8f1 0%, #ffffff 32%);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  border: 1px solid rgba(242, 153, 74, 0.18);
+}
+
+.rpfood-troco-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(27, 79, 114, 0.1);
+}
+
+.rpfood-troco-modal__eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #c86a17;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-troco-modal__title {
+  margin: 0;
+  color: #1b4f72;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.rpfood-troco-modal__subtitle {
+  margin: 10px 0 0;
+  color: #617085;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.rpfood-troco-modal__close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.rpfood-troco-modal__close:hover {
+  background: rgba(27, 79, 114, 0.14);
+  transform: scale(1.04);
+}
+
+.rpfood-troco-modal__body {
+  padding: 22px 24px 24px;
+}
+
+.rpfood-troco-modal__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.rpfood-troco-modal__summary-card {
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.rpfood-troco-modal__summary-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: #7a889d;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rpfood-troco-modal__summary-card strong {
+  display: block;
+  color: #1b4f72;
+  font-size: 1.04rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.rpfood-troco-modal__summary-card--accent {
+  background: linear-gradient(135deg, rgba(27, 79, 114, 0.96), rgba(242, 153, 74, 0.92));
+  border-color: transparent;
+}
+
+.rpfood-troco-modal__summary-card--accent span,
+.rpfood-troco-modal__summary-card--accent strong {
+  color: #fff;
+}
+
+.rpfood-troco-modal__label {
+  display: block;
+  margin-bottom: 8px;
+  color: #1b4f72;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.rpfood-troco-modal__input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 0 16px;
+  border: 1px solid rgba(27, 79, 114, 0.16);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.rpfood-troco-modal__input-wrap:focus-within {
+  border-color: rgba(242, 153, 74, 0.9);
+  box-shadow: 0 0 0 4px rgba(242, 153, 74, 0.12);
+}
+
+.rpfood-troco-modal__input-prefix {
+  color: #c86a17;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-troco-modal__input {
+  border: none;
+  padding: 0;
+  height: 56px;
+  background: transparent;
+  color: #1b4f72;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.rpfood-troco-modal__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.rpfood-troco-modal__hint {
+  margin: 10px 0 0;
+  color: #7a889d;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.rpfood-troco-modal__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.rpfood-troco-modal__chip {
+  min-width: 88px;
+  padding: 10px 14px;
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #1b4f72;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.rpfood-troco-modal__chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.8);
+  box-shadow: 0 12px 18px rgba(242, 153, 74, 0.14);
+}
+
+.rpfood-troco-modal__chip--active {
+  background: linear-gradient(135deg, #1b4f72, #f2994a);
+  border-color: transparent;
+  color: #fff;
+}
+
+.rpfood-troco-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 24px 24px;
+  border-top: 1px solid rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-troco-modal__button {
+  min-width: 132px;
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.rpfood-troco-modal__button:hover {
+  transform: translateY(-1px);
+}
+
+.rpfood-troco-modal__button--secondary {
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  background: #fff;
+  color: #1b4f72;
+}
+
+.rpfood-troco-modal__button--primary {
+  border: none;
+  background: linear-gradient(135deg, #1b4f72, #2e86c1 50%, #f2994a);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(27, 79, 114, 0.2);
+}
+
+.rpfood-fulfillment-shell {
+  padding: 8px 4px 4px;
+}
+
+.rpfood-fulfillment-shell__header {
+  margin-bottom: 18px;
+}
+
+.rpfood-fulfillment-shell__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-fulfillment-shell__title {
+  margin: 12px 0 6px;
+  color: #1b4f72;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.rpfood-fulfillment-shell__subtitle {
+  margin: 0;
+  max-width: 720px;
+  color: #617085;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.rpfood-fulfillment-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rpfood-fulfillment-switch--single {
+  grid-template-columns: 1fr;
+}
+
+.rpfood-fulfillment-option {
+  position: relative;
+  width: 100%;
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.08), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  text-align: left;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease;
+}
+
+.rpfood-fulfillment-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.4);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.1);
+}
+
+.rpfood-fulfillment-option--active {
+  border-color: rgba(242, 153, 74, 0.45);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 34%),
+    linear-gradient(135deg, #1b4f72 0%, #245f87 48%, #f2994a 115%);
+  box-shadow: 0 22px 44px rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-fulfillment-option__icon {
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.rpfood-fulfillment-option--active .rpfood-fulfillment-option__icon {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.rpfood-fulfillment-option__body {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  flex: 1;
+}
+
+.rpfood-fulfillment-option__title {
+  color: #1b4f72;
+  font-size: 1.16rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.rpfood-fulfillment-option__meta {
+  color: #617085;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.rpfood-fulfillment-option__check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(27, 79, 114, 0.3);
+}
+
+.rpfood-fulfillment-option--active .rpfood-fulfillment-option__title,
+.rpfood-fulfillment-option--active .rpfood-fulfillment-option__meta,
+.rpfood-fulfillment-option--active .rpfood-fulfillment-option__check {
+  color: #fff;
+}
+
+.rpfood-observation-card {
+  padding: 22px 22px 20px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+}
+
+.rpfood-observation-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.rpfood-observation-card__eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.16);
+  color: #d46c15;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-observation-card__title {
+  margin: 0;
+  color: #c86a17;
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.rpfood-observation-card__subtitle {
+  max-width: 760px;
+  margin: 10px 0 0;
+  color: #617085;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.rpfood-observation-card__counter {
+  min-width: 84px;
+  padding: 12px 14px 10px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-observation-card__counter strong {
+  display: block;
+  color: #1b4f72;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rpfood-observation-card__counter span {
+  display: block;
+  margin-top: 4px;
+  color: #7a889d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.rpfood-observation-card__counter--warning {
+  border-color: rgba(242, 153, 74, 0.35);
+  background: rgba(255, 244, 231, 0.9);
+}
+
+.rpfood-observation-card__composer {
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.rpfood-observation-card__textarea {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  color: #2b3954;
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 16px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.rpfood-observation-card__textarea::placeholder {
+  color: #94a0b3;
+}
+
+.rpfood-observation-card__textarea:focus {
+  outline: none;
+  border-color: rgba(242, 153, 74, 0.95);
+  box-shadow: 0 0 0 4px rgba(242, 153, 74, 0.12);
+}
+
+.rpfood-observation-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.rpfood-observation-card__hint {
+  color: #7a889d;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.rpfood-observation-card__clear {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rpfood-observation-card__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.rpfood-observation-card__chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  background: #fff;
+  color: #1b4f72;
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.rpfood-observation-card__chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.8);
+  box-shadow: 0 12px 18px rgba(242, 153, 74, 0.12);
+}
+
+.rpfood-observation-card__chip--active {
+  background: linear-gradient(135deg, #1b4f72, #f2994a);
+  border-color: transparent;
+  color: #fff;
+}
+
+.rpfood-feedback-stack {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.rpfood-feedback-stack__item {
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.rpfood-feedback-stack__item--ok {
+  background: #eef9f0;
+  color: #2c7a4b;
+}
+
+.rpfood-feedback-stack__item--error {
+  background: #fff2f0;
+  color: #c0392b;
+}
+
+.rpfood-swal-popup {
+  width: min(92vw, 30rem) !important;
+  padding: 0 0 1.6rem !important;
+  border-radius: 30px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 34%),
+    linear-gradient(180deg, #fffdf9 0%, #ffffff 100%) !important;
+  border: 1px solid rgba(242, 153, 74, 0.14) !important;
+  box-shadow: 0 30px 70px rgba(17, 35, 52, 0.26) !important;
+}
+
+.rpfood-swal-popup .swal2-icon.swal2-warning {
+  border-color: rgba(242, 153, 74, 0.35) !important;
+  color: #f2994a !important;
+}
+
+.rpfood-swal-popup .swal2-icon.swal2-error {
+  border-color: rgba(239, 83, 80, 0.3) !important;
+  color: #ef5350 !important;
+}
+
+.rpfood-swal-popup .swal2-icon.swal2-question {
+  border-color: rgba(27, 79, 114, 0.26) !important;
+  color: #1b4f72 !important;
+}
+
+.rpfood-swal-title {
+  padding: 0 2rem !important;
+  color: #23314d !important;
+  font-size: clamp(1.45rem, 4vw, 1.95rem) !important;
+  font-weight: 800 !important;
+  line-height: 1.08 !important;
+}
+
+.rpfood-swal-text {
+  margin: 0.95rem 2rem 0 !important;
+  padding: 0 !important;
+  color: #617085 !important;
+  font-size: 1rem !important;
+  line-height: 1.65 !important;
+}
+
+.rpfood-swal-icon {
+  margin-top: 1.9rem !important;
+  margin-bottom: 0.8rem !important;
+}
+
+.rpfood-swal-actions {
+  width: calc(100% - 2.5rem) !important;
+  margin: 1.45rem auto 0 !important;
+  gap: 12px !important;
+}
+
+.rpfood-swal-confirm,
+.rpfood-swal-cancel {
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 1.35rem !important;
+  border: none !important;
+  border-radius: 16px !important;
+  font-size: 0.98rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em !important;
+}
+
+.rpfood-swal-confirm {
+  background: linear-gradient(135deg, #ff7a18 0%, #ff9324 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 18px 30px rgba(255, 122, 24, 0.24) !important;
+}
+
+.rpfood-swal-cancel {
+  background: linear-gradient(180deg, #ffffff 0%, #f2f7fb 100%) !important;
+  color: #1b4f72 !important;
+  border: 1px solid rgba(27, 79, 114, 0.12) !important;
+  box-shadow: 0 12px 24px rgba(27, 79, 114, 0.1) !important;
+}
+
+.rpfood-swal-close {
+  color: #b4bfcd !important;
+}
+
+.rpfood-swal-close:hover {
+  color: #f2994a !important;
+}
+
+.rpfood-tracking-page {
+  max-width: 1280px;
+  padding: 16px 12px 28px;
+}
+
+.rpfood-tracking-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.rpfood-tracking-toolbar__status {
+  color: #8a99ac;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rpfood-tracking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.rpfood-tracking-status-card,
+.rpfood-tracking-order-card {
+  border-radius: 30px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 254, 0.98));
+  box-shadow:
+    0 26px 56px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-tracking-status-card {
+  padding: 26px 26px 22px;
+}
+
+.rpfood-tracking-order-card {
+  padding: 24px;
+}
+
+.rpfood-tracking-status-card__hero,
+.rpfood-tracking-order-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rpfood-tracking-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-tracking-title,
+.rpfood-tracking-order-card__title {
+  margin: 14px 0 8px;
+  color: #26365a;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-weight: 800;
+  line-height: 1.04;
+}
+
+.rpfood-tracking-order-card__title {
+  font-size: 1.7rem;
+  margin-bottom: 0;
+}
+
+.rpfood-tracking-subtitle {
+  margin: 0;
+  color: #6b7b91;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.rpfood-tracking-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(242, 79, 79, 0.14), rgba(255, 138, 0, 0.18));
+  color: #d96d12;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.rpfood-tracking-progress-panel {
+  margin-top: 20px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.rpfood-tracking-progress-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #26365a;
+  font-weight: 800;
+}
+
+.rpfood-tracking-progress-panel__head span {
+  color: #ff7f11;
+}
+
+.rpfood-tracking-progress {
+  width: 100%;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e9eef4 0%, #dde6ef 100%);
+}
+
+.rpfood-tracking-progress__bar {
+  height: 100%;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.18) 0 10px,
+      rgba(255, 255, 255, 0.02) 10px 20px
+    ),
+    linear-gradient(135deg, #ff7a18 0%, #ff9324 100%);
+  box-shadow: 0 10px 18px rgba(255, 127, 17, 0.22);
+}
+
+.rpfood-tracking-progress-panel__copy {
+  margin: 12px 0 0;
+  color: #6d7d93;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.rpfood-tracking-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.rpfood-tracking-metric {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.rpfood-tracking-metric__label {
+  display: block;
+  color: #7d8ea5;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rpfood-tracking-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #26365a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.rpfood-tracking-timeline-wrap {
+  margin-top: 18px;
+}
+
+.rpfood-tracking-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.rpfood-tracking-section-title {
+  margin: 0;
+  color: #26365a;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-timeline-head__hint {
+  color: #8a99ac;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rpfood-tracking-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.rpfood-tracking-timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.rpfood-tracking-timeline__item::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 30px;
+  bottom: -18px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(46, 134, 193, 0.22), rgba(46, 134, 193, 0.04));
+}
+
+.rpfood-tracking-timeline__item:last-child::before {
+  display: none;
+}
+
+.rpfood-tracking-timeline__dot {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 4px solid rgba(46, 134, 193, 0.16);
+  background: #fff;
+  box-shadow: 0 10px 18px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-tracking-timeline__dot.is-current {
+  border-color: rgba(28, 172, 120, 0.22);
+  background: linear-gradient(135deg, #39c58f 0%, #58dba5 100%);
+  box-shadow: 0 16px 24px rgba(57, 197, 143, 0.2);
+}
+
+.rpfood-tracking-timeline__card {
+  display: block;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+  color: #5f7087;
+}
+
+.rpfood-tracking-timeline__card h6 {
+  margin-top: 6px;
+  color: #26365a;
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-timeline__card.is-current {
+  border-color: rgba(57, 197, 143, 0.22);
+  background: linear-gradient(135deg, rgba(213, 244, 231, 0.9), rgba(238, 251, 245, 0.98));
+}
+
+.rpfood-tracking-timeline__time {
+  color: #91a0b4;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rpfood-tracking-timeline__empty {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #8a99ac;
+  font-weight: 700;
+}
+
+.rpfood-tracking-address-card {
+  margin-top: 16px;
+  padding: 18px 18px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  background: rgba(255, 248, 241, 0.82);
+}
+
+.rpfood-tracking-address-card__label {
+  margin: 0 0 10px;
+  color: #d46c15;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rpfood-tracking-address-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #26365a;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-address-card__title svg {
+  color: #ff7f11;
+  flex-shrink: 0;
+}
+
+.rpfood-tracking-address-card__text {
+  margin: 10px 0 0;
+  color: #6d7d93;
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+.rpfood-tracking-items {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.rpfood-tracking-item-card {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.rpfood-tracking-item-card__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rpfood-tracking-item-card__body {
+  min-width: 0;
+}
+
+.rpfood-tracking-item-card__top,
+.rpfood-tracking-item-card__meta,
+.rpfood-tracking-totals__row,
+.rpfood-tracking-totals__row.is-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rpfood-tracking-item-card__title {
+  margin: 0;
+  color: #26365a;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-item-card__size {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(46, 134, 193, 0.12);
+  color: #1b4f72;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-item-card__total {
+  color: #ff7f11;
+  font-size: 1.12rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rpfood-tracking-item-card__meta {
+  margin-top: 12px;
+  color: #7c8ca2;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rpfood-tracking-totals {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-tracking-totals__row {
+  color: #607188;
+  font-size: 0.98rem;
+}
+
+.rpfood-tracking-totals__row strong {
+  color: #26365a;
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-totals__row.is-total {
+  margin-top: 14px;
+  align-items: flex-end;
+}
+
+.rpfood-tracking-totals__row.is-total span {
+  display: block;
+  color: #7a8ba3;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rpfood-tracking-totals__row.is-total strong {
+  display: block;
+  margin-top: 6px;
+  color: #ff7f11;
+  font-size: 1.7rem;
+}
+
+.rpfood-tracking-totals__payment {
+  text-align: right;
+  color: #1b4f72;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.rpfood-tracking-item-image {
+  display: block;
+  width: 74px;
+  height: 74px;
+  object-fit: cover;
+  border-radius: 20px;
+  border: 1px solid rgba(242, 153, 74, 0.18);
+  background: #fff;
+  box-shadow: 0 16px 28px rgba(255, 127, 17, 0.1);
+}
+
+.rpfood-tracking-item-image--empty {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border: 1px solid #dce4ee;
+}
+
+@media only screen and (max-width: 75rem) {
+  .rpfood-tracking-layout,
+  .rpfood-tracking-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media only screen and (max-width: 61.9375rem) {
+  .rpfood-tracking-status-card,
+  .rpfood-tracking-order-card {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .rpfood-tracking-status-card__hero,
+  .rpfood-tracking-order-card__header,
+  .rpfood-tracking-toolbar,
+  .rpfood-tracking-timeline-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-tracking-status-pill {
+    align-self: flex-start;
+  }
+}
+
+@media only screen and (max-width: 47.9375rem) {
+  .rpfood-tracking-page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .rpfood-tracking-item-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-tracking-item-card__media {
+    justify-content: flex-start;
+  }
+
+  .rpfood-tracking-item-card__top,
+  .rpfood-tracking-item-card__meta,
+  .rpfood-tracking-totals__row.is-total {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rpfood-tracking-item-card__total,
+  .rpfood-tracking-totals__payment {
+    text-align: left;
+  }
+
+  .rpfood-item-page-title h4 {
+    font-size: 1.65rem;
+  }
+
+  .rpfood-item-shell {
+    border-radius: 24px;
+  }
+
+  .rpfood-item-shell__body {
+    padding: 18px 16px 10px;
+  }
+
+  .rpfood-item-image-box {
+    min-height: 130px;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  .rpfood-item-image-box img {
+    max-height: 112px;
+  }
+
+  .rpfood-item-summary-card {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .rpfood-item-form-area {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .rpfood-item-size-button {
+    min-width: 98px;
+    min-height: 64px;
+  }
+
+  .rpfood-item-section {
+    padding: 0 16px 18px;
+  }
+
+  .rpfood-item-section-header,
+  .rpfood-item-choice-card {
+    border-radius: 18px;
+  }
+
+  .rpfood-item-choice-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-item-choice-card .d-flex.align-items-center.justify-content-between {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+.rpfood-item-screen {
+  margin: 0;
+}
+
+.rpfood-item-page-title {
+  margin-bottom: 2px;
+}
+
+.rpfood-item-page-title h4 {
+  color: #26365a;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rpfood-item-shell {
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 254, 0.98));
+  box-shadow:
+    0 28px 56px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-item-shell__body {
+  padding: 12px 12px 8px;
+}
+
+.rpfood-item-detail-row {
+  align-items: stretch;
+  gap: 8px 0;
+}
+
+/* Card do detalhe mais compacto: a imagem ocupava quase metade da tela.
+   O max-width evita a moldura esticar com a coluna e sobrar vazio nas laterais. */
+.rpfood-item-image-box {
+  min-height: 136px;
+  max-width: 158px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(242, 153, 74, 0.18), transparent 40%),
+    linear-gradient(180deg, #fff9f4 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 18px 34px rgba(242, 153, 74, 0.1);
+}
+
+.rpfood-item-image-box img {
+  width: auto;
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 32px rgba(27, 79, 114, 0.12));
+}
+
+.rpfood-item-image-box--empty {
+  border: 1px solid #eef1f6;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f3f6fa 100%);
+}
+
+.rpfood-item-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #a4afbd;
+  min-height: 96px;
+  font-weight: 700;
+}
+
+.rpfood-item-image-placeholder i {
+  font-size: 2rem;
+}
+
+.rpfood-item-detail-content {
+  width: 100%;
+}
+
+.rpfood-item-summary-card {
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 79, 114, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 36px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-item-summary-card h4 {
+  margin: 0;
+  color: #26365a;
+  font-size: clamp(1.3rem, 1.8vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.04;
+}
+
+.rpfood-item-price-wrap {
+  width: 100%;
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.rpfood-item-price {
+  margin: 10px 0 0;
+  display: inline-flex !important;
+  float: none !important;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(242, 79, 79, 0.12), rgba(255, 138, 0, 0.16));
+  color: #ff7f11 !important;
+  font-size: clamp(1.6rem, 2.5vw, 2.1rem);
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(255, 127, 17, 0.12);
+}
+
+.rpfood-item-description {
+  margin: 16px 0 0;
+  color: #6c7d93;
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.rpfood-item-size-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-item-size-panel__header .subtitle {
+  color: #5f7087;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rpfood-item-size-grid {
+  margin-top: 12px;
+}
+
+.rpfood-item-size-button {
+  min-width: 114px;
+  min-height: 70px;
+  padding: 12px 16px !important;
+  display: inline-flex !important;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  border-radius: 18px !important;
+  border-color: rgba(27, 79, 114, 0.12) !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: #1b4f72 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 12px 20px rgba(27, 79, 114, 0.06);
+}
+
+.rpfood-item-size-button span {
+  line-height: 1.1;
+}
+
+.rpfood-item-size-button small {
+  line-height: 1.1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  opacity: 0.88;
+}
+
+.btn-check:checked + .rpfood-item-size-button {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #1b4f72 0%, #2e86c1 100%);
+  color: #fff !important;
+  box-shadow: 0 18px 30px rgba(27, 79, 114, 0.22);
+}
+
+.rpfood-item-form-area {
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-item-field {
+  min-width: 0;
+}
+
+.rpfood-item-field label {
+  display: block;
+  margin: 0 0 10px;
+  color: #54657e;
+  font-size: 0.92rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rpfood-item-quantity-field {
+  max-width: none;
+}
+
+.rpfood-item-counter {
+  min-height: 58px;
+  padding: 6px;
+  border-radius: 20px;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.rpfood-item-counter button {
+  width: 48px;
+  height: 46px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1b4f72 0%, #2e86c1 100%);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 12px 20px rgba(27, 79, 114, 0.16);
+}
+
+.rpfood-item-counter input {
+  width: 64px;
+  border: none;
+  background: transparent;
+  color: #26365a;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+}
+
+.rpfood-item-observation-field input {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 18px;
+  border: 1px solid #d9e4ef;
+  border-radius: 18px;
+  background: #fff;
+  color: #223049;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+@media (max-width: 720px) {
+  .rpfood-item-form-area {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .rpfood-item-quantity-field,
+  .rpfood-item-observation-field {
+    width: 100%;
+  }
+
+  .rpfood-item-counter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rpfood-item-observation-field input {
+    min-height: 54px;
+  }
+}
+
+.rpfood-item-section {
+  padding: 0 22px 22px;
+}
+
+.rpfood-item-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 20px;
+}
+
+.rpfood-item-section-header i {
+  font-size: 1.15rem;
+}
+
+.rpfood-item-section-header span {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.rpfood-item-section-header--spaced {
+  margin: 18px 0 10px;
+}
+
+.rpfood-item-section-header--dark {
+  background: linear-gradient(135deg, #1a3a5c 0%, #1b4f72 55%, #2e86c1 100%);
+  box-shadow: 0 16px 28px rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-item-section-header--blue {
+  background: linear-gradient(135deg, #2980b9 0%, #3498db 60%, #5dade2 100%);
+  box-shadow: 0 16px 28px rgba(41, 128, 185, 0.18);
+}
+
+.rpfood-item-choice-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rpfood-item-choice-card {
+  list-style: none;
+  margin: 0;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-radius: 22px !important;
+  border: 1px solid rgba(27, 79, 114, 0.08) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 253, 0.98)) !important;
+  box-shadow: 0 16px 30px rgba(27, 79, 114, 0.07);
+}
+
+.rpfood-item-choice-card ul {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.rpfood-item-choice-card .form-check-label {
+  color: #26365a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.rpfood-item-choice-card .badge {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14) !important;
+  color: #d46c15 !important;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.rpfood-item-section__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.rpfood-item-section__count,
+.rpfood-item-section__rule {
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.rpfood-item-section__count {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.rpfood-item-section__rule--required {
+  background: rgba(192, 57, 43, 0.92);
+  color: #fff;
+}
+
+.rpfood-item-section__rule--ok {
+  background: rgba(35, 155, 86, 0.92);
+  color: #fff;
+}
+
+.rpfood-item-section__rule--warn {
+  background: rgba(230, 126, 34, 0.96);
+  color: #fff;
+}
+
+.rpfood-auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 18px;
+  background:
+    radial-gradient(circle at top, rgba(255, 216, 184, 0.75), transparent 32%),
+    radial-gradient(circle at right bottom, rgba(255, 153, 51, 0.14), transparent 28%),
+    linear-gradient(180deg, #fff7f0 0%, #fffdf9 100%);
+}
+
+.rpfood-auth-card {
+  width: min(100%, 640px);
+  padding: 28px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(238, 228, 219, 0.9);
+  box-shadow:
+    0 28px 80px rgba(104, 67, 39, 0.12),
+    0 8px 22px rgba(104, 67, 39, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.rpfood-auth-card--wide {
+  width: min(100%, 980px);
+}
+
+.rpfood-auth-card--login {
+  width: min(100%, 560px);
+}
+
+.rpfood-auth-header {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  margin: 20px 0 24px;
+}
+
+.rpfood-auth-header--compact {
+  margin-top: 16px;
+}
+
+.rpfood-auth-logo-wrap {
+  width: 108px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.96), rgba(255, 246, 238, 0.9)),
+    linear-gradient(180deg, #ffffff 0%, #fff4e9 100%);
+  border: 1px solid #f5ddd0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 14px 36px rgba(245, 124, 0, 0.12);
+}
+
+.rpfood-auth-logo {
+  max-width: 82px;
+  max-height: 82px;
+  object-fit: contain;
+}
+
+.rpfood-auth-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.12);
+  color: #f2994a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-auth-title {
+  margin: 0;
+  color: #23314d;
+  font-size: clamp(1.9rem, 2.7vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+.rpfood-auth-subtitle {
+  margin: 0;
+  max-width: 560px;
+  color: #6c7a90;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.rpfood-auth-form {
+  display: grid;
+  gap: 22px;
+}
+
+.rpfood-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.rpfood-form-field {
+  min-width: 0;
+}
+
+.rpfood-form-field--full,
+.rpfood-form-field--span-2 {
+  grid-column: 1 / -1;
+}
+
+.rpfood-form-field label {
+  display: block;
+  margin: 0 0 8px;
+  color: #54657e;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.rpfood-form-field input,
+.rpfood-form-field select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid #d9e4ef;
+  border-radius: 16px;
+  background: #fff;
+  color: #223049;
+  font-size: 1rem;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.rpfood-form-field input::placeholder,
+.rpfood-form-field select {
+  color: #96a4b7;
+}
+
+.rpfood-form-field input:hover,
+.rpfood-form-field select:hover {
+  border-color: #c2d4e5;
+}
+
+.rpfood-form-field input:focus,
+.rpfood-form-field select:focus {
+  outline: none;
+  border-color: #f2994a;
+  box-shadow:
+    0 0 0 4px rgba(242, 153, 74, 0.14),
+    inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.rpfood-form-field input[readonly] {
+  background: linear-gradient(180deg, #f9fbfd 0%, #f3f7fb 100%);
+  color: #5e6f87;
+}
+
+.rpfood-form-field--price {
+  max-width: 220px;
+}
+
+.rpfood-auth-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.rpfood-login-callout {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 38%),
+    linear-gradient(180deg, #fff8f1 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow: 0 16px 32px rgba(104, 67, 39, 0.08);
+}
+
+.rpfood-login-callout__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-login-callout__title {
+  display: block;
+  margin: 12px 0 8px;
+  color: #23314d;
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rpfood-login-callout__text {
+  margin: 0;
+  color: #6c7a90;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.rpfood-auth-highlight {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 38%),
+    linear-gradient(180deg, #fff8f1 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow: 0 16px 32px rgba(104, 67, 39, 0.08);
+}
+
+.rpfood-auth-highlight--cool {
+  background:
+    radial-gradient(circle at top right, rgba(46, 134, 193, 0.14), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border-color: rgba(27, 79, 114, 0.12);
+  box-shadow: 0 16px 32px rgba(27, 79, 114, 0.08);
+}
+
+.rpfood-auth-highlight__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-auth-highlight--cool .rpfood-auth-highlight__eyebrow {
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+}
+
+.rpfood-auth-highlight__title {
+  display: block;
+  margin: 12px 0 8px;
+  color: #23314d;
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.rpfood-auth-highlight__text {
+  margin: 0;
+  color: #6c7a90;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.rpfood-login-phone-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 0 16px;
+  border: 1px solid #d9e4ef;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 22px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.rpfood-login-phone-field:hover {
+  border-color: #c2d4e5;
+}
+
+.rpfood-login-phone-field:focus-within {
+  border-color: #f2994a;
+  box-shadow:
+    0 0 0 4px rgba(242, 153, 74, 0.14),
+    0 10px 22px rgba(15, 23, 42, 0.05);
+  transform: translateY(-1px);
+}
+
+.rpfood-login-phone-field__prefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.rpfood-login-phone-field__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  height: 56px;
+  background: transparent;
+  color: #223049;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.rpfood-login-phone-field__input::placeholder {
+  color: #9aa8bb;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.rpfood-login-phone-field__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.rpfood-login-phone-field__hint {
+  margin: 10px 2px 0;
+  color: #6c7a90;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.rpfood-login-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.rpfood-address-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.rpfood-address-list-header__meta {
+  min-width: 0;
+}
+
+.rpfood-address-list-header__meta strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-address-list-header__meta span {
+  display: block;
+  color: #6c7a90;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.rpfood-address-list-header__button {
+  width: auto;
+  min-width: 190px;
+}
+
+.rpfood-address-list {
+  display: grid;
+  gap: 14px;
+}
+
+.rpfood-address-card {
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.1), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  border: 1px solid rgba(217, 228, 239, 0.96);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.rpfood-address-card--active {
+  border-color: rgba(27, 79, 114, 0.18);
+  box-shadow:
+    0 18px 34px rgba(27, 79, 114, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.rpfood-address-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.rpfood-address-card__icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  flex-shrink: 0;
+}
+
+.rpfood-address-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-address-card__title {
+  display: block;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.rpfood-address-card__text {
+  margin: 6px 0 0;
+  color: #6c7a90;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.rpfood-address-card__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #1b4f72;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.rpfood-address-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.rpfood-address-card__button {
+  flex: 1 1 220px;
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.rpfood-address-card__button:hover {
+  transform: translateY(-1px);
+}
+
+.rpfood-address-card__button--primary {
+  background: linear-gradient(135deg, #1b4f72, #2e86c1 55%, #f2994a);
+  color: #fff;
+  box-shadow: 0 16px 28px rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-address-card__button--selected {
+  background: linear-gradient(135deg, #1f8f5f, #34b27b);
+  color: #fff;
+  box-shadow: 0 16px 28px rgba(31, 143, 95, 0.18);
+}
+
+.rpfood-address-card__button--secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: #1b4f72;
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  box-shadow: 0 12px 24px rgba(27, 79, 114, 0.07);
+}
+
+.rpfood-address-empty {
+  padding: 28px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 36%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px dashed rgba(27, 79, 114, 0.18);
+  text-align: center;
+}
+
+.rpfood-address-empty strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-address-empty p {
+  margin: 0;
+  color: #6c7a90;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.rpfood-address-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.rpfood-address-form-actions .rpfood-primary-action,
+.rpfood-address-form-actions .rpfood-secondary-action {
+  flex: 1;
+}
+
+.rpfood-address-picker {
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 34%),
+    radial-gradient(circle at top left, rgba(46, 134, 193, 0.08), transparent 28%),
+    linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+}
+
+.rpfood-address-picker__hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.15), transparent 34%),
+    linear-gradient(135deg, rgba(27, 79, 114, 0.98), rgba(46, 134, 193, 0.92) 56%, rgba(242, 153, 74, 0.94));
+  color: #fff;
+  box-shadow: 0 22px 40px rgba(27, 79, 114, 0.18);
+}
+
+.rpfood-address-picker__hero-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-address-picker__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-address-picker__hero-title {
+  display: block;
+  margin-top: 14px;
+  font-size: clamp(1.2rem, 2.1vw, 1.7rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.rpfood-address-picker__hero-text {
+  margin: 10px 0 0;
+  max-width: 42rem;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.rpfood-address-picker__hero-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+  align-self: stretch;
+}
+
+.rpfood-address-picker__stat {
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.rpfood-address-picker__stat-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-address-picker__stat-value {
+  display: block;
+  margin-top: 8px;
+  color: #fff;
+  font-size: 1.18rem;
+  font-weight: 900;
+}
+
+.rpfood-address-picker__section {
+  margin-top: 22px;
+}
+
+.rpfood-address-picker__section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.rpfood-address-picker__section-kicker {
+  display: block;
+  color: #f2994a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-address-picker__section-title {
+  margin: 6px 0 0;
+  color: #23314d;
+  font-size: clamp(1.22rem, 2.1vw, 1.55rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.rpfood-address-picker__section-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rpfood-address-picker__grid {
+  display: grid;
+  gap: 14px;
+}
+
+.rpfood-address-picker-card {
+  padding: 18px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.08), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  border: 1px solid rgba(217, 228, 239, 0.96);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.rpfood-address-picker-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.28);
+  box-shadow: 0 20px 34px rgba(27, 79, 114, 0.09);
+}
+
+.rpfood-address-picker-card--active {
+  border-color: rgba(27, 79, 114, 0.2);
+  box-shadow:
+    0 22px 38px rgba(27, 79, 114, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.rpfood-address-picker-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.rpfood-address-picker-card__icon {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  flex-shrink: 0;
+}
+
+.rpfood-address-picker-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.rpfood-address-picker-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rpfood-address-picker-card__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(27, 79, 114, 0.08);
+  color: #1b4f72;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rpfood-address-picker-card__badge--active {
+  background: linear-gradient(135deg, #1f8f5f, #34b27b);
+  color: #fff;
+}
+
+.rpfood-address-picker-card__title {
+  display: block;
+  color: #23314d;
+  font-size: 1.04rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.rpfood-address-picker-card__text {
+  margin: 8px 0 0;
+  color: #6c7a90;
+  font-size: 0.94rem;
+  line-height: 1.7;
+}
+
+.rpfood-address-picker-card__button {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #1b4f72, #2e86c1 55%, #f2994a);
+  color: #fff;
+  font-size: 0.96rem;
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(27, 79, 114, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.rpfood-address-picker-card__button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.rpfood-address-picker-card__button--selected {
+  background: linear-gradient(135deg, #1f8f5f, #34b27b);
+  box-shadow: 0 16px 28px rgba(31, 143, 95, 0.18);
+}
+
+.rpfood-secondary-action {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(27, 79, 114, 0.14);
+  border-radius: 18px;
+  padding: 0 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f9fc 100%);
+  color: #1b4f72;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 26px rgba(27, 79, 114, 0.08);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.rpfood-secondary-action:hover:not(:disabled),
+.rpfood-secondary-action:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.4);
+  background: linear-gradient(180deg, #ffffff 0%, #eef5fb 100%);
+  box-shadow: 0 18px 30px rgba(27, 79, 114, 0.12);
+}
+
+.rpfood-secondary-action:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.rpfood-primary-action {
+  width: 100%;
+  min-height: 58px;
+  border: none;
+  border-radius: 18px;
+  padding: 0 20px;
+  background: linear-gradient(135deg, #ff7a18 0%, #ff9324 100%);
+  color: #fff;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 18px 30px rgba(255, 122, 24, 0.22);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.rpfood-primary-action:hover:not(:disabled),
+.rpfood-primary-action:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 34px rgba(255, 122, 24, 0.28);
+  filter: saturate(1.04);
+}
+
+.rpfood-primary-action:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.rpfood-auth-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+  color: #6b7a90;
+  font-size: 0.98rem;
+}
+
+.rpfood-profile-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.rpfood-profile-summary__item {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 36%),
+    linear-gradient(180deg, #fff8f1 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow: 0 12px 28px rgba(104, 67, 39, 0.08);
+}
+
+.rpfood-profile-summary__label {
+  display: block;
+  margin-bottom: 8px;
+  color: #f2994a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-profile-summary__value {
+  display: block;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.rpfood-profile-note {
+  margin: 18px 0 0;
+  color: #6c7a90;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.rpfood-store-shell {
+  width: min(100%, 1120px);
+  padding: 12px 0 8px;
+}
+
+.rpfood-store-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 28px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 249, 242, 0.94) 100%);
+  border: 1px solid rgba(242, 153, 74, 0.16);
+  box-shadow:
+    0 24px 56px rgba(104, 67, 39, 0.1),
+    0 8px 20px rgba(104, 67, 39, 0.06);
+}
+
+.rpfood-store-hero__content {
+  min-width: 0;
+}
+
+.rpfood-store-status {
+  min-width: 210px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid rgba(27, 79, 114, 0.1);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.rpfood-store-status__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-store-status__value {
+  display: block;
+  font-size: 1.16rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.rpfood-store-status--open {
+  color: #1f8f5f;
+  background: linear-gradient(180deg, #f2fff8 0%, #ffffff 100%);
+  border-color: rgba(31, 143, 95, 0.16);
+}
+
+.rpfood-store-status--closed {
+  color: #c85b3f;
+  background: linear-gradient(180deg, #fff5f1 0%, #ffffff 100%);
+  border-color: rgba(200, 91, 63, 0.16);
+}
+
+.rpfood-store-highlights {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.rpfood-store-highlight {
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(217, 228, 239, 0.92);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-store-highlight__label {
+  display: block;
+  margin-bottom: 8px;
+  color: #f2994a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-store-highlight__value {
+  display: block;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.rpfood-store-panel {
+  padding: 26px 28px 28px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 228, 239, 0.96);
+  box-shadow:
+    0 24px 56px rgba(15, 23, 42, 0.08),
+    0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.rpfood-store-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.rpfood-store-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  border-radius: 999px;
+  background: #fff;
+  color: #1b4f72;
+  font-size: 0.96rem;
+  font-weight: 700;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.rpfood-store-tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(242, 153, 74, 0.55);
+  box-shadow: 0 12px 20px rgba(242, 153, 74, 0.1);
+}
+
+.rpfood-store-tab--active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #1b4f72 0%, #2f6d97 50%, #f2994a 118%);
+  color: #fff;
+  box-shadow: 0 16px 26px rgba(27, 79, 114, 0.16);
+}
+
+.rpfood-store-tab__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rpfood-store-content {
+  min-height: 300px;
+}
+
+.rpfood-store-card {
+  padding: 24px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(242, 153, 74, 0.12), transparent 30%),
+    linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid rgba(242, 153, 74, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.rpfood-store-card__header {
+  margin-bottom: 18px;
+}
+
+.rpfood-store-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(242, 153, 74, 0.14);
+  color: #d46c15;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-store-card__title {
+  margin: 12px 0 0;
+  color: #23314d;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.rpfood-store-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rpfood-store-info-item,
+.rpfood-store-schedule-card,
+.rpfood-store-time-card {
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid rgba(217, 228, 239, 0.95);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.rpfood-store-info-item__label,
+.rpfood-store-time-card__label {
+  display: block;
+  margin-bottom: 8px;
+  color: #f2994a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rpfood-store-info-item__value {
+  color: #52637d;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.rpfood-store-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rpfood-store-schedule-card__day {
+  display: block;
+  margin-bottom: 10px;
+  color: #23314d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.rpfood-store-schedule-card__periods {
+  display: grid;
+  gap: 8px;
+  color: #617085;
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+.rpfood-store-payment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rpfood-store-payment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(27, 79, 114, 0.12);
+  color: #1b4f72;
+  font-size: 0.96rem;
+  font-weight: 700;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+}
+
+.rpfood-store-payment-chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1b4f72, #f2994a);
+}
+
+.rpfood-store-time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rpfood-store-time-card__value {
+  display: block;
+  color: #23314d;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.rpfood-store-time-card__note {
+  margin: 10px 0 0;
+  color: #617085;
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+
+.rpfood-store-empty {
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px dashed rgba(27, 79, 114, 0.18);
+  color: #617085;
+  font-weight: 600;
+}
+
+.rpfood-text-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #1b4f72;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rpfood-text-link:hover,
+.rpfood-text-link:focus-visible {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  body.rpfood-item-open {
+    padding-bottom: 200px;
+  }
+
+  .rpfood-destaque-card {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .rpfood-categoria-card {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .rpfood-destaque-card img {
+    width: 172px !important;
+    height: 113px !important;
+  }
+
+  .rpfood-categoria-card img {
+    width: 172px !important;
+    height: 113px !important;
+  }
+
+  /* O SmartImage fluido preenche o wrapper; tamanho fixo aqui deixava a imagem
+     ancorada no canto do card. */
+  .rpfood-categoria-card .rpfood-smart-image--fluid img {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .rpfood-nav-button span {
+    font-size: 0.62rem;
+  }
+
+  .rpfood-nav-button--small span {
+    font-size: 0.58rem;
+  }
+
+  .rpfood-cart-panel {
+    top: 72px;
+    bottom: calc(var(--rpfood-bottom-nav-total-height) + 50px);
+  }
+
+  #barraAcaoItemPedido {
+    bottom: calc(var(--rpfood-bottom-nav-total-height) + 60px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  #barraAcaoItemPedido .btn {
+    font-size: 0.9rem;
+    padding: 13px 10px;
+  }
+
+  .rpfood-auth-shell {
+    padding: 22px 12px;
+  }
+
+  .rpfood-auth-card {
+    padding: 20px 16px;
+    border-radius: 24px;
+  }
+
+  .rpfood-auth-highlight {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .rpfood-login-callout {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .rpfood-address-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-address-list-header__button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rpfood-address-card {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .rpfood-address-card__header {
+    flex-wrap: wrap;
+  }
+
+  .rpfood-address-card__badge {
+    order: -1;
+  }
+
+  .rpfood-address-picker__hero,
+  .rpfood-address-picker__section-header,
+  .rpfood-address-picker-card__top {
+    flex-direction: column;
+  }
+
+  .rpfood-address-picker__hero-meta {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rpfood-address-picker__section-count {
+    align-self: flex-start;
+  }
+
+  .rpfood-address-form-actions {
+    flex-direction: column;
+  }
+
+  .rpfood-login-phone-field {
+    gap: 10px;
+    padding: 0 14px;
+  }
+
+  .rpfood-login-phone-field__prefix {
+    min-width: 48px;
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.9rem;
+  }
+
+  .rpfood-login-phone-field__input {
+    font-size: 1rem;
+  }
+
+  .rpfood-auth-logo-wrap {
+    width: 92px;
+    height: 92px;
+    border-radius: 24px;
+  }
+
+  .rpfood-auth-logo {
+    max-width: 70px;
+    max-height: 70px;
+  }
+
+  .rpfood-form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .rpfood-form-field--span-2 {
+    grid-column: auto;
+  }
+
+  .rpfood-form-field--price {
+    max-width: none;
+  }
+
+  .rpfood-profile-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-store-shell {
+    width: 100%;
+  }
+
+  .rpfood-store-hero,
+  .rpfood-store-panel {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .rpfood-store-hero {
+    flex-direction: column;
+  }
+
+  .rpfood-store-status {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rpfood-store-highlights,
+  .rpfood-store-info-grid,
+  .rpfood-store-schedule-grid,
+  .rpfood-store-time-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-store-card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .rpfood-store-card__title {
+    font-size: 1.5rem;
+  }
+
+  .rpfood-store-tab {
+    flex: 1 1 calc(50% - 5px);
+    justify-content: center;
+  }
+
+  .rpfood-auth-footer {
+    flex-wrap: wrap;
+    text-align: center;
+  }
+
+  .rpfood-checkout-content {
+    padding-bottom: 220px;
+  }
+
+  .rpfood-checkout-hero,
+  .rpfood-checkout-section,
+  .rpfood-pix-shell {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .rpfood-pix-shell__toolbar,
+  .rpfood-pix-shell__fallback {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-pix-shell__toolbar-button,
+  .rpfood-pix-shell__fallback-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__toolbar-button,
+  .rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__fallback-button {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .rpfood-pix-shell__toolbar-status {
+    text-align: left;
+  }
+
+  .rpfood-checkout-hero__title {
+    font-size: 1.8rem;
+  }
+
+  .rpfood-checkout-section__title,
+  .rpfood-pix-shell__title {
+    font-size: 1.42rem;
+  }
+
+  .rpfood-checkout-hero__subtitle,
+  .rpfood-checkout-section__subtitle,
+  .rpfood-pix-shell__subtitle {
+    font-size: 0.92rem;
+  }
+
+  .rpfood-inline-address-form__actions {
+    flex-direction: column;
+  }
+
+  .rpfood-totals-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rpfood-totals-card--accent {
+    grid-column: 1 / -1;
+  }
+
+  .rpfood-order-card__main {
+    align-items: flex-start;
+  }
+
+  .rpfood-pix-shell__qr-frame {
+    width: min(100%, 240px);
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --rpfood-bottom-nav-height: 62px;
+  }
+
+  body.rpfood-checkout-open {
+    padding-bottom: 206px;
+  }
+
+  #checkoutActionBar {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--rpfood-bottom-nav-total-height) + 4px);
+    padding: 9px;
+  }
+
+  .rpfood-nav-button {
+    gap: 1px;
+    padding: 4px 0 3px;
+  }
+
+  .rpfood-bottom-nav-version {
+    top: 2px;
+    right: calc(env(safe-area-inset-right, 0px) + 8px);
+    font-size: 0.58rem;
+  }
+
+  .rpfood-nav-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .rpfood-nav-button span {
+    font-size: 0.58rem;
+    letter-spacing: -0.01em;
+  }
+
+  .rpfood-nav-button--small span {
+    font-size: 0.55rem;
+  }
+
+  #checkoutActionBarValor {
+    font-size: 1.16rem;
+  }
+
+  .rpfood-troco-modal {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
+  .rpfood-troco-modal__dialog {
+    width: 100%;
+    border-radius: 24px 24px 18px 18px;
+  }
+
+  .rpfood-troco-modal__header,
+  .rpfood-troco-modal__body,
+  .rpfood-troco-modal__footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .rpfood-troco-modal__title {
+    font-size: 1.55rem;
+  }
+
+  .rpfood-troco-modal__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-troco-modal__footer {
+    flex-direction: column-reverse;
+  }
+
+  .rpfood-troco-modal__button {
+    width: 100%;
+  }
+
+  .rpfood-observation-card {
+    padding: 18px 16px;
+    border-radius: 22px;
+  }
+
+  .rpfood-fulfillment-shell {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .rpfood-fulfillment-shell__title {
+    font-size: 1.42rem;
+  }
+
+  .rpfood-fulfillment-shell__subtitle {
+    font-size: 0.92rem;
+  }
+
+  .rpfood-fulfillment-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-fulfillment-option {
+    min-height: 92px;
+    padding: 16px;
+    gap: 14px;
+    border-radius: 20px;
+  }
+
+  .rpfood-fulfillment-option__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+
+  .rpfood-fulfillment-option__title {
+    font-size: 1.04rem;
+  }
+
+  .rpfood-fulfillment-option__meta {
+    font-size: 0.86rem;
+  }
+
+  .rpfood-store-tab {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .rpfood-store-card__title {
+    font-size: 1.36rem;
+  }
+
+  .rpfood-store-time-card__value {
+    font-size: 1.7rem;
+  }
+
+  .rpfood-observation-card__header {
+    flex-direction: column;
+  }
+
+  .rpfood-observation-card__title {
+    font-size: 1.55rem;
+  }
+
+  .rpfood-observation-card__subtitle {
+    font-size: 0.94rem;
+  }
+
+  .rpfood-observation-card__counter {
+    width: 100%;
+    max-width: 120px;
+  }
+
+  .rpfood-observation-card__composer {
+    padding: 14px;
+  }
+
+  .rpfood-observation-card__textarea {
+    min-height: 140px;
+    padding: 14px 15px;
+  }
+
+  .rpfood-observation-card__footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rpfood-checkout-content {
+    padding-bottom: 210px;
+  }
+
+  .rpfood-checkout-hero,
+  .rpfood-checkout-section,
+  .rpfood-pix-shell {
+    padding: 18px 16px;
+    border-radius: 22px;
+  }
+
+  .rpfood-pix-shell__toolbar,
+  .rpfood-pix-shell__fallback {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rpfood-pix-shell__toolbar-button,
+  .rpfood-pix-shell__fallback-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__toolbar-button,
+  .rpfood-pix-shell .rpfood-secondary-action.rpfood-pix-shell__fallback-button {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .rpfood-pix-shell__toolbar-status {
+    text-align: left;
+  }
+
+  .rpfood-checkout-hero__title {
+    font-size: 1.56rem;
+  }
+
+  .rpfood-checkout-section__title,
+  .rpfood-pix-shell__title {
+    font-size: 1.28rem;
+  }
+
+  .rpfood-delivery-card__header,
+  .rpfood-delivery-card__item,
+  .rpfood-payment-option__top,
+  .rpfood-order-card__main,
+  .rpfood-order-card__row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rpfood-delivery-card__body,
+  .rpfood-inline-address-form__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .rpfood-inline-address-form__header {
+    padding: 14px 16px 0;
+  }
+
+  .rpfood-delivery-card__item {
+    padding: 14px;
+  }
+
+  .rpfood-payment-grid,
+  .rpfood-totals-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rpfood-totals-card--accent {
+    grid-column: auto;
+  }
+
+  .rpfood-order-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .rpfood-order-card__detail {
+    align-items: flex-start;
+  }
+
+  .rpfood-delivery-card__summary {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .rpfood-pickup-card {
+    padding: 18px 16px;
+    border-radius: 22px;
+  }
+
+  .rpfood-pickup-card__title {
+    font-size: 1.12rem;
+  }
+
+  .rpfood-pix-shell__qr-frame {
+    width: min(100%, 220px);
+    min-height: 220px;
+    padding: 16px;
+    border-radius: 24px;
+  }
+
+  .rpfood-pix-shell__qr-image {
+    width: min(100%, 188px);
+  }
+
+  .rpfood-pix-shell__status {
+    text-align: center;
+    font-size: 0.84rem;
+  }
+
+  .rpfood-pix-shell__detail-card {
+    padding: 14px 15px;
+    border-radius: 18px;
+  }
+
+  .rpfood-pix-shell__detail-value--code {
+    padding: 10px 12px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .rpfood-nav-button span {
+    font-size: 0.55rem;
+  }
+
+  .rpfood-nav-button--small span {
+    font-size: 0.52rem;
+  }
+
+  .rpfood-checkout-hero__title {
+    font-size: 1.44rem;
+  }
+
+  .rpfood-checkout-section__title,
+  .rpfood-pix-shell__title,
+  .rpfood-fulfillment-shell__title {
+    font-size: 1.2rem;
+  }
+
+  .rpfood-payment-option__marker {
+    font-size: 0.66rem;
+    padding: 0 8px;
+  }
+}
+
+@media (min-width: 768px) {
+  #checkoutActionBar {
+    left: max(16px, calc(50% - 340px));
+    right: max(16px, calc(50% - 340px));
+  }
+}

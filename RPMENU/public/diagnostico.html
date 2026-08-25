@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RP Food - diagnostico de carrossel</title>
+    <style>
+      body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; background: #f6f9fc; color: #26365a; }
+      h1 { font-size: 1.1rem; margin: 0 0 4px; }
+      p.sub { margin: 0 0 16px; color: #708198; font-size: .85rem; }
+      section { background: #fff; border: 1px solid #e3eaf2; border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+      h2 { font-size: .9rem; margin: 0 0 8px; }
+      .linha { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #f0f4f8; font-size: .82rem; }
+      .linha:last-child { border-bottom: none; }
+      .ok { color: #1e7e46; font-weight: 700; }
+      .nao { color: #c0392b; font-weight: 700; }
+      textarea { width: 100%; height: 190px; font-family: ui-monospace, Menlo, monospace; font-size: .72rem; border: 1px solid #d7e1ec; border-radius: 8px; padding: 8px; }
+      button { width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 10px; background: #1b4f72; color: #fff; font-weight: 700; font-size: .95rem; }
+
+      /* Mesmas regras do carrossel real do site */
+      .trilho {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        touch-action: manipulation;
+      }
+      .trilho::-webkit-scrollbar { display: none; }
+      .trilho > * { flex: 0 0 auto; scroll-snap-align: start; }
+      .slide {
+        width: 140px; min-width: 140px; height: 96px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 12px; background: linear-gradient(135deg, #ffd9a8, #ffb066);
+        font-weight: 800;
+      }
+      .status { margin-top: 8px; font-size: .82rem; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>Diagnostico do carrossel</h1>
+    <p class="sub">Arraste o bloco laranja abaixo com o dedo, depois toque em "Copiar resultado" e mande para o desenvolvedor.</p>
+
+    <section>
+      <h2>1. Teste automatico</h2>
+      <div class="status" id="auto">Executando...</div>
+    </section>
+
+    <section>
+      <h2>2. ARRASTE o bloco laranja com o dedo</h2>
+      <p class="sub" style="margin:0 0 8px">Sem arrastar aqui, o resultado nao serve. Deslize para os lados.</p>
+      <div class="trilho" id="trilho">
+        <div class="slide">1</div><div class="slide">2</div><div class="slide">3</div>
+        <div class="slide">4</div><div class="slide">5</div><div class="slide">6</div>
+        <div class="slide">7</div><div class="slide">8</div>
+      </div>
+      <div class="status" id="status">Ainda nao arrastou.</div>
+    </section>
+
+    <section>
+      <h2>2. Suporte do navegador</h2>
+      <div id="suporte"></div>
+    </section>
+
+    <section>
+      <h2>3. Resultado</h2>
+      <textarea id="saida" readonly></textarea>
+      <button id="copiar" type="button">Copiar resultado</button>
+    </section>
+
+    <script>
+      var trilho = document.getElementById('trilho');
+      var status = document.getElementById('status');
+      var maxScroll = 0;
+      var eventos = { pointerdown: 0, pointermove: 0, pointercancel: 0, touchstart: 0, touchmove: 0, scroll: 0 };
+
+      ['pointerdown', 'pointermove', 'pointercancel', 'touchstart', 'touchmove'].forEach(function (nome) {
+        trilho.addEventListener(nome, function () { eventos[nome]++; atualiza(); }, { passive: true });
+      });
+      trilho.addEventListener('scroll', function () {
+        eventos.scroll++;
+        if (trilho.scrollLeft > maxScroll) maxScroll = trilho.scrollLeft;
+        atualiza();
+      }, { passive: true });
+
+      var checks = [
+        ['aspect-ratio', 'aspect-ratio: 1 / 1'],
+        ['overflow clip', 'overflow-x: clip'],
+        ['touch-action manipulation', 'touch-action: manipulation'],
+        ['scroll-snap proximity', 'scroll-snap-type: x proximity'],
+        ['content-visibility', 'content-visibility: auto'],
+        ['line-clamp', '-webkit-line-clamp: 2'],
+        ['min() em width', 'width: min(100%, 100px)']
+      ];
+
+      var suporte = {};
+      var html = '';
+      checks.forEach(function (c) {
+        var ok = false;
+        try { ok = CSS.supports(c[1]); } catch (e) { ok = false; }
+        suporte[c[0]] = ok;
+        html += '<div class="linha"><span>' + c[0] + '</span><span class="' + (ok ? 'ok' : 'nao') + '">' + (ok ? 'SIM' : 'NAO') + '</span></div>';
+      });
+      html += '<div class="linha"><span>tem overflow</span><span>' + (trilho.scrollWidth > trilho.clientWidth ? 'SIM' : 'NAO') + '</span></div>';
+      document.getElementById('suporte').innerHTML = html;
+
+      function atualiza() {
+        status.textContent = maxScroll > 0
+          ? 'Rolou ' + Math.round(maxScroll) + 'px — o carrossel FUNCIONA aqui.'
+          : 'Ainda nao rolou (eventos: move=' + eventos.pointermove + ', touchmove=' + eventos.touchmove + ', cancel=' + eventos.pointercancel + ')';
+        render();
+      }
+
+      // Testa por script se o elemento aceita rolagem horizontal. Separa
+      // "layout impede o scroll" de "o gesto nao chega ao elemento".
+      var auto = { scrollProgramatico: null, voltouAoZero: null };
+      (function testeAutomatico() {
+        var alvo = 200;
+        trilho.scrollLeft = alvo;
+        setTimeout(function () {
+          auto.scrollProgramatico = Math.round(trilho.scrollLeft);
+          trilho.scrollLeft = 0;
+          setTimeout(function () {
+            auto.voltouAoZero = Math.round(trilho.scrollLeft);
+            maxScroll = 0;
+            eventos.scroll = 0;
+            var el = document.getElementById('auto');
+            if (auto.scrollProgramatico > 0) {
+              el.innerHTML = '<span class="ok">O elemento ROLA por script (' + auto.scrollProgramatico + 'px).</span><br>Se o dedo nao rolar, o problema e o gesto, nao o layout.';
+            } else {
+              el.innerHTML = '<span class="nao">O elemento NAO rola nem por script.</span><br>O problema esta no layout/CSS.';
+            }
+            render();
+          }, 150);
+        }, 150);
+      })();
+
+      function render() {
+        var linhas = [
+          'userAgent: ' + navigator.userAgent,
+          'teste automatico (scroll por script): ' + JSON.stringify(auto),
+          'plataforma: ' + (navigator.platform || '-'),
+          'maxTouchPoints: ' + navigator.maxTouchPoints,
+          'tela: ' + window.innerWidth + 'x' + window.innerHeight + ' dpr=' + window.devicePixelRatio,
+          'scrollWidth/clientWidth: ' + trilho.scrollWidth + '/' + trilho.clientWidth,
+          'rolagem maxima atingida: ' + Math.round(maxScroll) + 'px',
+          'eventos: ' + JSON.stringify(eventos),
+          'suporte: ' + JSON.stringify(suporte)
+        ];
+        document.getElementById('saida').value = linhas.join('\n');
+      }
+
+      document.getElementById('copiar').addEventListener('click', function () {
+        if (eventos.touchstart === 0 && eventos.pointerdown === 0) {
+          alert('Antes de copiar, ARRASTE o bloco laranja com o dedo para os lados. Sem isso o resultado nao mostra nada.');
+          return;
+        }
+
+        var area = document.getElementById('saida');
+        area.removeAttribute('readonly');
+        area.select();
+        area.setSelectionRange(0, 99999);
+        try { document.execCommand('copy'); } catch (e) {}
+        if (navigator.clipboard) { navigator.clipboard.writeText(area.value); }
+        area.setAttribute('readonly', 'readonly');
+        this.textContent = 'Copiado!';
+      });
+
+      render();
+    </script>
+  </body>
+</html>

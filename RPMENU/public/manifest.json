@@ -1,0 +1,29 @@
+{
+  "name": "RPMENU - Pedido Online",
+  "short_name": "RPMENU",
+  "description": "RPMENU - cardapio digital e pedido online",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F2994A",
+  "theme_color": "#F2994A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "images/favicon.png?v=__BUILD_ID__",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "images/rpfood/logo/mobile500.png?v=__BUILD_ID__",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/rpfood/logo/mobile1080.png?v=__BUILD_ID__",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
