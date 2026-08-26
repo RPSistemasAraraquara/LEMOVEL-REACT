@@ -7,7 +7,7 @@ export const colors = {
   text: '#23314d',
   productTitle: '#34465d',
   productCard: '#fffdf9',
-  productImageSurface: '#eef3f7',
+  productImageSurface: '#ffffff',
   productPriceBorder: '#f6c58d',
   categorySurface: '#eef3f7',
   categorySelected: '#1b4f72',

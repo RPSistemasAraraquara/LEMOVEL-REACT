@@ -150,6 +150,60 @@ Validar o app de cardapio tablet sem alterar o fluxo do `APPReact`.
 
 **Resultado esperado:** A configuracao rola sem esconder acoes. O app nao mostra banner para `Item adicionado ao carrinho` nem para sincronizacao bem-sucedida; banners continuam aparecendo apenas em eventos operacionais relevantes.
 
+### CT-012 - Diagnostico exportavel
+
+**Modulo:** Configuracao/diagnostico
+**Tipo:** Suporte operacional
+
+**Passos:**
+1. Entrar em Configuracao com garcom autorizado.
+2. Tocar em Exportar diagnostico.
+3. Compartilhar o texto pelo app disponivel no Android.
+
+**Resultado esperado:** O diagnostico exportado contem versao, servidor API, empresa, mesa, terminal, status de modulo, sincronizacao, ping, kiosk e fila offline, sem expor senha de garcom.
+
+### CT-013 - Fila offline visivel
+
+**Modulo:** Envio offline
+**Tipo:** Regressao/rede
+
+**Passos:**
+1. Abrir a mesa, adicionar itens ao carrinho e desconectar a rede.
+2. Enviar o pedido.
+3. Entrar em Configuracao com garcom autorizado.
+4. Conferir a area Fila offline e tocar em Reenviar pendencias apos restaurar a rede.
+
+**Resultado esperado:** A tela mostra quantidade, valor, data, status e ultimo erro das pendencias. Ao reenviar com sucesso, a fila diminui e o diagnostico atualiza.
+
+### CT-014 - Release e smoke ADB
+
+**Modulo:** Release Android
+**Tipo:** Build/homologacao
+
+**Passos:**
+1. Rodar `npm run release:android`.
+2. Conferir o APK e o arquivo `release-info.txt` gerados em `dist`.
+3. Conectar o tablet via ADB.
+4. Rodar `npm run smoke:adb`.
+
+**Resultado esperado:** O release passa por typecheck, regras locais, build Gradle, `aapt` e `apksigner`. O smoke ADB instala, abre o app e registra versao/package/kiosk em `dist\adb-smoke-cardapio-tablet.txt`.
+
+### CT-015 - Recuperacao emergencial da API
+
+**Modulo:** Configuracao/API
+**Tipo:** Permissao/rede/mobile
+
+**Passos:**
+1. Configurar o tablet com um IP de API indisponivel.
+2. Abrir o app ate a tela `Servidor sem resposta`.
+3. Tocar em `Configurar API`.
+4. Tentar autorizar com credenciais diferentes de `ADM`.
+5. Repetir usando usuario `ADM` e a senha emergencial autorizada.
+6. Conferir a tela de configuracao aberta.
+7. Restaurar um IP valido e repetir a tentativa com `ADM`.
+
+**Resultado esperado:** Sem comunicacao com a API, somente o usuario local `ADM` com a senha emergencial abre a tela de configuracao da API. Nesta tela, somente `Servidor API` fica editavel; empresa, mesa, terminal e fracionado ficam travados. Quando a API esta comunicando, o usuario `ADM` local nao libera configuracao e o app exige usuario/senha do garcom pela API.
+
 ## Evidencias minimas
 
 - Print da tela bloqueada e da tela de configuracao autorizada.
@@ -160,3 +214,7 @@ Validar o app de cardapio tablet sem alterar o fluxo do `APPReact`.
 - Payload ou log da API no envio de lote.
 - Consulta da venda e vendaitem no banco.
 - Confirmacao visual de bloqueio apos fechamento da mesa.
+- Arquivo exportado pelo botao Exportar diagnostico.
+- Relatorio `dist\CardapioTablet-<versao>-release-info.txt`.
+- Relatorio `dist\adb-smoke-cardapio-tablet.txt` quando houver tablet conectado.
+- Evidencia do CT-015 mostrando acesso negado, acesso emergencial da API e bloqueio quando a API volta a comunicar.

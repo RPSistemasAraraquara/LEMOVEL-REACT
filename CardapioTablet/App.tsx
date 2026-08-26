@@ -11,6 +11,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -28,6 +29,7 @@ import type {
   LaunchOptionalPayload,
   MenuItem,
   PendingOrder,
+  ProductOptional,
   Sale,
   SaleLine,
   TableOrder,
@@ -82,7 +84,7 @@ import {
 
 type AppMode = 'loading' | 'setup' | 'locked' | 'unlock' | 'settingsAuth' | 'menu' | 'cart';
 type SettingsReturnMode = 'loading' | 'locked' | 'menu' | 'cart';
-type SettingsAccessMode = 'initial' | 'waiter';
+type SettingsAccessMode = 'initial' | 'waiter' | 'emergencyApi';
 type AppDialogTone = 'info' | 'warning' | 'danger' | 'success';
 
 type AppDialog = {
@@ -118,11 +120,18 @@ type SettingsForm = {
 const CUSTOMER_LOCK_MESSAGE = 'Mesa bloqueada. Solicite a liberacao ao garcom.';
 const MODULE_DISABLED_MESSAGE = 'Modulo não habilitado';
 const API_RECONNECT_MESSAGE = 'Sem resposta da API. Verifique a rede ou configure o IP do servidor.';
+const APP_DISPLAY_BRAND = 'Cardapio Tablet';
 const APP_DISPLAY_NAME = 'CARDAPIO TABLET';
-const APP_DISPLAY_VERSION = '1.0.0';
+const APP_DISPLAY_VERSION = '2.0.0';
+const EMERGENCY_API_ADMIN_LOGIN = 'ADM';
+const EMERGENCY_API_ADMIN_PASSWORD = '18021950';
 const PRODUCT_TITLE_CONNECTORS = new Set(['a', 'ao', 'aos', 'as', 'com', 'da', 'das', 'de', 'do', 'dos', 'e', 'em', 'na', 'nas', 'no', 'nos', 'para', 'por', 'sem']);
+const FRACTION_FLAVOR_COUNTS = [1, 2, 3, 4] as const;
+const DEFAULT_FRACTION_FLAVOR_COUNT = 1;
+const FRACTION_GROUP_TITLE = 'Item fracionado';
 const SMART_SYNC_MIN_INTERVAL_MS = 5000;
-const PRODUCT_IMAGE_PREFETCH_LIMIT = 16;
+const PRODUCT_IMAGE_PREFETCH_LIMIT = 64;
+const PRODUCT_LAUNCH_ARM_DELAY_MS = 350;
 
 type TabletKioskModule = {
   exitApp?: () => Promise<boolean>;
@@ -171,12 +180,25 @@ function formatQuantity(value: number): string {
   return quantity.toFixed(3).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
 }
 
+function formatFractionFlavorCount(value: number): string {
+  const count = Math.max(1, Math.trunc(Number(value || 1)));
+  return `${count} ${count === 1 ? 'sabor' : 'sabores'}`;
+}
+
 function formatDateTime(value?: string): string {
   if (!value) return 'Ainda nao registrado';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Ainda nao registrado';
   const pad = (part: number) => String(part).padStart(2, '0');
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDiagnosticsDateTime(value?: string): string {
+  if (!value) return 'Nao registrado';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Nao registrado';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function normalizeKioskStatus(status?: Partial<TabletKioskStatus> | null): TabletKioskStatus {
@@ -254,6 +276,99 @@ function getOkLabel(value?: boolean): string {
   if (value === true) return 'OK';
   if (value === false) return 'Falhou';
   return 'Sem teste';
+}
+
+function isEmergencyApiRecoveryCredentials(login: string, password: string): boolean {
+  return (
+    login.trim().toLocaleUpperCase('pt-BR') === EMERGENCY_API_ADMIN_LOGIN &&
+    password.trim() === EMERGENCY_API_ADMIN_PASSWORD
+  );
+}
+
+function getPendingOrderPresentation(order: PendingOrder): { label: string; tone: 'neutral' | 'warning' | 'danger' } {
+  if (order.lastError) {
+    return { label: 'Falhou', tone: 'danger' };
+  }
+
+  if (order.attempts > 0) {
+    return { label: 'Aguardando nova tentativa', tone: 'warning' };
+  }
+
+  return { label: 'Aguardando envio', tone: 'neutral' };
+}
+
+function formatPendingOrderTitle(order: PendingOrder): string {
+  const saleId = Number(order.session?.idVenda || 0);
+  const saleLabel = saleId > 0 ? `Venda ${saleId}` : 'Venda sem id';
+  return `Mesa ${formatMesa(order.session?.mesaNumero || order.settings?.mesaNumero || 1)} - ${saleLabel}`;
+}
+
+function buildTabletDiagnosticsReport({
+  settings,
+  diagnostics,
+  pendingOrders,
+  kioskStatus
+}: {
+  settings: TabletSettings;
+  diagnostics: TabletDiagnostics;
+  pendingOrders: PendingOrder[];
+  kioskStatus: TabletKioskStatus | null;
+}): string {
+  const kioskPresentation = getKioskStatusPresentation(kioskStatus, false);
+  const lines = [
+    `${APP_DISPLAY_BRAND} - Diagnostico`,
+    `Versao: ${APP_DISPLAY_VERSION}`,
+    `Gerado em: ${formatDiagnosticsDateTime(new Date().toISOString())}`,
+    '',
+    'Configuracao',
+    `Servidor API: ${settings.baseUrl}`,
+    `Empresa: ${settings.empresaId}`,
+    `Mesa: ${formatMesa(settings.mesaNumero)}`,
+    `Terminal: ${settings.terminalName}`,
+    `Modulo Cardapio Tablet: ${settings.utilizaCardapioTablet || diagnostics.utilizaCardapioTablet ? 'habilitado' : 'sem confirmacao'}`,
+    '',
+    'Rede e sincronizacao',
+    `Modulo: ${getOkLabel(settings.utilizaCardapioTablet || diagnostics.utilizaCardapioTablet)} em ${formatDiagnosticsDateTime(diagnostics.lastModuleCheckAt)}`,
+    `Sincronizacao: ${getOkLabel(diagnostics.lastSyncOk)} em ${formatDiagnosticsDateTime(diagnostics.lastSyncAt)}`,
+    `Catalogo: ${diagnostics.lastCatalogSource === 'api' ? 'API' : 'sem leitura'} em ${formatDiagnosticsDateTime(diagnostics.lastCatalogAt)}`,
+    `Ping API: ${getOkLabel(diagnostics.lastPingOk)}${diagnostics.lastPingMs ? ` (${diagnostics.lastPingMs}ms)` : ''}`,
+    `Ultimo envio: ${getOkLabel(diagnostics.lastSendOk)} em ${formatDiagnosticsDateTime(diagnostics.lastSendAt)}`,
+    '',
+    'Kiosk Android',
+    `Status: ${kioskPresentation.title}`,
+    `Modo LockTask: ${kioskStatus?.lockTaskMode || 'desconhecido'}`,
+    `Device Owner: ${kioskStatus?.deviceOwner ? 'sim' : 'nao'}`,
+    `Lock Task permitido: ${kioskStatus?.lockTaskPermitted ? 'sim' : 'nao'}`,
+    '',
+    'Fila offline',
+    `Pendencias: ${pendingOrders.length}`
+  ];
+
+  if (pendingOrders.length === 0) {
+    lines.push('Nenhuma pendencia offline registrada.');
+  } else {
+    pendingOrders.slice(0, 10).forEach((order, index) => {
+      const pendingStatus = getPendingOrderPresentation(order);
+      lines.push(
+        `${index + 1}. ${formatPendingOrderTitle(order)} - ${pendingStatus.label} - ${formatMoney(order.total)} - ${formatItemCount(order.items.length)} - ${formatDiagnosticsDateTime(order.updatedAt)}`,
+        `   Tentativas: ${order.attempts}`,
+        `   Erro: ${order.lastError || 'sem erro registrado'}`
+      );
+    });
+
+    if (pendingOrders.length > 10) {
+      lines.push(`Mais ${pendingOrders.length - 10} pendencia(s) nao listadas.`);
+    }
+  }
+
+  lines.push(
+    '',
+    'Ultimos erros',
+    `Envio: ${diagnostics.lastSendError || 'nenhum'}`,
+    `Sincronizacao: ${diagnostics.lastSyncError || 'nenhum'}`
+  );
+
+  return lines.join('\n');
 }
 
 function getCredentialFailureMessage(error: unknown, fallback: string): string {
@@ -368,6 +483,46 @@ function hasDuplicateFlavorSelection(values: Array<number | null>): boolean {
   return selected.length !== new Set(selected).size;
 }
 
+function hasVisibleOptional(optional: ProductOptional): boolean {
+  return Boolean(
+    optional.descricao?.trim() ||
+    optional.opcionalP?.trim() ||
+    optional.opcionalM?.trim() ||
+    optional.opcionalG?.trim() ||
+    optional.opcionalGG?.trim() ||
+    optional.opcionalExtra?.trim()
+  );
+}
+
+function getVisibleProductOptionals(product: MenuItem | null | undefined): ProductOptional[] {
+  return (product?.opcionais || []).filter(hasVisibleOptional);
+}
+
+function buildSelectedOptionals(
+  optionals: ProductOptional[],
+  getQuantity: (optionalId: number) => number,
+  sizeCode: string
+): LaunchOptionalPayload[] {
+  return optionals.flatMap((optional): LaunchOptionalPayload[] => {
+    const quantity = Math.max(0, Math.trunc(Number(getQuantity(optional.idOpcional) || 0)));
+    if (quantity <= 0) return [];
+
+    return Array.from({ length: quantity }, () => ({
+      idOpcional: optional.idOpcional,
+      descricao: getOptionalDisplay(optional, sizeCode) || optional.descricao,
+      valor: getOptionalPrice(optional, sizeCode),
+      gratis: Boolean(optional.gratis)
+    }));
+  });
+}
+
+function getOptionalsAddition(optionals: LaunchOptionalPayload[], quantity = 1): number {
+  return optionals.reduce(
+    (total, optional) => total + (optional.gratis ? 0 : Number(optional.valor || 0) * Number(quantity || 0)),
+    0
+  );
+}
+
 function summarizeOptionals(optionals: Array<{ idOpcional?: number; descricao: string }>): string {
   const counts = new Map<string, { descricao: string; quantidade: number }>();
   optionals.forEach((optional) => {
@@ -382,6 +537,121 @@ function summarizeOptionals(optionals: Array<{ idOpcional?: number; descricao: s
   return Array.from(counts.values())
     .map((item) => (item.quantidade > 1 ? `${item.quantidade}x ${item.descricao}` : item.descricao))
     .join(', ');
+}
+
+function getOptionalsSignature(optionals: Array<{ idOpcional?: number; descricao: string; valor?: number; gratis?: boolean }>): string {
+  const counts = new Map<string, number>();
+  optionals.forEach((optional) => {
+    const key = [
+      optional.idOpcional || 0,
+      optional.descricao.trim().toLocaleUpperCase('pt-BR'),
+      Number(optional.valor || 0),
+      optional.gratis ? 1 : 0
+    ].join('|');
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, quantity]) => `${key}:${quantity}`)
+    .join(';');
+}
+
+function getFractionOptionalsForPresentation<T extends { opcionais?: O[] }, O extends { idOpcional?: number; descricao: string; valor?: number; gratis?: boolean }>(
+  fractions: T[]
+): O[] {
+  const optionalsByFraction = fractions
+    .map((fraction) => fraction.opcionais || [])
+    .filter((optionals) => optionals.length > 0);
+
+  if (optionalsByFraction.length === 0) return [];
+
+  const firstSignature = getOptionalsSignature(optionalsByFraction[0]);
+  const sameOptionalsInEveryFraction = optionalsByFraction.every(
+    (optionals) => getOptionalsSignature(optionals) === firstSignature
+  );
+
+  return sameOptionalsInEveryFraction ? optionalsByFraction[0] : optionalsByFraction.flat();
+}
+
+function getCombinedOptionalsForPresentation<T extends { opcionais?: O[] }, O extends { idOpcional?: number; descricao: string; valor?: number; gratis?: boolean }>(
+  ownOptionals: O[] = [],
+  fractions: T[] = []
+): O[] {
+  const fractionOptionals = getFractionOptionalsForPresentation<T, O>(fractions);
+  if (ownOptionals.length === 0) return fractionOptionals;
+  if (fractionOptionals.length === 0) return ownOptionals;
+  return getOptionalsSignature(ownOptionals) === getOptionalsSignature(fractionOptionals)
+    ? ownOptionals
+    : [...ownOptionals, ...fractionOptionals];
+}
+
+function getCartLineFractions(item: CartItem): LaunchItemFractionPayload[] {
+  return (item.fracoes || []).filter((fraction) => Boolean(fraction.produtoDescricao?.trim()));
+}
+
+function getSingleCartFraction(item: CartItem): LaunchItemFractionPayload | null {
+  const fractions = getCartLineFractions(item);
+  return fractions.length === 1 ? fractions[0] : null;
+}
+
+function getCartLineTitle(item: CartItem): string {
+  const fractions = getCartLineFractions(item);
+  if (fractions.length > 1) return FRACTION_GROUP_TITLE;
+  return getSingleCartFraction(item)?.produtoDescricao || item.product.descricao;
+}
+
+function getCartLineSizeDescription(item: CartItem): string {
+  const fractions = getCartLineFractions(item);
+  const description = item.descricaoTamanho.trim();
+  if (fractions.length > 1 && !/\b\d+\s+sabor(?:es)?\b/i.test(description)) {
+    return [description, formatFractionFlavorCount(fractions.length)].filter(Boolean).join(' - ');
+  }
+  if (!getSingleCartFraction(item)) return description;
+  return description.replace(/\s*-\s*1\s+sabor(?:es)?\s*$/i, '').trim();
+}
+
+function shouldShowCartFractionSummary(item: CartItem): boolean {
+  return getCartLineFractions(item).length > 1;
+}
+
+function getCartLineOptionals(item: CartItem): LaunchOptionalPayload[] {
+  return getCombinedOptionalsForPresentation(item.opcionais || [], getCartLineFractions(item));
+}
+
+function getCartLineObservation(item: CartItem): string {
+  const observations = [
+    item.observacao,
+    ...getCartLineFractions(item).map((fraction) => fraction.observacao)
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return Array.from(new Set(observations.map((value) => value.trim()))).join(' / ');
+}
+
+function getSingleSaleLineFraction(item: SaleLine) {
+  return item.fracoes?.length === 1 ? item.fracoes[0] : null;
+}
+
+function getSaleLineTitle(item: SaleLine): string {
+  if (Number(item.fracoes?.length || 0) > 1) return FRACTION_GROUP_TITLE;
+  return getSingleSaleLineFraction(item)?.produtoDescricao || item.produtoDescricao || `Produto ${item.idProduto}`;
+}
+
+function getSaleLineOptionals(item: SaleLine): SaleLine['opcionais'] {
+  return getCombinedOptionalsForPresentation(item.opcionais || [], item.fracoes || []);
+}
+
+function getSaleLineObservation(item: SaleLine): string {
+  const observations = [
+    item.observacao,
+    ...(item.fracoes || []).map((fraction) => fraction.observacao)
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return Array.from(new Set(observations.map((value) => value.trim()))).join(' / ');
+}
+
+function shouldShowSaleLineFractions(item: SaleLine): boolean {
+  return Number(item.fracoes?.length || 0) > 1;
 }
 
 export default function App() {
@@ -411,22 +681,29 @@ export default function App() {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [selectedObservation, setSelectedObservation] = useState('');
   const [selectedOptionalQty, setSelectedOptionalQty] = useState<Record<number, number>>({});
-  const [selectedFractionCount, setSelectedFractionCount] = useState(2);
+  const [selectedFractionCount, setSelectedFractionCount] = useState(DEFAULT_FRACTION_FLAVOR_COUNT);
   const [selectedFractionIds, setSelectedFractionIds] = useState<Array<number | null>>([]);
+  const [selectedFractionDetails, setSelectedFractionDetails] = useState<Record<number, MenuItem>>({});
+  const [selectedFractionOptionalQty, setSelectedFractionOptionalQty] = useState<
+    Record<number, Record<number, number>>
+  >({});
+  const [productLaunchReady, setProductLaunchReady] = useState(false);
   const [orderPreviewVisible, setOrderPreviewVisible] = useState(false);
   const [orderPreviewLoading, setOrderPreviewLoading] = useState(false);
   const [orderPreviewSale, setOrderPreviewSale] = useState<Sale | null>(null);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [diagnostics, setDiagnostics] = useState<TabletDiagnostics>({});
   const [retryingPendingOrders, setRetryingPendingOrders] = useState(false);
-  const [deferProductImages, setDeferProductImages] = useState(false);
   const [failedImageUris, setFailedImageUris] = useState<Record<string, true>>({});
   const [kioskStatus, setKioskStatus] = useState<TabletKioskStatus | null>(null);
   const [checkingKioskStatus, setCheckingKioskStatus] = useState(false);
   const appStateRef = useRef(AppState.currentState);
   const syncingRef = useRef(false);
   const lastSyncAttemptAtRef = useRef(0);
-  const imageResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productLaunchArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productDetailRequestSeqRef = useRef(0);
+  const fractionDetailRequestCounterRef = useRef(0);
+  const fractionDetailRequestByIndexRef = useRef<Record<number, number>>({});
 
   const api = useMemo(() => new TabletApi(settings.baseUrl, settings.empresaId), [settings.baseUrl, settings.empresaId]);
   const cartTotal = useMemo(() => getCartTotal(cart), [cart]);
@@ -456,6 +733,10 @@ export default function App() {
     () => (selectedProduct ? getProductSizeOptions(selectedProduct) : []),
     [selectedProduct]
   );
+  const selectedProductOptionals = useMemo(
+    () => getVisibleProductOptionals(selectedProduct),
+    [selectedProduct]
+  );
   const categoryProductCounts = useMemo(() => {
     return products.reduce<Map<number, number>>((acc, product) => {
       const categoryId = Number(product.idCategoria || 0);
@@ -465,37 +746,50 @@ export default function App() {
     }, new Map<number, number>());
   }, [products]);
 
-  const selectedOptionals = useMemo(() => {
-    if (!selectedProduct) return [];
-    return (selectedProduct.opcionais || [])
-      .flatMap((optional): LaunchOptionalPayload[] => {
-        const quantity = Math.max(0, Math.trunc(Number(selectedOptionalQty[optional.idOpcional] || 0)));
-        if (quantity <= 0) return [];
-
-        return Array.from({ length: quantity }, () => ({
-          idOpcional: optional.idOpcional,
-          descricao: getOptionalDisplay(optional, selectedSize) || optional.descricao,
-          valor: getOptionalPrice(optional, selectedSize),
-          gratis: Boolean(optional.gratis)
-        }));
-      });
-  }, [selectedOptionalQty, selectedProduct, selectedSize]);
-
   const fractionFlavorOptions = useMemo(() => {
     if (!selectedProduct?.permiteFracao) return [];
     const categoryId = Number(selectedProduct.idCategoria || 0);
     return products
       .filter((product) => product.b_venda_mobile !== false)
       .filter((product) => !categoryId || Number(product.idCategoria || 0) === categoryId)
-      .filter((product) => product.permiteFracao || product.vendaPorTamanho || product.idProduto === selectedProduct.idProduto)
       .sort((left, right) => left.descricao.localeCompare(right.descricao));
   }, [products, selectedProduct]);
 
   const selectedFractionProducts = useMemo(() => {
     if (!selectedProduct?.permiteFracao) return [];
     const byId = new Map(fractionFlavorOptions.map((product) => [product.idProduto, product]));
-    return selectedFractionIds.map((id) => (id ? byId.get(id) || null : null));
-  }, [fractionFlavorOptions, selectedFractionIds, selectedProduct]);
+    return selectedFractionIds.map((id, index) => {
+      if (!id) return null;
+      const detail = selectedFractionDetails[index];
+      return detail?.idProduto === id ? detail : byId.get(id) || null;
+    });
+  }, [fractionFlavorOptions, selectedFractionDetails, selectedFractionIds, selectedProduct]);
+
+  const selectedFractionOptionalsByIndex = useMemo(
+    () => selectedFractionProducts.map((product) => getVisibleProductOptionals(product)),
+    [selectedFractionProducts]
+  );
+
+  const selectedFractionLaunchOptionalsByIndex = useMemo(
+    () =>
+      selectedFractionOptionalsByIndex.map((optionals, index) =>
+        buildSelectedOptionals(
+          optionals,
+          (optionalId) => selectedFractionOptionalQty[index]?.[optionalId] || 0,
+          selectedSize
+        )
+      ),
+    [selectedFractionOptionalQty, selectedFractionOptionalsByIndex, selectedSize]
+  );
+
+  const selectedOptionals = useMemo(() => {
+    if (!selectedProduct) return [];
+    return buildSelectedOptionals(
+      selectedProductOptionals,
+      (optionalId) => selectedOptionalQty[optionalId] || 0,
+      selectedSize
+    );
+  }, [selectedOptionalQty, selectedProduct, selectedProductOptionals, selectedSize]);
 
   const selectedFractionReady = useMemo(() => {
     if (!selectedProduct?.permiteFracao) return true;
@@ -514,15 +808,16 @@ export default function App() {
       const fractionQuantity = 1 / selectedFractionCount;
       const fractionPrices = validFractions.map((product) => getProductUnitPrice(product, selectedSize));
       const maxUnitPrice = Math.max(...fractionPrices);
+      const orderCount = Math.max(1, Math.round(selectedQuantity));
       const baseUnitTotal = fractionPrices.reduce((total, price) => {
         const unitPrice = settings.cobrarMaiorValorFracionado ? maxUnitPrice : price;
         return total + unitPrice * fractionQuantity;
       }, 0);
-      const optionalValue = selectedOptionals.reduce(
-        (total, optional) => total + (optional.gratis ? 0 : optional.valor * Math.max(1, Math.round(selectedQuantity))),
+      const optionalValue = selectedFractionLaunchOptionalsByIndex.reduce(
+        (total, optionals) => total + getOptionalsAddition(optionals, fractionQuantity),
         0
       );
-      return roundMoney(baseUnitTotal * Math.max(1, Math.round(selectedQuantity)) + optionalValue);
+      return roundMoney(baseUnitTotal * orderCount + optionalValue * orderCount);
     }
 
     const unitValue = getProductUnitPrice(selectedProduct, selectedSize);
@@ -533,6 +828,7 @@ export default function App() {
     return roundMoney(unitValue * selectedQuantity + optionalValue);
   }, [
     selectedFractionCount,
+    selectedFractionLaunchOptionalsByIndex,
     selectedFractionProducts,
     selectedOptionals,
     selectedProduct,
@@ -556,32 +852,69 @@ export default function App() {
   );
 
   useEffect(() => {
+    const validOptionalIds = new Set(selectedProductOptionals.map((optional) => optional.idOpcional));
+    setSelectedOptionalQty((current) => {
+      let changed = false;
+      const next: Record<number, number> = {};
+
+      Object.entries(current).forEach(([key, value]) => {
+        const idOpcional = Number(key);
+        if (validOptionalIds.has(idOpcional)) {
+          next[idOpcional] = value;
+        } else {
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [selectedProductOptionals]);
+
+  useEffect(() => {
+    setSelectedFractionOptionalQty((current) => {
+      let changed = false;
+      const next: Record<number, Record<number, number>> = {};
+
+      Object.entries(current).forEach(([indexKey, quantities]) => {
+        const index = Number(indexKey);
+        if (index < 0 || index >= selectedFractionCount) {
+          changed = true;
+          return;
+        }
+
+        const validOptionalIds = new Set(
+          (selectedFractionOptionalsByIndex[index] || []).map((optional) => optional.idOpcional)
+        );
+        const validQuantities: Record<number, number> = {};
+        Object.entries(quantities).forEach(([optionalKey, quantity]) => {
+          const optionalId = Number(optionalKey);
+          if (validOptionalIds.has(optionalId)) {
+            validQuantities[optionalId] = quantity;
+          } else {
+            changed = true;
+          }
+        });
+
+        if (Object.keys(validQuantities).length > 0) {
+          next[index] = validQuantities;
+        } else if (Object.keys(quantities).length > 0) {
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [selectedFractionCount, selectedFractionOptionalsByIndex]);
+
+  useEffect(() => {
     void prefetchProductImages(filteredProducts, PRODUCT_IMAGE_PREFETCH_LIMIT);
   }, [filteredProducts]);
 
-  const pauseProductImages = useCallback(() => {
-    if (imageResumeTimerRef.current) {
-      clearTimeout(imageResumeTimerRef.current);
-      imageResumeTimerRef.current = null;
-    }
-    setDeferProductImages(true);
-  }, []);
-
-  const resumeProductImages = useCallback(() => {
-    if (imageResumeTimerRef.current) {
-      clearTimeout(imageResumeTimerRef.current);
-    }
-
-    imageResumeTimerRef.current = setTimeout(() => {
-      imageResumeTimerRef.current = null;
-      setDeferProductImages(false);
-    }, 140);
-  }, []);
-
   useEffect(
     () => () => {
-      if (imageResumeTimerRef.current) {
-        clearTimeout(imageResumeTimerRef.current);
+      productDetailRequestSeqRef.current += 1;
+      if (productLaunchArmTimerRef.current) {
+        clearTimeout(productLaunchArmTimerRef.current);
       }
     },
     []
@@ -621,6 +954,32 @@ export default function App() {
       setCheckingKioskStatus(false);
     }
   }, []);
+
+  const shareTabletDiagnostics = useCallback(async () => {
+    try {
+      const currentPendingOrders = await refreshPendingOrders();
+      const report = buildTabletDiagnosticsReport({
+        settings,
+        diagnostics: {
+          ...diagnostics,
+          pendingOrderCount: currentPendingOrders.length
+        },
+        pendingOrders: currentPendingOrders,
+        kioskStatus
+      });
+
+      await Share.share({
+        title: 'Diagnostico Cardapio Tablet',
+        message: report
+      });
+    } catch (error) {
+      showAppDialog({
+        title: 'Diagnostico',
+        message: getFriendlyErrorMessage(error, 'Nao foi possivel exportar o diagnostico.'),
+        tone: 'danger'
+      });
+    }
+  }, [diagnostics, kioskStatus, refreshPendingOrders, settings, showAppDialog]);
 
   const lockTablet = useCallback(async (message = CUSTOMER_LOCK_MESSAGE) => {
     await clearTabletSession();
@@ -942,10 +1301,33 @@ export default function App() {
     return () => clearInterval(timer);
   }, [mode, retryStartupConnection, session, settings.configured, settings.pollingMs, startupConnectionIssue]);
 
+  const isApiRecoveryAuthMode = useCallback(
+    () => startupConnectionIssue || settingsReturnMode === 'loading',
+    [settingsReturnMode, startupConnectionIssue]
+  );
+
+  const isCurrentApiCommunicating = useCallback(async () => {
+    try {
+      return await api.ping();
+    } catch {
+      return false;
+    }
+  }, [api]);
+
   const saveSettings = async () => {
     setBusyLabel('Salvando configuracao...');
     try {
-      const normalizedSettings = settingsFromForm(settingsForm);
+      const formToSave =
+        settingsAccessMode === 'emergencyApi'
+          ? {
+              ...settingsForm,
+              empresaId: String(settings.empresaId),
+              mesaNumero: String(settings.mesaNumero),
+              terminalName: settings.terminalName,
+              cobrarMaiorValorFracionado: settings.cobrarMaiorValorFracionado
+            }
+          : settingsForm;
+      const normalizedSettings = settingsFromForm(formToSave);
       const client = new TabletApi(normalizedSettings.baseUrl, normalizedSettings.empresaId);
       const companyStatus = await client.getCompanyStatus();
       const moduleEnabled = companyStatus.utilizaCardapioTablet === true;
@@ -1044,6 +1426,15 @@ export default function App() {
     setMode('settingsAuth');
   };
 
+  const openApiRecoverySettings = () => {
+    setBanner(API_RECONNECT_MESSAGE);
+    setSettingsAuthLogin('');
+    setSettingsAuthPassword('');
+    setSettingsForm(toSettingsForm(settings));
+    setSettingsAccessMode('emergencyApi');
+    setMode('setup');
+  };
+
   const cancelSettingsAuth = () => {
     setBanner('');
     setSettingsAuthLogin('');
@@ -1086,8 +1477,26 @@ export default function App() {
       return;
     }
 
-    setBusyLabel('Autorizando configuracao...');
+    const recoveryAuthMode = isApiRecoveryAuthMode();
+    const emergencyCredentials = isEmergencyApiRecoveryCredentials(settingsAuthLogin, settingsAuthPassword);
+
+    setBusyLabel(recoveryAuthMode && emergencyCredentials ? 'Verificando comunicacao da API...' : 'Autorizando configuracao...');
     try {
+      if (recoveryAuthMode && emergencyCredentials) {
+        const apiCommunicating = await isCurrentApiCommunicating();
+        if (apiCommunicating) {
+          showAppDialog({
+            title: 'API comunicando',
+            message: 'A API respondeu. Use usuario e senha do garcom para alterar a configuracao.',
+            tone: 'warning'
+          });
+          return;
+        }
+
+        openApiRecoverySettings();
+        return;
+      }
+
       await api.login(settingsAuthLogin, settingsAuthPassword);
       setSettingsForm(toSettingsForm(settings));
       setSettingsAccessMode('waiter');
@@ -1095,9 +1504,14 @@ export default function App() {
       setBanner('Configuracao liberada para o garcom.');
       setMode('setup');
     } catch (error) {
+      const recoveryMessage =
+        recoveryAuthMode
+          ? 'Sem resposta da API. Para trocar o IP do servidor, informe o usuario ADM e a senha emergencial autorizada.'
+          : getCredentialFailureMessage(error, 'Nao foi possivel autorizar a configuracao.');
+
       showAppDialog({
-        title: 'Acesso negado',
-        message: getCredentialFailureMessage(error, 'Nao foi possivel autorizar a configuracao.'),
+        title: recoveryAuthMode ? 'Acesso emergencial negado' : 'Acesso negado',
+        message: recoveryMessage,
         tone: 'danger'
       });
     } finally {
@@ -1255,22 +1669,123 @@ export default function App() {
     }
   };
 
+  const clearFractionOptionalQuantities = (index: number) => {
+    setSelectedFractionOptionalQty((current) => {
+      if (!current[index]) return current;
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  };
+
+  const loadFractionProductDetail = (index: number, flavor: MenuItem) => {
+    const requestToken = ++fractionDetailRequestCounterRef.current;
+    fractionDetailRequestByIndexRef.current[index] = requestToken;
+    const catalogOptionals = getVisibleProductOptionals(flavor);
+
+    setSelectedFractionDetails((current) => ({
+      ...current,
+      [index]: { ...flavor, opcionais: catalogOptionals }
+    }));
+
+    void api
+      .getProduct(flavor.idProduto, false)
+      .then((detail) => {
+        if (fractionDetailRequestByIndexRef.current[index] !== requestToken || !detail) return;
+        const detailOptionals = getVisibleProductOptionals(detail);
+
+        setSelectedFractionDetails((current) => {
+          if (current[index]?.idProduto !== flavor.idProduto) return current;
+          return {
+            ...current,
+            [index]: {
+              ...flavor,
+              ...detail,
+              imagem: detail.imagem || flavor.imagem,
+              opcionais: detailOptionals.length > 0 ? detailOptionals : catalogOptionals
+            }
+          };
+        });
+      })
+      .catch(() => undefined);
+  };
+
   const openProduct = (product: MenuItem) => {
-    setSelectedProduct(product);
+    const requestSeq = ++productDetailRequestSeqRef.current;
+    const catalogOptionals = getVisibleProductOptionals(product);
+    fractionDetailRequestByIndexRef.current = {};
+    if (productLaunchArmTimerRef.current) {
+      clearTimeout(productLaunchArmTimerRef.current);
+      productLaunchArmTimerRef.current = null;
+    }
+
+    setProductLaunchReady(false);
+    setSelectedProduct({ ...product, opcionais: catalogOptionals });
     setSelectedSize(getDefaultSizeCode(product));
     setSelectedQuantity(1);
     setSelectedObservation('');
     setSelectedOptionalQty({});
-    setSelectedFractionCount(2);
-    setSelectedFractionIds(product.permiteFracao ? [product.idProduto, null] : []);
+    setSelectedFractionCount(DEFAULT_FRACTION_FLAVOR_COUNT);
+    setSelectedFractionIds(product.permiteFracao ? [product.idProduto] : []);
+    setSelectedFractionDetails(
+      product.permiteFracao ? { 0: { ...product, opcionais: catalogOptionals } } : {}
+    );
+    setSelectedFractionOptionalQty({});
+    productLaunchArmTimerRef.current = setTimeout(() => {
+      productLaunchArmTimerRef.current = null;
+      setProductLaunchReady(true);
+    }, PRODUCT_LAUNCH_ARM_DELAY_MS);
+
+    void api
+      .getProduct(product.idProduto, false)
+      .then((detail) => {
+        if (requestSeq !== productDetailRequestSeqRef.current || !detail) return;
+        const detailOptionals = getVisibleProductOptionals(detail);
+
+        setSelectedProduct((current) => {
+          if (!current || current.idProduto !== product.idProduto) return current;
+          return {
+            ...product,
+            ...detail,
+            imagem: detail.imagem || product.imagem,
+            opcionais: detailOptionals.length > 0 ? detailOptionals : catalogOptionals
+          };
+        });
+
+        if (product.permiteFracao) {
+          setSelectedFractionDetails((current) => {
+            if (current[0]?.idProduto !== product.idProduto) return current;
+            return {
+              ...current,
+              0: {
+                ...product,
+                ...detail,
+                imagem: detail.imagem || product.imagem,
+                opcionais: detailOptionals.length > 0 ? detailOptionals : catalogOptionals
+              }
+            };
+          });
+        }
+      })
+      .catch(() => undefined);
   };
 
   const closeProduct = () => {
+    productDetailRequestSeqRef.current += 1;
+    fractionDetailRequestByIndexRef.current = {};
+    if (productLaunchArmTimerRef.current) {
+      clearTimeout(productLaunchArmTimerRef.current);
+      productLaunchArmTimerRef.current = null;
+    }
+
+    setProductLaunchReady(false);
     setSelectedProduct(null);
     setSelectedOptionalQty({});
     setSelectedObservation('');
     setSelectedFractionIds([]);
-    setSelectedFractionCount(2);
+    setSelectedFractionDetails({});
+    setSelectedFractionOptionalQty({});
+    setSelectedFractionCount(DEFAULT_FRACTION_FLAVOR_COUNT);
   };
 
   const changeQuantity = (delta: number) => {
@@ -1299,9 +1814,47 @@ export default function App() {
     });
   };
 
+  const changeFractionOptionalQuantity = (index: number, idOpcional: number, delta: number) => {
+    setSelectedFractionOptionalQty((current) => {
+      const currentQuantities = current[index] || {};
+      const nextQuantity = Math.max(0, Math.trunc(Number(currentQuantities[idOpcional] || 0)) + delta);
+      const nextQuantities = { ...currentQuantities };
+
+      if (nextQuantity <= 0) {
+        delete nextQuantities[idOpcional];
+      } else {
+        nextQuantities[idOpcional] = nextQuantity;
+      }
+
+      const next = { ...current };
+      if (Object.keys(nextQuantities).length > 0) {
+        next[index] = nextQuantities;
+      } else {
+        delete next[index];
+      }
+      return next;
+    });
+  };
+
   const changeFractionCount = (count: number) => {
-    const normalized = Math.max(2, Math.min(4, Math.trunc(count)));
+    const normalized = Math.max(1, Math.min(4, Math.trunc(count)));
     setSelectedFractionCount(normalized);
+    Object.keys(fractionDetailRequestByIndexRef.current).forEach((indexKey) => {
+      const index = Number(indexKey);
+      if (index >= normalized) {
+        delete fractionDetailRequestByIndexRef.current[index];
+      }
+    });
+    setSelectedFractionDetails((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([indexKey]) => Number(indexKey) < normalized)
+      ) as Record<number, MenuItem>
+    );
+    setSelectedFractionOptionalQty((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([indexKey]) => Number(indexKey) < normalized)
+      ) as Record<number, Record<number, number>>
+    );
     setSelectedFractionIds((current) => {
       const next = current.slice(0, normalized);
       while (next.length < normalized) {
@@ -1315,6 +1868,12 @@ export default function App() {
   };
 
   const selectFractionFlavor = (index: number, idProduto: number) => {
+    if (selectedFractionIds[index] === idProduto) return;
+    const flavor = fractionFlavorOptions.find((product) => product.idProduto === idProduto);
+    if (!flavor) return;
+
+    clearFractionOptionalQuantities(index);
+    loadFractionProductDetail(index, flavor);
     setSelectedFractionIds((current) => {
       const next = current.slice(0, selectedFractionCount);
       while (next.length < selectedFractionCount) {
@@ -1326,6 +1885,8 @@ export default function App() {
   };
 
   const addSelectedProductToCart = () => {
+    if (!productLaunchReady) return;
+
     if (!session || !selectedProduct) {
       void lockTablet(CUSTOMER_LOCK_MESSAGE);
       return;
@@ -1361,6 +1922,8 @@ export default function App() {
             ? maxUnitPrice
             : getProductUnitPrice(flavor, selectedSize);
           const fractionLaunchId = `${itemLineId}:F${flavorIndex + 1}`;
+          const fractionOptionals = selectedFractionLaunchOptionalsByIndex[flavorIndex] || [];
+          const fractionAddition = roundMoney(getOptionalsAddition(fractionOptionals, fractionQuantity));
           return {
             mobileLaunchId: fractionLaunchId,
             MobileLaunchId: fractionLaunchId,
@@ -1369,10 +1932,10 @@ export default function App() {
             quantidade: fractionQuantity,
             valorUnitario: flavorUnitPrice,
             valorTotal: roundMoney(flavorUnitPrice * fractionQuantity),
-            acrescimo: 0,
+            acrescimo: fractionAddition,
             observacao: selectedObservation.trim() || undefined,
             descricaoTamanho: `${label} (${flavorIndex + 1}/${selectedFractionCount})`,
-            opcionais: []
+            opcionais: fractionOptionals
           };
         });
 
@@ -1382,9 +1945,9 @@ export default function App() {
           quantidade: 1,
           valorUnitario: parentUnitPrice,
           tamanho: selectedSize,
-          descricaoTamanho: `${label} - ${selectedFractionCount} sabores`,
+          descricaoTamanho: `${label} - ${formatFractionFlavorCount(selectedFractionCount)}`,
           observacao: selectedObservation.trim() || undefined,
-          opcionais: selectedOptionals,
+          opcionais: [],
           fracoes
         };
       });
@@ -1677,7 +2240,7 @@ export default function App() {
           {showConnectionActions ? (
             <View style={styles.loadingActions}>
               <ActionButton label="Tentar novamente" variant="secondary" onPress={() => retryStartupConnection(true)} />
-              <ActionButton label="Configuracao" variant="config" onPress={() => openSettingsAuth('loading')} />
+              <ActionButton label="Configurar API" variant="config" onPress={() => openSettingsAuth('loading')} />
             </View>
           ) : null}
         </View>
@@ -1776,6 +2339,7 @@ export default function App() {
 
   const renderSetup = () => {
     const kioskPresentation = getKioskStatusPresentation(kioskStatus, checkingKioskStatus);
+    const emergencyApiAccess = settingsAccessMode === 'emergencyApi';
 
     return (
       <KeyboardAvoidingView style={[styles.screen, styles.setupScreen]}>
@@ -1788,7 +2352,7 @@ export default function App() {
             >
               <View>
                 <Text style={styles.setupEyebrow}>Cardapio Tablet</Text>
-                <Text style={styles.setupHeroTitle}>Configuracao</Text>
+                <Text style={styles.setupHeroTitle}>{emergencyApiAccess ? 'API' : 'Configuracao'}</Text>
                 <Text style={styles.setupHeroText}>Mesa {formatMesa(Number(settingsForm.mesaNumero || settings.mesaNumero))}</Text>
               </View>
               <View style={styles.setupSummary}>
@@ -1813,8 +2377,12 @@ export default function App() {
             >
               <View style={styles.setupHeader}>
                 <View>
-                  <Text style={styles.setupTitle}>Configuracao do tablet</Text>
-                  <Text style={styles.setupSubtitle}>Defina a API e a mesa fixa deste dispositivo.</Text>
+                  <Text style={styles.setupTitle}>{emergencyApiAccess ? 'Configuracao da API' : 'Configuracao do tablet'}</Text>
+                  <Text style={styles.setupSubtitle}>
+                    {emergencyApiAccess
+                      ? 'Ajuste somente o endereco do servidor para recuperar a comunicacao.'
+                      : 'Defina a API e a mesa fixa deste dispositivo.'}
+                  </Text>
                 </View>
                 <View style={styles.setupMesaBadge}>
                   <Text style={styles.setupMesaBadgeLabel}>Mesa</Text>
@@ -1830,6 +2398,13 @@ export default function App() {
                   onChangeText={(value) => setSettingsForm((current) => ({ ...current, baseUrl: value }))}
                   autoCapitalize="none"
                 />
+                {emergencyApiAccess ? (
+                  <View style={styles.emergencyApiNotice}>
+                    <Text style={styles.emergencyApiNoticeText}>
+                      Acesso emergencial liberado somente porque a API atual nao comunicou. Empresa, mesa e terminal permanecem travados.
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={styles.setupGrid}>
                   <LabeledInput
                     label="Empresa"
@@ -1837,6 +2412,7 @@ export default function App() {
                     value={settingsForm.empresaId}
                     onChangeText={(value) => setSettingsForm((current) => ({ ...current, empresaId: value }))}
                     keyboardType="numeric"
+                    editable={!emergencyApiAccess}
                   />
                   <LabeledInput
                     label="Mesa"
@@ -1844,6 +2420,7 @@ export default function App() {
                     value={settingsForm.mesaNumero}
                     onChangeText={(value) => setSettingsForm((current) => ({ ...current, mesaNumero: value }))}
                     keyboardType="numeric"
+                    editable={!emergencyApiAccess}
                   />
                 </View>
                 <LabeledInput
@@ -1851,11 +2428,13 @@ export default function App() {
                   value={settingsForm.terminalName}
                   onChangeText={(value) => setSettingsForm((current) => ({ ...current, terminalName: value }))}
                   autoCapitalize="characters"
+                  editable={!emergencyApiAccess}
                 />
                 <ToggleRow
                   label="Cobrar maior valor no fracionado"
                   value={settingsForm.cobrarMaiorValorFracionado}
                   onValueChange={(value) => setSettingsForm((current) => ({ ...current, cobrarMaiorValorFracionado: value }))}
+                  disabled={emergencyApiAccess}
                 />
               </View>
 
@@ -1943,17 +2522,60 @@ export default function App() {
                   />
                 </View>
 
+                {pendingOrders.length > 0 ? (
+                  <View style={styles.pendingOrderList}>
+                    <View style={styles.pendingOrderListHeader}>
+                      <Text style={styles.pendingOrderListTitle}>Fila offline</Text>
+                      <Text style={styles.pendingOrderListMeta}>{pendingOrders.length} pendente(s)</Text>
+                    </View>
+                    {pendingOrders.slice(0, 3).map((order) => {
+                      const pendingPresentation = getPendingOrderPresentation(order);
+                      return (
+                        <View style={styles.pendingOrderRow} key={order.queueId}>
+                          <View
+                            style={[
+                              styles.pendingOrderDot,
+                              pendingPresentation.tone === 'warning' && styles.pendingOrderDotWarning,
+                              pendingPresentation.tone === 'danger' && styles.pendingOrderDotDanger
+                            ]}
+                          />
+                          <View style={styles.pendingOrderTextBox}>
+                            <Text style={styles.pendingOrderTitle} numberOfLines={1}>{formatPendingOrderTitle(order)}</Text>
+                            <Text style={styles.pendingOrderMeta} numberOfLines={1}>
+                              {pendingPresentation.label} - {formatMoney(order.total)} - {formatItemCount(order.items.length)} - {formatDateTime(order.updatedAt)}
+                            </Text>
+                            {order.lastError ? (
+                              <Text style={styles.pendingOrderError} numberOfLines={1}>{order.lastError}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })}
+                    {pendingOrders.length > 3 ? (
+                      <Text style={styles.pendingOrderMore}>+{pendingOrders.length - 3} pendencia(s) na fila offline.</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 <View style={styles.diagnosticsFooter}>
                   <Text style={styles.diagnosticsLastError} numberOfLines={2}>
                     {pendingOrders[0]?.lastError || diagnostics.lastSendError || diagnostics.lastSyncError || 'Nenhuma falha registrada.'}
                   </Text>
-                  <ActionButton
-                    label="Reenviar pendencias"
-                    variant="order"
-                    compact
-                    onPress={retryPendingOrderQueue}
-                    disabled={pendingOrders.length === 0 || retryingPendingOrders}
-                  />
+                  <View style={styles.diagnosticsActions}>
+                    <ActionButton
+                      label="Exportar diagnostico"
+                      variant="secondary"
+                      compact
+                      onPress={shareTabletDiagnostics}
+                    />
+                    <ActionButton
+                      label="Reenviar pendencias"
+                      variant="order"
+                      compact
+                      onPress={retryPendingOrderQueue}
+                      disabled={pendingOrders.length === 0 || retryingPendingOrders}
+                    />
+                  </View>
                 </View>
               </View>
               ) : null}
@@ -1977,7 +2599,7 @@ export default function App() {
   const renderLocked = () => (
     <View style={styles.lockedScreen}>
       <View style={styles.lockedHeader}>
-        <Text style={styles.brand}>LeMovel</Text>
+        <Text style={styles.brand}>{APP_DISPLAY_BRAND}</Text>
         <Text style={styles.lockedMesa}>Mesa {formatMesa(settings.mesaNumero)}</Text>
       </View>
 
@@ -2078,91 +2700,105 @@ export default function App() {
     </KeyboardAvoidingView>
   );
 
-  const renderSettingsAuth = () => (
-    <KeyboardAvoidingView style={[styles.screen, styles.authScreen]}>
-      <View style={styles.authShell}>
-        <View style={styles.authSidebar}>
-          <View style={styles.authSidebarTop}>
-            <Text style={styles.authSidebarEyebrow}>Cardapio Tablet</Text>
-            <Text style={styles.authHeroTitle}>Area protegida</Text>
-            <View style={styles.authMesaCard}>
-              <Text style={styles.authMesaLabel}>Mesa</Text>
-              <Text style={styles.authMesaValue}>{formatMesa(settings.mesaNumero)}</Text>
-            </View>
-          </View>
+  const renderSettingsAuth = () => {
+    const recoveryAuthMode = isApiRecoveryAuthMode();
 
-          <View style={styles.authSidebarBottom}>
-            <View style={styles.authAccessPanel}>
-              <Text style={styles.authAccessLabel}>Configuracao</Text>
-              <Text style={styles.authAccessText}>Somente garcom</Text>
-            </View>
-            <View style={styles.authSummaryGrid}>
-              <View style={styles.authSummaryItem}>
-                <Text style={styles.authSummaryLabel}>Empresa</Text>
-                <Text style={styles.authSummaryValue}>{settings.empresaId}</Text>
-              </View>
-              <View style={styles.authSummaryItem}>
-                <Text style={styles.authSummaryLabel}>Terminal</Text>
-                <Text style={styles.authSummaryValue} numberOfLines={1}>{settings.terminalName}</Text>
+    return (
+      <KeyboardAvoidingView style={[styles.screen, styles.authScreen]}>
+        <View style={styles.authShell}>
+          <View style={styles.authSidebar}>
+            <View style={styles.authSidebarTop}>
+              <Text style={styles.authSidebarEyebrow}>Cardapio Tablet</Text>
+              <Text style={styles.authHeroTitle}>Area protegida</Text>
+              <View style={styles.authMesaCard}>
+                <Text style={styles.authMesaLabel}>Mesa</Text>
+                <Text style={styles.authMesaValue}>{formatMesa(settings.mesaNumero)}</Text>
               </View>
             </View>
+
+            <View style={styles.authSidebarBottom}>
+              <View style={styles.authAccessPanel}>
+                <Text style={styles.authAccessLabel}>Configuracao</Text>
+                <Text style={styles.authAccessText}>{recoveryAuthMode ? 'Somente ADM' : 'Somente garcom'}</Text>
+              </View>
+              <View style={styles.authSummaryGrid}>
+                <View style={styles.authSummaryItem}>
+                  <Text style={styles.authSummaryLabel}>Empresa</Text>
+                  <Text style={styles.authSummaryValue}>{settings.empresaId}</Text>
+                </View>
+                <View style={styles.authSummaryItem}>
+                  <Text style={styles.authSummaryLabel}>Terminal</Text>
+                  <Text style={styles.authSummaryValue} numberOfLines={1}>{settings.terminalName}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.authPanel}>
+            <View style={styles.authKickerRow}>
+              <View style={styles.authBadge}>
+                <Text style={styles.authBadgeText}>ADM</Text>
+              </View>
+              <Text style={styles.authKicker}>{recoveryAuthMode ? 'Recuperacao da API' : 'Autorizacao do garcom'}</Text>
+            </View>
+
+            <View style={styles.authHeaderText}>
+              <Text style={styles.authTitle}>
+                {recoveryAuthMode ? 'Liberar configuracao da API' : 'Liberar configuracao'}
+              </Text>
+              <Text style={styles.authSubtitle}>
+                {recoveryAuthMode
+                  ? 'Acesso local emergencial para trocar o IP quando o servidor nao responde.'
+                  : 'Credenciais do garcom responsavel.'}
+              </Text>
+            </View>
+
+            <View style={styles.authFieldCard}>
+              <View style={styles.authFieldHeader}>
+                <Text style={styles.authFieldTitle}>{recoveryAuthMode ? 'Acesso emergencial' : 'Identificacao'}</Text>
+                <Text style={styles.authFieldMeta}>Mesa {formatMesa(settings.mesaNumero)}</Text>
+              </View>
+              <LabeledInput
+                label="Usuario"
+                value={settingsAuthLogin}
+                onChangeText={setSettingsAuthLogin}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
+                containerStyle={styles.authInputGroup}
+              />
+              <LabeledInput
+                label="Senha"
+                value={settingsAuthPassword}
+                onChangeText={setSettingsAuthPassword}
+                secureTextEntry
+                autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
+                containerStyle={styles.authInputGroupLast}
+              />
+            </View>
+
+            <View style={styles.authActionsBar}>
+              <Text style={styles.authActionNote}>
+                {recoveryAuthMode
+                  ? 'Sem resposta da API. Somente o usuario ADM local pode liberar a troca de IP.'
+                  : 'Alteracao restrita ao responsavel pela mesa.'}
+              </Text>
+              <View style={[styles.authActionsRow, recoveryAuthMode && styles.authActionsRowRecovery]}>
+                <ActionButton label="Voltar" variant="secondary" onPress={cancelSettingsAuth} />
+                <ActionButton label="Autorizar" onPress={authorizeSettingsChange} />
+              </View>
+            </View>
+            <AppFooter />
           </View>
         </View>
-
-        <View style={styles.authPanel}>
-          <View style={styles.authKickerRow}>
-            <View style={styles.authBadge}>
-              <Text style={styles.authBadgeText}>ADM</Text>
-            </View>
-            <Text style={styles.authKicker}>Autorizacao do garcom</Text>
-          </View>
-
-          <View style={styles.authHeaderText}>
-            <Text style={styles.authTitle}>Liberar configuracao</Text>
-            <Text style={styles.authSubtitle}>Credenciais do garcom responsavel.</Text>
-          </View>
-
-          <View style={styles.authFieldCard}>
-            <View style={styles.authFieldHeader}>
-              <Text style={styles.authFieldTitle}>Identificacao</Text>
-              <Text style={styles.authFieldMeta}>Mesa {formatMesa(settings.mesaNumero)}</Text>
-            </View>
-            <LabeledInput
-              label="Usuario"
-              value={settingsAuthLogin}
-              onChangeText={setSettingsAuthLogin}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              containerStyle={styles.authInputGroup}
-            />
-            <LabeledInput
-              label="Senha"
-              value={settingsAuthPassword}
-              onChangeText={setSettingsAuthPassword}
-              secureTextEntry
-              autoCorrect={false}
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              containerStyle={styles.authInputGroupLast}
-            />
-          </View>
-
-          <View style={styles.authActionsBar}>
-            <Text style={styles.authActionNote}>Alteracao restrita ao responsavel pela mesa.</Text>
-            <View style={styles.authActionsRow}>
-              <ActionButton label="Voltar" variant="secondary" onPress={cancelSettingsAuth} />
-              <ActionButton label="Autorizar" onPress={authorizeSettingsChange} />
-            </View>
-          </View>
-          <AppFooter />
-        </View>
-      </View>
-    </KeyboardAvoidingView>
-  );
+      </KeyboardAvoidingView>
+    );
+  };
 
   const renderCategory = ({ item }: { item: Category }) => {
     const selected = selectedCategoryId === item.id;
@@ -2198,7 +2834,7 @@ export default function App() {
   const renderProduct = ({ item }: { item: MenuItem }) => {
     const imageUri = resolveProductImageUri(item);
     const imageUnavailable = imageUri ? Boolean(failedImageUris[imageUri] || isProductImageFailed(imageUri)) : false;
-    const hasImage = Boolean(imageUri && !deferProductImages && !imageUnavailable);
+    const hasImage = Boolean(imageUri && !imageUnavailable);
 
     return (
       <Pressable style={styles.productCard} onPress={() => openProduct(item)} android_ripple={{ color: colors.primarySoft }}>
@@ -2207,7 +2843,7 @@ export default function App() {
             <Image
               source={{ uri: imageUri }}
               style={styles.productImage}
-              resizeMode="cover"
+              resizeMode="contain"
               fadeDuration={0}
               onError={() => {
                 markProductImageFailed(imageUri);
@@ -2219,7 +2855,7 @@ export default function App() {
             />
           ) : (
             <View style={styles.productImageFallbackBox}>
-              <Text style={styles.productImageFallback}>{deferProductImages && imageUri ? 'Carregando foto' : 'Sem foto'}</Text>
+              <Text style={styles.productImageFallback}>Sem foto</Text>
             </View>
           )}
           <View style={styles.productAddBadge}>
@@ -2323,46 +2959,69 @@ export default function App() {
             initialNumToRender={12}
             maxToRenderPerBatch={8}
             updateCellsBatchingPeriod={60}
-            windowSize={7}
-            removeClippedSubviews
-            onScrollBeginDrag={pauseProductImages}
-            onMomentumScrollBegin={pauseProductImages}
-            onScrollEndDrag={resumeProductImages}
-            onMomentumScrollEnd={resumeProductImages}
+            windowSize={11}
+            removeClippedSubviews={false}
           />
         </View>
       </View>
     </View>
   );
 
-  const renderCartItem = ({ item }: { item: CartItem }) => (
-    <View style={styles.cartLine}>
-      <View style={styles.cartLineMain}>
-        <Text style={styles.cartLineTitle}>{item.product.descricao}</Text>
-        <Text style={styles.cartLineMeta}>
-          {item.quantidade} x {formatMoney(item.valorUnitario)}
-          {item.descricaoTamanho ? `  |  ${item.descricaoTamanho}` : ''}
-        </Text>
-        {item.opcionais.length > 0 ? (
-          <Text style={styles.cartLineOptionals} numberOfLines={2}>
-            {summarizeOptionals(item.opcionais)}
+  const renderCartItem = ({ item }: { item: CartItem }) => {
+    const cartLineTitle = getCartLineTitle(item);
+    const cartLineSizeDescription = getCartLineSizeDescription(item);
+    const cartLineOptionals = getCartLineOptionals(item);
+    const cartLineObservation = getCartLineObservation(item);
+    const cartLineFractions = getCartLineFractions(item);
+    const showFractionSummary = shouldShowCartFractionSummary(item);
+
+    return (
+      <View style={styles.cartLine}>
+        <View style={styles.cartLineMain}>
+          <Text style={styles.cartLineTitle}>{cartLineTitle}</Text>
+          <Text style={styles.cartLineMeta}>
+            {item.quantidade} x {formatMoney(item.valorUnitario)}
+            {cartLineSizeDescription ? `  |  ${cartLineSizeDescription}` : ''}
           </Text>
-        ) : null}
-        {item.fracoes?.length ? (
-          <Text style={styles.cartLineOptionals} numberOfLines={3}>
-            Sabores: {item.fracoes.map((fraction) => fraction.produtoDescricao).join(' / ')}
-          </Text>
-        ) : null}
-        {item.observacao ? <Text style={styles.cartLineOptionals}>Obs: {item.observacao}</Text> : null}
+          {cartLineOptionals.length > 0 && !showFractionSummary ? (
+            <Text style={styles.cartLineOptionals} numberOfLines={2}>
+              Adicionais: {summarizeOptionals(cartLineOptionals)}
+            </Text>
+          ) : null}
+          {showFractionSummary ? (
+            <View style={styles.cartFractionList}>
+              <Text style={styles.cartFractionTitle}>Sabores ({formatFractionFlavorCount(cartLineFractions.length)})</Text>
+              {cartLineFractions.map((fraction, index) => {
+                const fractionOptionals = fraction.opcionais || [];
+                const fractionObservation = fraction.observacao?.trim();
+
+                return (
+                  <View key={`${fraction.mobileLaunchId || index}-${fraction.idProduto}`} style={styles.cartFractionLine}>
+                    <Text style={styles.cartFractionText}>
+                      {index + 1}. {fraction.produtoDescricao}
+                    </Text>
+                    {fractionOptionals.length > 0 ? (
+                      <Text style={styles.cartFractionDetail}>Adicionais: {summarizeOptionals(fractionOptionals)}</Text>
+                    ) : null}
+                    {fractionObservation && fractionObservation !== cartLineObservation ? (
+                      <Text style={styles.cartFractionDetail}>Obs: {fractionObservation}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+          {cartLineObservation ? <Text style={styles.cartLineOptionals}>Obs: {cartLineObservation}</Text> : null}
+        </View>
+        <View style={styles.cartLineSide}>
+          <Text style={styles.cartLineTotal}>{formatMoney(getCartItemTotal(item))}</Text>
+          <Pressable style={styles.removeButton} onPress={() => removeCartItem(item.lineId)}>
+            <Text style={styles.removeButtonText}>Remover</Text>
+          </Pressable>
+        </View>
       </View>
-      <View style={styles.cartLineSide}>
-        <Text style={styles.cartLineTotal}>{formatMoney(getCartItemTotal(item))}</Text>
-        <Pressable style={styles.removeButton} onPress={() => removeCartItem(item.lineId)}>
-          <Text style={styles.removeButtonText}>Remover</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderCart = () => (
     <View style={styles.cartScreen}>
@@ -2396,8 +3055,10 @@ export default function App() {
   );
 
   const renderOrderPreviewLine = ({ item }: { item: SaleLine }) => {
-    const optionals = item.opcionais || [];
+    const optionals = getSaleLineOptionals(item) || [];
+    const observation = getSaleLineObservation(item);
     const fractions = item.fracoes || [];
+    const showFractions = shouldShowSaleLineFractions(item);
     const lineTotal = item.valorTotal || roundMoney(item.valorUnitario * item.quantidade + item.acrescimo - item.desconto);
 
     return (
@@ -2407,22 +3068,35 @@ export default function App() {
           <Text style={styles.orderQuantityLabel}>qtde</Text>
         </View>
         <View style={styles.orderLineMain}>
-          <Text style={styles.orderLineTitle}>{formatProductCardTitle(item.produtoDescricao || `Produto ${item.idProduto}`)}</Text>
+          <Text style={styles.orderLineTitle}>{formatProductCardTitle(getSaleLineTitle(item))}</Text>
           <View style={styles.orderLineMetaRow}>
             {item.descricaoTamanho ? <Text style={styles.orderLineMeta}>{item.descricaoTamanho}</Text> : null}
             {item.nomeGarcom ? <Text style={styles.orderLineMeta}>Garcom: {item.nomeGarcom}</Text> : null}
           </View>
-          {optionals.length > 0 ? <Text style={styles.orderLineText}>Adicionais: {summarizeOptionals(optionals)}</Text> : null}
-          {item.observacao ? <Text style={styles.orderLineText}>Obs: {item.observacao}</Text> : null}
-          {fractions.length > 0 ? (
+          {optionals.length > 0 && !showFractions ? (
+            <Text style={styles.orderLineText}>Adicionais: {summarizeOptionals(optionals)}</Text>
+          ) : null}
+          {observation ? <Text style={styles.orderLineText}>Obs: {observation}</Text> : null}
+          {showFractions ? (
             <View style={styles.orderFractionBox}>
               <Text style={styles.orderFractionTitle}>Sabores</Text>
-              {fractions.map((fraction, index) => (
-                <View key={`${fraction.numeroItem || index}-${fraction.idProduto}`} style={styles.orderFractionLine}>
-                  <Text style={styles.orderFractionText}>{formatProductCardTitle(fraction.produtoDescricao)}</Text>
-                  <Text style={styles.orderFractionValue}>{formatMoney(fraction.valorTotal)}</Text>
-                </View>
-              ))}
+              {fractions.map((fraction, index) => {
+                const fractionOptionals = fraction.opcionais || [];
+                const fractionObservation = fraction.observacao?.trim();
+
+                return (
+                  <View key={`${fraction.numeroItem || index}-${fraction.idProduto}`} style={styles.orderFractionLine}>
+                    <View style={styles.orderFractionMain}>
+                      <Text style={styles.orderFractionText}>{formatProductCardTitle(fraction.produtoDescricao)}</Text>
+                      {fractionOptionals.length > 0 ? (
+                        <Text style={styles.orderFractionDetail}>Adicionais: {summarizeOptionals(fractionOptionals)}</Text>
+                      ) : null}
+                      {fractionObservation ? <Text style={styles.orderFractionDetail}>Obs: {fractionObservation}</Text> : null}
+                    </View>
+                    <Text style={styles.orderFractionValue}>{formatMoney(fraction.valorTotal)}</Text>
+                  </View>
+                );
+              })}
             </View>
           ) : null}
         </View>
@@ -2478,8 +3152,52 @@ export default function App() {
 
   const renderProductModal = () => {
     if (!selectedProduct) return null;
-    const canLaunch = selectedProduct.permiteFracao ? selectedFractionReady : true;
+    const canLaunch = productLaunchReady &&
+      (selectedProduct.permiteFracao ? selectedFractionReady : true);
     const modalImageUri = resolveProductImageUri(selectedProduct);
+    const renderOptionalGrid = (
+      optionals: ProductOptional[],
+      getQuantity: (optional: ProductOptional) => number,
+      onChange: (optional: ProductOptional, delta: number) => void
+    ) => (
+      <View style={styles.optionalGrid}>
+        {optionals.map((optional) => {
+          const quantity = getQuantity(optional);
+          const selected = quantity > 0;
+          const label = getOptionalDisplay(optional, selectedSize);
+          const price = getOptionalPrice(optional, selectedSize);
+          return (
+            <View
+              key={optional.idOpcional}
+              style={[styles.optionalButton, selected && styles.optionalButtonSelected]}
+            >
+              <Text style={[styles.optionalText, selected && styles.optionalTextSelected]} numberOfLines={2}>
+                {label}
+              </Text>
+              <Text style={[styles.optionalPrice, selected && styles.optionalTextSelected]}>
+                {optional.gratis ? 'Gratis' : formatMoney(price)}
+              </Text>
+              <View style={styles.optionalStepper}>
+                <Pressable
+                  style={[styles.optionalStepButton, quantity <= 0 && styles.optionalStepButtonDisabled]}
+                  onPress={() => onChange(optional, -1)}
+                  disabled={quantity <= 0}
+                >
+                  <Text style={styles.optionalStepText}>-</Text>
+                </Pressable>
+                <Text style={[styles.optionalQtyText, selected && styles.optionalTextSelected]}>{quantity}</Text>
+                <Pressable
+                  style={styles.optionalStepButton}
+                  onPress={() => onChange(optional, 1)}
+                >
+                  <Text style={styles.optionalStepText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
 
     return (
       <Modal visible transparent animationType="fade" onRequestClose={closeProduct}>
@@ -2521,7 +3239,10 @@ export default function App() {
               <ScrollView
                 style={styles.productModalOptions}
                 contentContainerStyle={styles.productModalOptionsContent}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator
+                persistentScrollbar
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
               >
                 {selectedProductSizes.length > 1 ? (
                   <>
@@ -2548,7 +3269,7 @@ export default function App() {
                   <>
                     <Text style={styles.sectionLabel}>Sabores</Text>
                     <View style={styles.fractionCountRow}>
-                      {[2, 3, 4].map((count) => {
+                      {FRACTION_FLAVOR_COUNTS.map((count) => {
                         const selected = selectedFractionCount === count;
                         return (
                           <Pressable
@@ -2557,19 +3278,40 @@ export default function App() {
                             onPress={() => changeFractionCount(count)}
                           >
                             <Text style={[styles.fractionCountText, selected && styles.fractionCountTextSelected]}>
-                              {count} sabores
+                              {formatFractionFlavorCount(count)}
                             </Text>
                           </Pressable>
                         );
                       })}
                     </View>
 
-                    {Array.from({ length: selectedFractionCount }).map((_, index) => (
-                      <View style={styles.fractionSlot} key={`fraction-${index}`}>
-                        <Text style={styles.fractionSlotTitle}>Sabor {index + 1}</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                          <View style={styles.fractionFlavorRow}>
-                            {fractionFlavorOptions.map((flavor) => {
+                    {Array.from({ length: selectedFractionCount }).map((_, index) => {
+                      const selectedFlavorId = selectedFractionIds[index];
+                      const selectedFlavor = fractionFlavorOptions.find(
+                        (flavor) => flavor.idProduto === selectedFlavorId
+                      );
+                      const orderedFlavorOptions = selectedFlavor
+                        ? [
+                            selectedFlavor,
+                            ...fractionFlavorOptions.filter(
+                              (flavor) => flavor.idProduto !== selectedFlavor.idProduto
+                            )
+                          ]
+                        : fractionFlavorOptions;
+
+                      return (
+                        <View style={styles.fractionSlot} key={`fraction-${index}`}>
+                          <Text style={styles.fractionSlotTitle}>Sabor {index + 1}</Text>
+                          <ScrollView
+                            horizontal
+                            style={styles.fractionFlavorScroller}
+                            contentContainerStyle={styles.fractionFlavorRow}
+                            showsHorizontalScrollIndicator
+                            persistentScrollbar
+                            nestedScrollEnabled
+                            keyboardShouldPersistTaps="handled"
+                          >
+                            {orderedFlavorOptions.map((flavor) => {
                               const selected = selectedFractionIds[index] === flavor.idProduto;
                               const duplicate = selectedFractionIds.some(
                                 (id, otherIndex) => otherIndex !== index && id === flavor.idProduto
@@ -2605,10 +3347,10 @@ export default function App() {
                                 </Pressable>
                               );
                             })}
-                          </View>
-                        </ScrollView>
-                      </View>
-                    ))}
+                          </ScrollView>
+                        </View>
+                      );
+                    })}
 
                     {!selectedFractionReady ? (
                       <View style={styles.warningBox}>
@@ -2629,46 +3371,33 @@ export default function App() {
                   </Pressable>
                 </View>
 
-                {(selectedProduct.opcionais || []).length > 0 ? (
+                {selectedProduct.permiteFracao ? (
+                  selectedFractionProducts.map((flavor, index) => {
+                    const optionals = selectedFractionOptionalsByIndex[index] || [];
+                    if (!flavor || optionals.length === 0) return null;
+
+                    return (
+                      <View key={`fraction-optionals-${index}-${flavor.idProduto}`}>
+                        <Text style={styles.sectionLabel}>
+                          Opcionais do sabor {index + 1} - {flavor.descricao}
+                        </Text>
+                        {renderOptionalGrid(
+                          optionals,
+                          (optional) => selectedFractionOptionalQty[index]?.[optional.idOpcional] || 0,
+                          (optional, delta) =>
+                            changeFractionOptionalQuantity(index, optional.idOpcional, delta)
+                        )}
+                      </View>
+                    );
+                  })
+                ) : selectedProductOptionals.length > 0 ? (
                   <>
                     <Text style={styles.sectionLabel}>Opcionais</Text>
-                    <View style={styles.optionalGrid}>
-                      {(selectedProduct.opcionais || []).map((optional) => {
-                        const quantity = selectedOptionalQty[optional.idOpcional] || 0;
-                        const selected = quantity > 0;
-                        const label = getOptionalDisplay(optional, selectedSize);
-                        const price = getOptionalPrice(optional, selectedSize);
-                        return (
-                          <View
-                            key={optional.idOpcional}
-                            style={[styles.optionalButton, selected && styles.optionalButtonSelected]}
-                          >
-                            <Text style={[styles.optionalText, selected && styles.optionalTextSelected]} numberOfLines={2}>
-                              {label}
-                            </Text>
-                            <Text style={[styles.optionalPrice, selected && styles.optionalTextSelected]}>
-                              {optional.gratis ? 'Gratis' : formatMoney(price)}
-                            </Text>
-                            <View style={styles.optionalStepper}>
-                              <Pressable
-                                style={[styles.optionalStepButton, quantity <= 0 && styles.optionalStepButtonDisabled]}
-                                onPress={() => changeOptionalQuantity(optional.idOpcional, -1)}
-                                disabled={quantity <= 0}
-                              >
-                                <Text style={styles.optionalStepText}>-</Text>
-                              </Pressable>
-                              <Text style={[styles.optionalQtyText, selected && styles.optionalTextSelected]}>{quantity}</Text>
-                              <Pressable
-                                style={styles.optionalStepButton}
-                                onPress={() => changeOptionalQuantity(optional.idOpcional, 1)}
-                              >
-                                <Text style={styles.optionalStepText}>+</Text>
-                              </Pressable>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
+                    {renderOptionalGrid(
+                      selectedProductOptionals,
+                      (optional) => selectedOptionalQty[optional.idOpcional] || 0,
+                      (optional, delta) => changeOptionalQuantity(optional.idOpcional, delta)
+                    )}
                   </>
                 ) : null}
 
@@ -2741,6 +3470,7 @@ function LabeledInput({
   textContentType,
   importantForAutofill,
   placeholder,
+  editable = true,
   containerStyle
 }: {
   label: string;
@@ -2754,13 +3484,14 @@ function LabeledInput({
   textContentType?: TextInputProps['textContentType'];
   importantForAutofill?: TextInputProps['importantForAutofill'];
   placeholder?: string;
+  editable?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }) {
   return (
     <View style={[styles.inputGroup, containerStyle]}>
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, !editable && styles.inputDisabled]}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
@@ -2772,6 +3503,7 @@ function LabeledInput({
         importantForAutofill={importantForAutofill}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
+        editable={editable}
       />
     </View>
   );
@@ -2780,17 +3512,19 @@ function LabeledInput({
 function ToggleRow({
   label,
   value,
-  onValueChange
+  onValueChange,
+  disabled = false
 }: {
   label: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <Pressable style={styles.toggleRow} onPress={() => onValueChange(!value)}>
-      <Text style={styles.toggleLabel}>{label}</Text>
-      <View style={[styles.toggleBox, value && styles.toggleBoxActive]}>
-        <Text style={[styles.toggleText, value && styles.toggleTextActive]}>{value ? 'Sim' : 'Nao'}</Text>
+    <Pressable style={[styles.toggleRow, disabled && styles.toggleRowDisabled]} onPress={() => onValueChange(!value)} disabled={disabled}>
+      <Text style={[styles.toggleLabel, disabled && styles.toggleLabelDisabled]}>{label}</Text>
+      <View style={[styles.toggleBox, value && styles.toggleBoxActive, disabled && styles.toggleBoxDisabled]}>
+        <Text style={[styles.toggleText, value && styles.toggleTextActive, disabled && styles.toggleTextDisabled]}>{value ? 'Sim' : 'Nao'}</Text>
       </View>
     </Pressable>
   );
@@ -3261,6 +3995,80 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 2
   },
+  pendingOrderList: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.sm
+  },
+  pendingOrderListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md
+  },
+  pendingOrderListTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase'
+  },
+  pendingOrderListMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  pendingOrderRow: {
+    minHeight: 58,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  pendingOrderDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.muted
+  },
+  pendingOrderDotWarning: {
+    backgroundColor: colors.warning
+  },
+  pendingOrderDotDanger: {
+    backgroundColor: colors.danger
+  },
+  pendingOrderTextBox: {
+    flex: 1,
+    minWidth: 0
+  },
+  pendingOrderTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900'
+  },
+  pendingOrderMeta: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  pendingOrderError: {
+    color: colors.danger,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  pendingOrderMore: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '800'
+  },
   diagnosticsFooter: {
     minHeight: 50,
     marginTop: spacing.md,
@@ -3271,6 +4079,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md
+  },
+  diagnosticsActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    flexShrink: 0
   },
   diagnosticsLastError: {
     flex: 1,
@@ -3522,6 +4337,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: spacing.md
   },
+  authActionsRowRecovery: {
+    flexShrink: 1,
+    flexWrap: 'wrap'
+  },
   appFooter: {
     minHeight: 30,
     marginTop: spacing.md,
@@ -3590,6 +4409,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlignVertical: 'center'
   },
+  inputDisabled: {
+    backgroundColor: colors.surfaceMuted,
+    color: colors.muted
+  },
+  emergencyApiNotice: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.productPriceBorder,
+    backgroundColor: colors.warningSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
+    marginBottom: spacing.md
+  },
+  emergencyApiNoticeText: {
+    color: colors.warning,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '800'
+  },
   toggleRow: {
     minHeight: 52,
     borderWidth: 1,
@@ -3603,11 +4443,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.md
   },
+  toggleRowDisabled: {
+    opacity: 0.72
+  },
   toggleLabel: {
     color: colors.text,
     fontSize: 15,
     fontWeight: '800',
     flex: 1
+  },
+  toggleLabelDisabled: {
+    color: colors.muted
   },
   toggleBox: {
     minWidth: 72,
@@ -3623,12 +4469,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     borderColor: colors.success
   },
+  toggleBoxDisabled: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border
+  },
   toggleText: {
     color: colors.muted,
     fontWeight: '900'
   },
   toggleTextActive: {
     color: colors.surface
+  },
+  toggleTextDisabled: {
+    color: colors.muted
   },
   actionsRow: {
     flexDirection: 'row',
@@ -3992,8 +4845,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   productImage: {
-    width: '100%',
-    height: '100%'
+    width: '92%',
+    height: '92%'
   },
   productImageFallbackBox: {
     minWidth: 100,
@@ -4114,6 +4967,28 @@ const styles = StyleSheet.create({
   cartLineOptionals: {
     color: colors.muted,
     fontSize: 13
+  },
+  cartFractionList: {
+    marginTop: spacing.xs,
+    gap: 2
+  },
+  cartFractionTitle: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800'
+  },
+  cartFractionLine: {
+    gap: 1
+  },
+  cartFractionText: {
+    color: colors.productTitle,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  cartFractionDetail: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16
   },
   cartLineSide: {
     minWidth: 150,
@@ -4280,13 +5155,24 @@ const styles = StyleSheet.create({
   orderFractionLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: spacing.md
   },
-  orderFractionText: {
+  orderFractionMain: {
     flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  orderFractionText: {
     color: colors.productTitle,
     fontSize: 13,
     fontWeight: '800'
+  },
+  orderFractionDetail: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700'
   },
   orderFractionValue: {
     color: colors.accent,
@@ -4355,9 +5241,10 @@ const styles = StyleSheet.create({
     padding: spacing.xl
   },
   productModal: {
-    width: '88%',
+    width: '90%',
     maxWidth: 1180,
-    maxHeight: '92%',
+    height: '94%',
+    maxHeight: '96%',
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: 0,
@@ -4367,13 +5254,13 @@ const styles = StyleSheet.create({
     ...shadows.card
   },
   productModalHeader: {
-    minHeight: 84,
+    minHeight: 74,
     borderTopWidth: 5,
     borderTopColor: colors.accent,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4384,22 +5271,24 @@ const styles = StyleSheet.create({
     flex: 1
   },
   productModalBody: {
-    minHeight: 430,
-    maxHeight: 620,
+    flex: 1,
+    minHeight: 0,
     flexDirection: 'row',
     gap: spacing.lg,
-    padding: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
     backgroundColor: colors.background
   },
   productModalPreview: {
-    width: 360,
+    width: 340,
     gap: spacing.md
   },
   productModalOptions: {
-    flex: 1
+    flex: 1,
+    minHeight: 0
   },
   productModalOptionsContent: {
-    paddingBottom: spacing.lg
+    paddingBottom: spacing.xxl + 96
   },
   modalHeader: {
     flexDirection: 'row',
@@ -4435,7 +5324,7 @@ const styles = StyleSheet.create({
   },
   modalImageFrame: {
     width: '100%',
-    height: 260,
+    height: 238,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -4462,7 +5351,7 @@ const styles = StyleSheet.create({
     fontWeight: '900'
   },
   modalPricePanel: {
-    minHeight: 92,
+    minHeight: 84,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -4490,8 +5379,8 @@ const styles = StyleSheet.create({
   },
   modalDescription: {
     color: colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '700'
   },
   sectionLabel: {
@@ -4598,10 +5487,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900'
   },
+  fractionFlavorScroller: {
+    minHeight: 88,
+    maxHeight: 88
+  },
   fractionFlavorRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingRight: spacing.sm
+    paddingRight: spacing.sm,
+    paddingBottom: spacing.sm
   },
   fractionFlavorButton: {
     width: 150,
@@ -4719,6 +5613,7 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   modalFooter: {
+    flexShrink: 0,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     minHeight: 82,

@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Cardapio Tablet",
-    "slug": "lemovel-cardapio-tablet",
-    "version": "1.0.0",
+    "slug": "cardapio-tablet",
+    "version": "2.0.0",
     "orientation": "landscape",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -10,6 +10,7 @@
     ],
     "android": {
       "package": "br.com.sistemalechef.cardapiotablet",
+      "versionCode": 2,
       "usesCleartextTraffic": true
     },
     "web": {

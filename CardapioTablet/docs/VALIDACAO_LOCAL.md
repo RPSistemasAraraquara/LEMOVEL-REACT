@@ -1,9 +1,34 @@
 # Validacao local - Cardapio Tablet
 
-Data: 2026-08-23 / 2026-08-24
+Data: 2026-08-23 / 2026-08-24 / 2026-08-26
 
 ## Validado
 
+- Release `2.0.0` gerado em 2026-08-26:
+  - `npm run release:android`
+    - Executa `npm run test:smoke`, build Gradle release, copia o APK para `dist`, valida `aapt`, valida `apksigner` e calcula SHA-256.
+  - `npm run test:smoke`
+    - TypeScript sem erros.
+    - Checagem de regras do tablet aprovada, incluindo rodape `CARDAPIO TABLET  Versão 2.0.0`, marca `Cardapio Tablet`, diagnostico exportavel, fila offline visivel, scripts de release/ADB e docs de kiosk/seguranca.
+  - `android/gradlew.bat assembleRelease`
+    - Build release Android concluido com sucesso.
+  - APK gerado:
+    - `dist/CardapioTablet-2.0.0-homologacao-debugsigned.apk`
+    - Tamanho: `56.792.343` bytes.
+    - SHA-256: `01E6AA1B79AB1C300A6B9143A1CE39545E9EF2C821518E1C3734BA7D782B8CD2`
+    - Package: `br.com.sistemalechef.cardapiotablet`
+    - Application label: `Cardapio Tablet`
+    - Version: `2.0.0` / versionCode `2`
+    - minSdk: `24`
+    - targetSdk: `36`
+    - native-code: `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`
+    - Assinatura APK v2: verificada.
+    - Evidencia: `dist/CardapioTablet-2.0.0-release-info.txt`.
+  - `npm run smoke:adb`
+    - APK instalado no dispositivo `RX2WA0279AK` com `adb install -r`.
+    - App aberto via `monkey` no pacote `br.com.sistemalechef.cardapiotablet`.
+    - `dumpsys package` confirmou `versionName=2.0.0` e `versionCode=2`.
+    - Evidencia: `dist/adb-smoke-cardapio-tablet.txt`.
 - `npm run test:smoke`
   - TypeScript sem erros.
   - Checagem de regras do tablet aprovada.
@@ -34,7 +59,7 @@ Data: 2026-08-23 / 2026-08-24
   - App nao inicia mais o modo de pinagem comum (`PINNED`), pois ele mostra a mensagem nativa `O aplicativo foi fixado` e ensina o atalho de saida ao cliente.
   - Abertura limpa validada por captura em `dist/cardapio-kiosk-no-pinning-message-clean.png`: a mensagem nativa de pinagem nao aparece.
   - `adb shell dpm list-owners` retornou `no owners` neste tablet; por isso o Android ainda nao permite o kiosk inviolavel.
-  - `dumpsys activity` retornou `mLockTaskModeState=NONE` sem Device Owner. O estado esperado para homologacao final do bloqueio e `LOCK_TASK_MODE_LOCKED`.
+  - `dumpsys activity` retornou `mLockTaskModeState=NONE` sem Device Owner, inclusive no smoke ADB de 2026-08-26. O estado esperado para homologacao final do bloqueio e `LOCK_TASK_MODE_LOCKED`.
   - Tela de configuracao passa a exibir o indicador `Modo Kiosk Seguro`, consultando o Android pelo modulo nativo. Neste tablet sem Device Owner, o estado esperado do indicador e `Inativo`.
   - Tela de cardapio validada por captura real apos refinamento visual dos cards de produto e categorias.
   - Tela de cardapio validada por captura final em `dist/cardapio-tablet-qa-final-clean.png`.
@@ -65,6 +90,8 @@ Data: 2026-08-23 / 2026-08-24
   - Tela de configuracao ajustada com rolagem propria para alturas menores, mantendo diagnostico, botoes e rodape acessiveis.
   - Banners de rotina `Item adicionado ao carrinho`, `Produto fracionado adicionado ao carrinho` e sucesso de sincronizacao foram removidos; erros e eventos operacionais continuam visiveis.
   - Botao `BACK` enviado por ADB; o processo continuou ativo e a janela permaneceu focada no app.
+  - Recuperacao de API ajustada: quando a API nao comunica, a tela de configuracao nao abre mais direto; exige usuario local `ADM` e senha emergencial autorizada. Apos liberar, somente o campo `Servidor API` fica editavel.
+  - Se a API atual responder ao ping, o acesso emergencial local e recusado e a configuracao continua exigindo usuario/senha do garcom pela API.
 - Expo local:
   - `http://localhost:8081` respondeu HTTP 200.
 - ADB:

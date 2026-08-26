@@ -350,6 +350,7 @@ function parseSaleLineOptional(value: unknown): SaleLineOptional {
 function parseSaleLineFraction(value: unknown): SaleLineFraction {
   const source = readObject(value);
   const descricaoTamanho = resolveField(source, ['descricaoTamanho', 'DescricaoTamanho', 'descricao_tamanho']);
+  const rawOptionals = resolveField(source, ['opcionais', 'opcional', 'adicionais']);
   return {
     idProduto: parseNumber(resolveField(source, ['idProduto', 'id_produto', 'mat_001']), 0),
     produtoDescricao: sanitizeText(resolveField(source, ['produtoDescricao', 'descricao', 'mat_003']), ''),
@@ -360,7 +361,7 @@ function parseSaleLineFraction(value: unknown): SaleLineFraction {
     acrescimo: parseNumber(resolveField(source, ['acrescimo', 'valorAcrescimo']), 0),
     observacao: sanitizeText(resolveField(source, ['observacao', 'obs']), '') || undefined,
     descricaoTamanho: descricaoTamanho ? sanitizeText(descricaoTamanho, '') : undefined,
-    opcionais: Array.isArray(source.opcionais) ? source.opcionais.map(parseSaleLineOptional) : []
+    opcionais: Array.isArray(rawOptionals) ? rawOptionals.map(parseSaleLineOptional) : []
   };
 }
 
@@ -419,6 +420,24 @@ export function roundMoney(value: number): number {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function cloneLaunchOptional(optional: LaunchOptionalPayload): LaunchOptionalPayload {
+  return {
+    idOpcional: optional.idOpcional,
+    descricao: optional.descricao,
+    valor: optional.valor,
+    gratis: optional.gratis
+  };
+}
+
+function getLaunchOptionalsTotal(optionals: LaunchOptionalPayload[], quantity: number): number {
+  return roundMoney(
+    optionals.reduce(
+      (total, optional) => total + (optional.gratis ? 0 : Number(optional.valor || 0) * Number(quantity || 0)),
+      0
+    )
+  );
+}
+
 export function getCartItemTotal(
   item: Pick<CartItem, 'quantidade' | 'valorUnitario' | 'opcionais' | 'fracoes'>
 ): number {
@@ -440,6 +459,23 @@ export function getCartTotal(items: CartItem[]): number {
 }
 
 export function buildLaunchPayload(item: CartItem, idMesa: number, idGarcom: number, terminalName: string): LaunchItemPayload {
+  const hasFractions = Boolean(item.fracoes?.length);
+  const fracoes = item.fracoes?.map((fraction, index): LaunchItemFractionPayload => {
+    const mobileLaunchId = fraction.mobileLaunchId || `${item.lineId}:F${index + 1}`;
+    const fractionOptionals = fraction.opcionais || [];
+    const fractionQuantity = Number(fraction.quantidade || 0);
+    const currentAddition = Number(fraction.acrescimo || 0);
+    const optionalAddition = getLaunchOptionalsTotal(fractionOptionals, fractionQuantity);
+
+    return {
+      ...fraction,
+      acrescimo: currentAddition || optionalAddition,
+      opcionais: fractionOptionals.map(cloneLaunchOptional),
+      mobileLaunchId,
+      MobileLaunchId: mobileLaunchId
+    };
+  });
+
   return {
     mobileLaunchId: item.lineId,
     MobileLaunchId: item.lineId,
@@ -457,16 +493,13 @@ export function buildLaunchPayload(item: CartItem, idMesa: number, idGarcom: num
     idGarcom,
     terminalImpressao: terminalName,
     TerminalImpressao: terminalName,
-    opcionais: item.opcionais,
-    fracoes: item.fracoes?.map((fraction, index): LaunchItemFractionPayload => {
-      const mobileLaunchId = fraction.mobileLaunchId || `${item.lineId}:F${index + 1}`;
-      return {
-        ...fraction,
-        mobileLaunchId,
-        MobileLaunchId: mobileLaunchId
-      };
-    })
+    opcionais: hasFractions ? [] : item.opcionais.map(cloneLaunchOptional),
+    fracoes
   };
+}
+
+function hasConfiguredSizeOption(label: string | undefined, value: number | undefined): boolean {
+  return sanitizeText(label, '').trim().length > 0 || Number(value || 0) > 0;
 }
 
 export function getProductSizeOptions(product: MenuItem): ProductSizeOption[] {
@@ -487,8 +520,15 @@ export function getProductSizeOptions(product: MenuItem): ProductSizeOption[] {
     { code: 'GG', label: product.tamanhoGG || 'GG', value: Number(product.valorTamanhoGG || 0) },
     { code: 'E', label: product.tamanhoExtra || 'Extra', value: Number(product.valorTamanhoExtra || 0) }
   ];
+  const configuredSizes = [
+    hasConfiguredSizeOption(product.tamanhoP, product.valorTamanhoP),
+    hasConfiguredSizeOption(product.tamanhoM, product.valorTamanhoM),
+    hasConfiguredSizeOption(product.tamanhoG, product.valorTamanhoG),
+    hasConfiguredSizeOption(product.tamanhoGG, product.valorTamanhoGG),
+    hasConfiguredSizeOption(product.tamanhoExtra, product.valorTamanhoExtra)
+  ];
 
-  const valid = candidates.filter((item) => item.value > 0 || item.label.trim().length > 0);
+  const valid = candidates.filter((_, index) => configuredSizes[index]);
   if (valid.length > 0) return valid;
 
   return [
@@ -663,6 +703,21 @@ export class TabletApi {
     );
     if (!Array.isArray(payload)) throw new Error('Erro na API ao carregar produtos.');
     return payload.map(parseMenuItem).filter((item) => item.idProduto > 0 && item.b_venda_mobile !== false);
+  }
+
+  async getProduct(idProduto: number, exibirImagem = false): Promise<MenuItem | null> {
+    const normalizedId = Math.trunc(Number(idProduto || 0));
+    if (normalizedId <= 0) return null;
+
+    const { response, payload } = await this.request(
+      `rpCheff/v1/empresa/${this.empresaId}/produto/${normalizedId}?exibirImagem=${exibirImagem ? 'true' : 'false'}`,
+      {
+        headers: NO_CACHE_HEADERS,
+        timeoutMs: PRODUCT_TIMEOUT_MS
+      }
+    );
+    if (!response.ok || !payload || typeof payload !== 'object') return null;
+    return parseMenuItem(payload);
   }
 
   async listTables(): Promise<TableOrder[]> {
