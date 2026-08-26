@@ -38,6 +38,7 @@ function SmartImageContent({
 }: SmartImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const hasSrc = src.trim().length > 0;
 
   const wrapperStyle: CSSProperties = fluid
     ? { aspectRatio: width && height ? `${width} / ${height}` : undefined }
@@ -51,7 +52,7 @@ function SmartImageContent({
       className={`rpfood-smart-image ${fluid ? "rpfood-smart-image--fluid" : ""} ${wrapperClassName ?? ""}`.trim()}
       style={wrapperStyle}
     >
-      {placeholderSrc && !hasError ? (
+      {placeholderSrc && hasSrc && !hasError ? (
         <img
           src={placeholderSrc}
           alt=""
@@ -68,7 +69,7 @@ function SmartImageContent({
         />
       )}
 
-      {!hasError ? (
+      {hasSrc && !hasError ? (
         <img
           {...imgProps}
           src={src}

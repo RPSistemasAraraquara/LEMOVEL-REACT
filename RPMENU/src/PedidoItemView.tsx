@@ -31,6 +31,7 @@ type PedidoItemViewProps = {
   priceLabel: string;
   product: Produto;
   productOptions: ProdutoOpcional[];
+  readOnly?: boolean;
 };
 
 function formatCurrency(value: number): string {
@@ -63,6 +64,7 @@ export function PedidoItemView({
   priceLabel,
   product,
   productOptions,
+  readOnly = false,
 }: PedidoItemViewProps) {
   void config;
   const buttons = sizeButtons(product);
@@ -72,8 +74,8 @@ export function PedidoItemView({
   const firstUngroupedOptionCode = sortedOptions.find((item) => item.groupId <= 0)?.codigoOpcional ?? 0;
   // O proprio produto aberto ja ocupa uma das partes, entao a lista abaixo so
   // oferece o que sobra. Anunciar o total cru confundia: dizia 4 e deixava marcar 3.
-  // O botao de adicionar continua clicavel no limite de proposito: quem trata o
-  // estouro e o onChangeFraction, que explica ao cliente por que nao cabe mais.
+  // No modo de pedido, o limite continua sendo tratado no onChangeFraction para
+  // manter a mensagem centralizada em uma unica regra.
   const extraFlavorsAllowed = maxExtraFractions(maxFractionParts);
 
   return (
@@ -170,62 +172,72 @@ export function PedidoItemView({
                         ) : null}
                       </div>
 
-                      <div className="mb-2 me-3 rpfood-item-form-area">
-                        <div className="col-4 px-0 mb-2 me-3 rpfood-item-quantity-field rpfood-item-field">
-                          <label htmlFor="IWEDT_QUANTIDADE_ITEM" title="Quantidade">
-                            Quantidade
-                          </label>
-                          <div className="quntity rpfood-item-counter" style={{ display: "inline-flex", alignItems: "center" }}>
-                            <button
-                              type="button"
-                              data-decrease
-                              onClick={() => onChangeQuantity(Math.max(1, draft.quantidade - 1))}
-                              aria-label="Diminuir quantidade"
-                            >
-                              -
-                            </button>
+                      {!readOnly ? (
+                        <div className="mb-2 me-3 rpfood-item-form-area">
+                          <div className="col-4 px-0 mb-2 me-3 rpfood-item-quantity-field rpfood-item-field">
+                            <label htmlFor="IWEDT_QUANTIDADE_ITEM" title="Quantidade">
+                              Quantidade
+                            </label>
+                            <div className="quntity rpfood-item-counter" style={{ display: "inline-flex", alignItems: "center" }}>
+                              <button
+                                type="button"
+                                data-decrease
+                                onClick={() => onChangeQuantity(Math.max(1, draft.quantidade - 1))}
+                                aria-label="Diminuir quantidade"
+                              >
+                                -
+                              </button>
+                              <input
+                                id="IWEDT_QUANTIDADE_ITEM"
+                                data-value
+                                type="text"
+                                value={draft.quantidade}
+                                readOnly
+                                aria-readonly="true"
+                              />
+                              <button
+                                type="button"
+                                data-increase
+                                onClick={() => onChangeQuantity(draft.quantidade + 1)}
+                                aria-label="Aumentar quantidade"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mb-2 me-3 rpfood-item-observation-field rpfood-item-field">
+                            <label htmlFor="IWEDTOBSERVACAO">Observação</label>
                             <input
-                              id="IWEDT_QUANTIDADE_ITEM"
-                              data-value
+                              id="IWEDTOBSERVACAO"
+                              className="form-control input-btn"
                               type="text"
-                              value={draft.quantidade}
-                              readOnly
-                              aria-readonly="true"
+                              placeholder="Alguma Observação?"
+                              maxLength={100}
+                              value={draft.observacao}
+                              onChange={(event) => onChangeObservation(event.target.value)}
                             />
-                            <button
-                              type="button"
-                              data-increase
-                              onClick={() => onChangeQuantity(draft.quantidade + 1)}
-                              aria-label="Aumentar quantidade"
-                            >
-                              +
-                            </button>
                           </div>
                         </div>
+                      ) : null}
 
-                        <div className="mb-2 me-3 rpfood-item-observation-field rpfood-item-field">
-                          <label htmlFor="IWEDTOBSERVACAO">Observação</label>
-                          <input
-                            id="IWEDTOBSERVACAO"
-                            className="form-control input-btn"
-                            type="text"
-                            placeholder="Alguma Observação?"
-                            maxLength={100}
-                            value={draft.observacao}
-                            onChange={(event) => onChangeObservation(event.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="shopping-cart" id="barraAcaoItemPedido">
-                        <button className="btn btn-danger" type="button" style={{ flex: 1, minWidth: 0 }} onClick={onClose}>
-                          <i className="fa fa-cancel me-2" />
-                          Não quero ++
-                        </button>
-                        <button className="btn btn-primary" type="button" style={{ flex: 1, minWidth: 0 }} onClick={onConfirm} disabled={loading}>
-                          <i className="fa fa-shopping-basket me-2" />
-                          É isso aiiii
-                        </button>
+                      <div className={readOnly ? "shopping-cart rpfood-item-readonly-actions" : "shopping-cart"} id="barraAcaoItemPedido">
+                        {readOnly ? (
+                          <button className="btn btn-primary" type="button" style={{ flex: 1, minWidth: 0 }} onClick={onClose}>
+                            Voltar ao cardapio
+                          </button>
+                        ) : (
+                          <>
+                            <button className="btn btn-danger" type="button" style={{ flex: 1, minWidth: 0 }} onClick={onClose}>
+                              <i className="fa fa-cancel me-2" />
+                              Não quero ++
+                            </button>
+                            <button className="btn btn-primary" type="button" style={{ flex: 1, minWidth: 0 }} onClick={onConfirm} disabled={loading}>
+                              <i className="fa fa-shopping-basket me-2" />
+                              É isso aiiii
+                            </button>
+                          </>
+                        )}
                       </div>
                       <div className="shopping-cart" style={{ marginTop: 10 }} />
                     </div>
@@ -249,7 +261,9 @@ export function PedidoItemView({
                   >
                     <i className="la la-utensils me-2" style={{ fontSize: "1.2em" }} />
                     <span style={{ fontWeight: 700, fontSize: "1.10em", letterSpacing: "0.5px" }}>
-                      Este item ja conta como 1 sabor. Escolha ate mais {extraFlavorsAllowed}.
+                      {readOnly
+                        ? "Sabores disponiveis para este produto."
+                        : `Este item ja conta como 1 sabor. Escolha ate mais ${extraFlavorsAllowed}.`}
                     </span>
                   </div>
                   <div className="card-body" id="divFracao">
@@ -276,20 +290,22 @@ export function PedidoItemView({
                                         </span>
                                         <br />
                                       </div>
-                                      <div className="quntity align-items-xxl-end rpfood-item-counter">
-                                        <button type="button" data-decrease onClick={() => onChangeFraction(fractionProduct, -1)}>
-                                          -
-                                        </button>
-                                        <input data-value type="text" value={quantity} readOnly id={`fracao_${fractionProduct.codigo}`} />
-                                        <button
-                                          type="button"
-                                          data-increase
-                                          disabled={quantity >= 1}
-                                          onClick={() => onChangeFraction(fractionProduct, 1)}
-                                        >
-                                          +
-                                        </button>
-                                      </div>
+                                      {!readOnly ? (
+                                        <div className="quntity align-items-xxl-end rpfood-item-counter">
+                                          <button type="button" data-decrease onClick={() => onChangeFraction(fractionProduct, -1)}>
+                                            -
+                                          </button>
+                                          <input data-value type="text" value={quantity} readOnly id={`fracao_${fractionProduct.codigo}`} />
+                                          <button
+                                            type="button"
+                                            data-increase
+                                            disabled={quantity >= 1}
+                                            onClick={() => onChangeFraction(fractionProduct, 1)}
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      ) : null}
                                     </div>
                                   </ul>
                                 </li>
@@ -336,7 +352,7 @@ export function PedidoItemView({
                                 {option.groupDescription}
                               </span>
                               <span>
-                                {option.opcionalMaximo > 0 ? (
+                                {!readOnly && option.opcionalMaximo > 0 ? (
                                   <span
                                     style={{ fontSize: "0.95em", fontWeight: 700, marginRight: 8 }}
                                     id={`guarnicao_counter_${option.groupId}`}
@@ -344,7 +360,7 @@ export function PedidoItemView({
                                     {totalInGroup}/{option.opcionalMaximo}
                                   </span>
                                 ) : null}
-                                {option.opcionalMinimo > 0 ? (
+                                {!readOnly && option.opcionalMinimo > 0 ? (
                                   <>
                                     <span
                                       className="badge"
@@ -416,15 +432,17 @@ export function PedidoItemView({
                                   </span>
                                   <br />
                                 </div>
-                                <div className="quntity align-items-xxl-end rpfood-item-counter">
-                                  <button type="button" data-decrease onClick={() => onChangeOptional(option, -1)}>
-                                    -
-                                  </button>
-                                  <input data-value type="text" value={quantity} readOnly id={`opcional_${option.codigoOpcional}`} />
-                                  <button type="button" data-increase onClick={() => onChangeOptional(option, 1)}>
-                                    +
-                                  </button>
-                                </div>
+                                {!readOnly ? (
+                                  <div className="quntity align-items-xxl-end rpfood-item-counter">
+                                    <button type="button" data-decrease onClick={() => onChangeOptional(option, -1)}>
+                                      -
+                                    </button>
+                                    <input data-value type="text" value={quantity} readOnly id={`opcional_${option.codigoOpcional}`} />
+                                    <button type="button" data-increase onClick={() => onChangeOptional(option, 1)}>
+                                      +
+                                    </button>
+                                  </div>
+                                ) : null}
                               </div>
                             </ul>
                           </li>

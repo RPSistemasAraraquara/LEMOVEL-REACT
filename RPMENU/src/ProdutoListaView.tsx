@@ -63,6 +63,8 @@ const ProdutoCard = memo(function ProdutoCard({
   onSelectProduct,
   onShowDetails,
 }: ProdutoCardProps) {
+  void quantityInCart;
+
   return (
     <div className={columnClass}>
       <article className="rpfood-products-card" onClick={() => onSelectProduct(product)}>
@@ -73,16 +75,8 @@ const ProdutoCard = memo(function ProdutoCard({
             {product.vendaPorTamanho ? (
               <span className="rpfood-products-card__tag">Com tamanhos</span>
             ) : (
-              <span className="rpfood-products-card__tag rpfood-products-card__tag--soft">Pronto para pedir</span>
+              <span className="rpfood-products-card__tag rpfood-products-card__tag--soft">Disponivel</span>
             )}
-            {quantityInCart > 0 ? (
-              <span className="rpfood-products-card__in-cart" aria-label={`${quantityInCart} na sacola`}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                {quantityInCart}
-              </span>
-            ) : null}
           </div>
           <div className="rpfood-products-card__media-frame">
             <SmartImage
@@ -132,7 +126,7 @@ const ProdutoCard = memo(function ProdutoCard({
               onSelectProduct(product);
             }}
           >
-            <span aria-hidden="true">+</span>
+            <span aria-hidden="true">Ver</span>
           </button>
         </div>
       </article>

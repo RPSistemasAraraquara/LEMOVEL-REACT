@@ -1,0 +1,121 @@
+;
+; Archive created at 2025-02-25 14:31:42
+;     dbname: FOOD
+;     TOC Entries: 110
+;     Compression: none
+;     Dump Version: 1.16-0
+;     Format: TAR
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 17.2
+;     Dumped by pg_dump version: 17.2
+;
+;
+; Selected TOC Entries:
+;
+253; 1255 440515 FUNCTION public is_atendimento_disponivel() postgres
+217; 1259 440516 TABLE public bairro postgres
+218; 1259 440521 TABLE public bairro_ceps postgres
+219; 1259 440524 TABLE public clientes postgres
+220; 1259 440532 SEQUENCE public clientes_cli_001_seq postgres
+221; 1259 440533 TABLE public clientes_endereco postgres
+222; 1259 440539 SEQUENCE public clientes_endereco_id_endereco_seq postgres
+223; 1259 440540 TABLE public configuracao_funcionamento postgres
+224; 1259 440564 SEQUENCE public configuracao_funcionamento_id_seq postgres
+5200; 0 0 SEQUENCE OWNED BY public configuracao_funcionamento_id_seq postgres
+225; 1259 440565 TABLE public configuracao_rpfood postgres
+226; 1259 440576 SEQUENCE public configuracao_rpfood_id_seq postgres
+5201; 0 0 SEQUENCE OWNED BY public configuracao_rpfood_id_seq postgres
+227; 1259 440577 TABLE public empresas postgres
+228; 1259 440583 SEQUENCE public empresas_id_empresa_seq postgres
+229; 1259 440584 TABLE public formapgto postgres
+230; 1259 440588 TABLE public grupos postgres
+231; 1259 440595 TABLE public happy_hour postgres
+232; 1259 440600 SEQUENCE public happy_hour_id_seq postgres
+5202; 0 0 SEQUENCE OWNED BY public happy_hour_id_seq postgres
+233; 1259 440601 TABLE public mesa postgres
+234; 1259 440605 TABLE public opcional postgres
+235; 1259 440617 TABLE public produtos postgres
+236; 1259 440642 TABLE public produtos_opcional postgres
+237; 1259 440645 TABLE public promocao postgres
+238; 1259 440701 TABLE public restricoesvendas postgres
+239; 1259 440711 TABLE public sincronizacao postgres
+5203; 0 0 COMMENT public COLUMN sincronizacao.id postgres
+5204; 0 0 COMMENT public COLUMN sincronizacao.data postgres
+5205; 0 0 COMMENT public COLUMN sincronizacao.id_empresa postgres
+240; 1259 440714 TABLE public transferencia_imagens postgres
+241; 1259 440718 SEQUENCE public transferencia_imagens_id_seq postgres
+5206; 0 0 SEQUENCE OWNED BY public transferencia_imagens_id_seq postgres
+242; 1259 440719 TABLE public usuarios postgres
+243; 1259 440723 TABLE public usuarios_empresa postgres
+244; 1259 440726 TABLE public usuarios_permissoes postgres
+245; 1259 440732 TABLE public venda postgres
+246; 1259 440738 TABLE public venda_endereco postgres
+247; 1259 440743 SEQUENCE public venda_id_venda_seq postgres
+248; 1259 440744 TABLE public vendaitem postgres
+249; 1259 440752 TABLE public vendaitemopcional postgres
+250; 1259 440761 TABLE public vendamesa postgres
+251; 1259 440765 TABLE public vendamesaitem postgres
+252; 1259 440775 TABLE public vendas_status_log postgres
+4838; 2604 440779 DEFAULT public configuracao_funcionamento id postgres
+4845; 2604 440780 DEFAULT public configuracao_rpfood id postgres
+4852; 2604 440781 DEFAULT public happy_hour id postgres
+4943; 2604 440782 DEFAULT public transferencia_imagens id postgres
+5158; 0 440516 TABLE DATA public bairro postgres
+5159; 0 440521 TABLE DATA public bairro_ceps postgres
+5160; 0 440524 TABLE DATA public clientes postgres
+5162; 0 440533 TABLE DATA public clientes_endereco postgres
+5164; 0 440540 TABLE DATA public configuracao_funcionamento postgres
+5166; 0 440565 TABLE DATA public configuracao_rpfood postgres
+5168; 0 440577 TABLE DATA public empresas postgres
+5170; 0 440584 TABLE DATA public formapgto postgres
+5171; 0 440588 TABLE DATA public grupos postgres
+5172; 0 440595 TABLE DATA public happy_hour postgres
+5174; 0 440601 TABLE DATA public mesa postgres
+5175; 0 440605 TABLE DATA public opcional postgres
+5176; 0 440617 TABLE DATA public produtos postgres
+5177; 0 440642 TABLE DATA public produtos_opcional postgres
+5178; 0 440645 TABLE DATA public promocao postgres
+5179; 0 440701 TABLE DATA public restricoesvendas postgres
+5180; 0 440711 TABLE DATA public sincronizacao postgres
+5181; 0 440714 TABLE DATA public transferencia_imagens postgres
+5183; 0 440719 TABLE DATA public usuarios postgres
+5184; 0 440723 TABLE DATA public usuarios_empresa postgres
+5185; 0 440726 TABLE DATA public usuarios_permissoes postgres
+5186; 0 440732 TABLE DATA public venda postgres
+5187; 0 440738 TABLE DATA public venda_endereco postgres
+5189; 0 440744 TABLE DATA public vendaitem postgres
+5190; 0 440752 TABLE DATA public vendaitemopcional postgres
+5191; 0 440761 TABLE DATA public vendamesa postgres
+5192; 0 440765 TABLE DATA public vendamesaitem postgres
+5193; 0 440775 TABLE DATA public vendas_status_log postgres
+5207; 0 0 SEQUENCE SET public clientes_cli_001_seq postgres
+5208; 0 0 SEQUENCE SET public clientes_endereco_id_endereco_seq postgres
+5209; 0 0 SEQUENCE SET public configuracao_funcionamento_id_seq postgres
+5210; 0 0 SEQUENCE SET public configuracao_rpfood_id_seq postgres
+5211; 0 0 SEQUENCE SET public empresas_id_empresa_seq postgres
+5212; 0 0 SEQUENCE SET public happy_hour_id_seq postgres
+5213; 0 0 SEQUENCE SET public transferencia_imagens_id_seq postgres
+5214; 0 0 SEQUENCE SET public venda_id_venda_seq postgres
+4980; 2606 441031 CONSTRAINT public configuracao_funcionamento configuracao_funcionamento_pkey postgres
+4982; 2606 441033 CONSTRAINT public configuracao_rpfood configuracao_rpfood_pkey postgres
+4984; 2606 441035 CONSTRAINT public empresas empresas_pkey postgres
+4986; 2606 441037 CONSTRAINT public formapgto formapgto_pkey postgres
+4988; 2606 441039 CONSTRAINT public grupos grupos_pkey postgres
+4990; 2606 441041 CONSTRAINT public happy_hour happy_hour_pkey postgres
+4992; 2606 441043 CONSTRAINT public opcional opcional_pkey postgres
+4974; 2606 441045 CONSTRAINT public bairro pk_bairro postgres
+4976; 2606 441047 CONSTRAINT public bairro_ceps pk_bairro_ceps postgres
+4978; 2606 441049 CONSTRAINT public clientes_endereco pk_clientes_endereco postgres
+4996; 2606 441051 CONSTRAINT public promocao pk_promocao postgres
+4998; 2606 441053 CONSTRAINT public usuarios pk_usuarios postgres
+5000; 2606 441055 CONSTRAINT public usuarios_empresa pk_usuarios_empresa postgres
+5002; 2606 441057 CONSTRAINT public venda pk_venda postgres
+5006; 2606 441059 CONSTRAINT public vendaitem pk_vendaitem postgres
+5008; 2606 441061 CONSTRAINT public vendamesaitem pk_vendamesaitem postgres
+4994; 2606 441063 CONSTRAINT public produtos produtos_pkey postgres
+5004; 2606 441065 CONSTRAINT public venda_endereco venda_endereco_pkey postgres
+5009; 2606 441066 FK CONSTRAINT public bairro_ceps fk_bairro_ceps postgres
+5010; 2606 441071 FK CONSTRAINT public formapgto fk_formapgto_id postgres
+5011; 2606 441076 FK CONSTRAINT public promocao fk_promocao_idmaterial postgres
+5012; 2606 441081 FK CONSTRAINT public vendaitem fk_venda_item_empresa postgres

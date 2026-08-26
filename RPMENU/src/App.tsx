@@ -189,6 +189,10 @@ type PaymentSession = {
   pagamento: PagamentoPix;
 };
 
+type TableAccess = {
+  mesa: string;
+};
+
 type AppScreen =
   | "home"
   | "login"
@@ -218,6 +222,17 @@ type AuthTarget = "home" | "checkout" | "tracking" | "profile" | "addresses" | "
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const appVersion = "1.0.0";
+const catalogOnlyMode = true;
+const catalogOnlyVisibleRoutes = new Set<InitialRoute>([
+  "home",
+  "about",
+  "products-all",
+  "products-category",
+  "admin-login",
+  "admin-index",
+  "admin-index2",
+  "not-found",
+]);
 const keys = {
   companyId: "rpmenu.site.companyId",
   cart: "rpmenu.site.cart",
@@ -225,6 +240,7 @@ const keys = {
   checkout: "rpmenu.site.checkout",
   phone: "rpmenu_telefone",
   adminSession: "rpmenu.site.adminSession",
+  tableAccess: "rpmenu.site.tableAccess",
 };
 
 function resolveCurrentLegacyRoute(): string {
@@ -517,68 +533,91 @@ function formatMoney(value: number): string {
   return money.format(roundCurrency(value));
 }
 
-function formatLeadTime(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "--";
-
-  const normalized = String(value).trim();
-  if (!normalized) return "--";
-  if (/min/i.test(normalized)) return normalized.replace(/\s+/g, " ");
-
-  return `${normalized} min`;
-}
-
-function normalizeDayLabel(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-function formatBusinessTime(value: string | null | undefined): string {
-  if (!value) return "";
-
-  const normalized = String(value).trim();
-  if (!normalized) return "";
-
-  const timeMatch = normalized.match(/(\d{2}):(\d{2})/);
-  if (timeMatch) {
-    return `${timeMatch[1]}:${timeMatch[2]}`;
-  }
-
-  return normalized;
-}
-
-function currentBusinessHours(data: SobreLoja | null): string {
-  if (!data?.horarios?.length) return "";
-
-  const weekdays = [
-    "domingo",
-    "segunda",
-    "terca",
-    "quarta",
-    "quinta",
-    "sexta",
-    "sabado",
-  ];
-  const today = weekdays[new Date().getDay()] ?? "";
-  const horarioHoje =
-    data.horarios.find((item) => normalizeDayLabel(item.dia).startsWith(today)) ?? data.horarios[0];
-
-  if (!horarioHoje) return "";
-
-  const periodos = [
-    [horarioHoje.horaAbertura, horarioHoje.horaFechamento],
-    [horarioHoje.horaAbertura2, horarioHoje.horaFechamento2],
-  ]
-    .filter(([inicio, fim]) => inicio && fim)
-    .map(([inicio, fim]) => `${formatBusinessTime(inicio)} as ${formatBusinessTime(fim)}`);
-
-  return periodos.join(" | ");
-}
-
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+function loadSessionStored<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const saved = window.sessionStorage.getItem(key);
+  if (!saved) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(saved) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistSessionStored<T>(key: string, value: T | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (value === null) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+
+  window.sessionStorage.setItem(key, JSON.stringify(value));
+}
+
+function firstUrlParam(params: URLSearchParams, ...names: string[]) {
+  for (const name of names) {
+    const value = params.get(name);
+    if (value?.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function extractMesaFromQRCode(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trimmed, typeof window === "undefined" ? "http://localhost" : window.location.origin);
+    const mesa = firstUrlParam(url.searchParams, "mesa", "table", "m");
+    if (mesa) {
+      return digitsOnly(mesa) || mesa;
+    }
+  } catch {
+    // Entrada manual pode ser somente o numero da mesa.
+  }
+
+  const queryMatch = trimmed.match(/(?:^|[?&;])(mesa|table|m)=([^&#;]+)/i);
+  if (queryMatch?.[2]) {
+    const decoded = decodeURIComponent(queryMatch[2].replace(/\+/g, " ")).trim();
+    return digitsOnly(decoded) || decoded;
+  }
+
+  return digitsOnly(trimmed);
+}
+
+function resolveInitialTableAccess(): TableAccess | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const mesaFromUrl = extractMesaFromQRCode(firstUrlParam(new URLSearchParams(window.location.search), "mesa", "table", "m"));
+  if (mesaFromUrl) {
+    return { mesa: mesaFromUrl };
+  }
+
+  return loadSessionStored<TableAccess | null>(keys.tableAccess, null);
+}
+
+function isProtectedAdminScreen(screen: AppScreen) {
+  return screen === "admin-login" || screen === "admin-index" || screen === "admin-index2";
 }
 
 function parseCurrencyInput(value: string): number {
@@ -669,12 +708,18 @@ function App() {
   }, [draft.fracoes]);
   const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>(() =>
-    loadStored<CartItem[]>(keys.cart, []).map((item) => normalizeCartItem(item)),
+    catalogOnlyMode ? [] : loadStored<CartItem[]>(keys.cart, []).map((item) => normalizeCartItem(item)),
   );
   const [customer, setCustomer] = useState<Cliente | null>(() => loadStored<Cliente | null>(keys.customer, null));
+  const initialTableAccessRef = useRef<TableAccess | null>(resolveInitialTableAccess());
+  const [tableAccess, setTableAccess] = useState<TableAccess | null>(() => initialTableAccessRef.current);
+  const [tableInput, setTableInput] = useState(() => initialTableAccessRef.current?.mesa ?? "");
   const initialRouteRef = useRef<InitialRoute>(resolveInitialScreen(Boolean(customer?.idCliente)));
   const initialRouteHandledRef = useRef(false);
-  const [screen, setScreen] = useState<AppScreen>(() => mapInitialRouteToScreen(initialRouteRef.current));
+  const initialScreenRef = useRef<AppScreen>(mapInitialRouteToScreen(initialRouteRef.current));
+  const [screen, setScreen] = useState<AppScreen>(() =>
+    initialScreenRef.current === "login" && initialTableAccessRef.current ? "home" : initialScreenRef.current,
+  );
   const [authTarget, setAuthTarget] = useState<AuthTarget>("home");
   const [loginPhone, setLoginPhone] = useState<string>(() => localStorage.getItem(keys.phone) ?? "");
   const [forgotEmail, setForgotEmail] = useState("");
@@ -928,7 +973,17 @@ function App() {
   }
 
   useEffect(() => localStorage.setItem(keys.companyId, JSON.stringify(companyId)), [companyId]);
-  useEffect(() => localStorage.setItem(keys.cart, JSON.stringify(cart)), [cart]);
+  useEffect(() => {
+    if (catalogOnlyMode) {
+      localStorage.removeItem(keys.cart);
+      if (cart.length) {
+        setCart([]);
+      }
+      return;
+    }
+
+    localStorage.setItem(keys.cart, JSON.stringify(cart));
+  }, [cart]);
   useEffect(() => localStorage.setItem(keys.customer, JSON.stringify(customer)), [customer]);
   useEffect(() => localStorage.setItem(keys.checkout, JSON.stringify(checkout)), [checkout]);
   useEffect(() => {
@@ -941,6 +996,7 @@ function App() {
       localStorage.removeItem(keys.adminSession);
     }
   }, [adminSession]);
+  useEffect(() => persistSessionStored(keys.tableAccess, tableAccess), [tableAccess]);
   useEffect(() => {
     if (customer?.celular || customer?.telefone) {
       setLoginPhone(customer.celular || customer.telefone);
@@ -1124,7 +1180,17 @@ function App() {
     const initialRoute = initialRouteRef.current;
     initialRouteHandledRef.current = true;
 
+    if (catalogOnlyMode && !catalogOnlyVisibleRoutes.has(initialRoute)) {
+      openHomeScreen();
+      return;
+    }
+
     switch (initialRoute) {
+      case "login":
+        if (tableAccess) {
+          openHomeScreen();
+        }
+        return;
       case "about":
         void openAboutScreen();
         return;
@@ -1227,7 +1293,7 @@ function App() {
   // Rota inicial deve ser consumida uma unica vez, depois que catalogo/cliente
   // estiverem disponiveis, sem reexecutar ao recriar handlers de navegacao.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart, catalog, customer, loading, paymentSession]);
+  }, [cart, catalog, customer, loading, paymentSession, tableAccess]);
 
   useEffect(() => {
     document.body.classList.toggle("rpfood-item-open", Boolean(activeProduct));
@@ -1579,19 +1645,12 @@ function App() {
   const maxFractionParts = normalizeMaxFractionParts(catalog?.empresa.quantidadeMaximaFracaoProdutos);
   const maxExtraFlavors = maxExtraFractions(maxFractionParts);
   const subtotalSemEntrega = total - deliveryFee;
-  const featuredProducts = catalog?.destaques?.length
-    ? catalog.destaques
-    : Array.from(new Map(Object.values(productsByCategory).flat().map((item) => [item.codigo, item])).values());
-  const listedCategories =
-    catalog?.categorias.map((category) => ({
-      ...category,
-      produtos: productsByCategory[category.codigo] ?? [],
-    })) ?? [];
-  const latestSale = history[0] ?? null;
+  const allHomeProducts = useMemo(
+    () => Array.from(new Map(Object.values(productsByCategory).flat().map((item) => [item.codigo, item])).values()),
+    [productsByCategory],
+  );
+  const featuredProducts = catalog?.destaques?.length ? catalog.destaques : allHomeProducts.slice(0, 20);
   const loggedCustomer = Boolean(customer?.idCliente);
-  const storeStatusLabel = catalog?.aberta ? "Aberto agora" : "Fechado";
-  const storeStatusColor = catalog?.aberta ? "#27ae60" : "#e74c3c";
-  const storeBusinessHours = currentBusinessHours(aboutData);
   const adminQtdeVendas = adminDashboard?.qtdeVendas ?? "0";
   const adminValorVendas = adminDashboard?.valorVendas ?? "0,00";
   const adminTaxaEntrega = adminDashboard?.taxaEntrega ?? "0,00";
@@ -1794,6 +1853,22 @@ function App() {
   function openHomeScreen() {
     clearTransientNavigationState();
     setSelectedCategoryId(null);
+    setScreen("home");
+    setShowHistoryPanel(false);
+    setShowCartPanel(false);
+    setError("");
+    setMessage("");
+  }
+
+  async function handleTableAccessSubmit() {
+    const mesa = extractMesaFromQRCode(tableInput);
+    if (!mesa || Number(mesa) <= 0) {
+      await showLegacyValidation("Mesa nao identificada", "Leia o QR Code da mesa ou informe o numero da mesa.");
+      return;
+    }
+
+    setTableAccess({ mesa });
+    setTableInput(mesa);
     setScreen("home");
     setShowHistoryPanel(false);
     setShowCartPanel(false);
@@ -2016,6 +2091,11 @@ function App() {
   }
 
   function openCheckout(cliente?: Cliente | null) {
+    if (catalogOnlyMode) {
+      openHomeScreen();
+      return;
+    }
+
     const targetCustomer = cliente ?? customer;
     const nextTipoEntrega = resolveTipoEntrega(checkout.tipoEntrega, allowPickup);
     setError("");
@@ -2067,6 +2147,10 @@ function App() {
   }
 
   function toggleCartPanel() {
+    if (catalogOnlyMode) {
+      return;
+    }
+
     if (!cart.length) {
       return;
     }
@@ -3279,6 +3363,11 @@ function App() {
   function addToCart() {
     if (!activeProduct) return;
 
+    if (catalogOnlyMode) {
+      void showLegacyValidation("Cardapio online", "Este cardapio e somente para consulta.");
+      return;
+    }
+
     if (catalog?.configuracao.utilizaControleOpcionais && !usesCategoryRule(activeOptions) && activeProduct.opcionalMinimo > 0) {
       if (totalSelectedOptions() < activeProduct.opcionalMinimo) {
         void showLegacyWarning("Atencao", `A quantidade minima a ser preenchido e: ${activeProduct.opcionalMinimo} Opcionais.`);
@@ -3346,14 +3435,7 @@ function App() {
         : [...current, next],
     );
     setMessage("");
-    // Confirmacao imediata: sem isso o cliente volta para a listagem sem nenhum
-    // retorno visual e acaba lancando o mesmo item mais de uma vez.
-    setCartFeedback({
-      id: Date.now(),
-      text: wasEditing
-        ? `${next.produto.descricao} atualizado na sacola`
-        : `${next.quantidade}x ${next.produto.descricao} na sacola`,
-    });
+    setCartFeedback(null);
     closeProductDetail();
     if (screen === "products-category" || screen === "products-all") {
       void window.requestAnimationFrame(() => {
@@ -3588,6 +3670,11 @@ function App() {
   }
 
   async function handleRepeatOrder(saleId: number, sourceSale?: VendaHistorico | null) {
+    if (catalogOnlyMode) {
+      await showLegacyValidation("Cardapio online", "Este cardapio e somente para consulta.");
+      return;
+    }
+
     if (!customer?.idCliente) {
       await showLegacyWarning("Atencao", "Faca o login do cliente antes de repetir o pedido.");
       return;
@@ -3740,6 +3827,11 @@ function App() {
     setMessage("");
     setError("");
 
+    if (catalogOnlyMode) {
+      await showLegacyValidation("Cardapio online", "Este cardapio e somente para consulta.");
+      return;
+    }
+
     if (cart.length) {
       openCheckout();
       return;
@@ -3765,7 +3857,61 @@ function App() {
     }
   }
 
+  function renderTableAccessGate() {
+    const companyName = catalog?.empresa.nome || "Cardapio digital";
+    const loadingStatus = loading ? "Sincronizando cardapio..." : "A mesa sera vinculada a esta sessao do cardapio.";
+
+    return (
+      <main className="rpmenu-qr-shell">
+        <section className="rpmenu-qr-card">
+          <div className="rpmenu-qr-card__brand">
+            <div className="rpmenu-qr-card__mark">RP</div>
+            <div>
+              <strong>RP MENU</strong>
+              <span>{companyName}</span>
+            </div>
+          </div>
+
+          <div className="rpmenu-qr-card__content">
+            <div className="rpmenu-qr-card__copy">
+              <span className="rpmenu-qr-card__eyebrow">Acesso da mesa</span>
+              <h1>Leia o QR Code da mesa</h1>
+              <p>Abra o cardapio pelo QR Code impresso na mesa. Se necessario, informe o numero manualmente.</p>
+            </div>
+
+            <form
+              className="rpmenu-qr-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleTableAccessSubmit();
+              }}
+            >
+              <label htmlFor="rpmenu-table-input">Mesa</label>
+              <div className="rpmenu-qr-form__row">
+                <input
+                  id="rpmenu-table-input"
+                  inputMode="numeric"
+                  placeholder="Ex.: 1 ou link do QR Code"
+                  value={tableInput}
+                  onChange={(event) => setTableInput(event.target.value)}
+                />
+                <button type="submit">Abrir cardapio</button>
+              </div>
+              <small>{loadingStatus}</small>
+            </form>
+          </div>
+        </section>
+
+        <footer className="rpmenu-qr-footer">RPMENU {appVersion}</footer>
+      </main>
+    );
+  }
+
   function renderCartChrome() {
+    if (catalogOnlyMode) {
+      return null;
+    }
+
     return (
       <>
         {cartFeedback ? (
@@ -4045,27 +4191,31 @@ function App() {
           <span>Home</span>
         </button>
 
-        <button type="button" className="rpfood-nav-button" onClick={() => void handlePedidoNavigation()} style={{ position: "relative" }}>
-          <svg height="20" width="20" viewBox="0 -31 512.00026 512" fill="#1B4F72">
-            <path d="m164.960938 300.003906h.023437c.019531 0 .039063-.003906.058594-.003906h271.957031c6.695312 0 12.582031-4.441406 14.421875-10.878906l60-210c1.292969-4.527344.386719-9.394532-2.445313-13.152344-2.835937-3.757812-7.269531-5.96875-11.976562-5.96875h-366.632812l-10.722657-48.253906c-1.527343-6.863282-7.613281-11.746094-14.644531-11.746094h-90c-8.285156 0-15 6.714844-15 15s6.714844 15 15 15h77.96875c1.898438 8.550781 51.3125 230.917969 54.15625 243.710938-15.941406 6.929687-27.125 22.824218-27.125 41.289062 0 24.8125 20.1875 45 45 45h272c8.285156 0 15-6.714844 15-15s-6.714844-15-15-15h-272c-8.269531 0-15-6.730469-15-15 0-8.257812 6.707031-14.976562 14.960938-14.996094zm312.152343-210.003906-51.429687 180h-248.652344l-40-180zm0 0" />
-            <path d="m150 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
-            <path d="m362 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
-          </svg>
-          <span id="badgeQtdNav" className={`badge bg-danger rounded-circle${cartFeedback ? " rpfood-cart-badge--pulse" : ""}`} style={{ position: "absolute", top: 0, right: "calc(50% - 18px)", fontSize: "0.55rem", minWidth: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {cartItemsCount}
-          </span>
-          <span>Pedido</span>
-        </button>
+        {!catalogOnlyMode ? (
+          <button type="button" className="rpfood-nav-button" onClick={() => void handlePedidoNavigation()} style={{ position: "relative" }}>
+            <svg height="20" width="20" viewBox="0 -31 512.00026 512" fill="#1B4F72">
+              <path d="m164.960938 300.003906h.023437c.019531 0 .039063-.003906.058594-.003906h271.957031c6.695312 0 12.582031-4.441406 14.421875-10.878906l60-210c1.292969-4.527344.386719-9.394532-2.445313-13.152344-2.835937-3.757812-7.269531-5.96875-11.976562-5.96875h-366.632812l-10.722657-48.253906c-1.527343-6.863282-7.613281-11.746094-14.644531-11.746094h-90c-8.285156 0-15 6.714844-15 15s6.714844 15 15 15h77.96875c1.898438 8.550781 51.3125 230.917969 54.15625 243.710938-15.941406 6.929687-27.125 22.824218-27.125 41.289062 0 24.8125 20.1875 45 45 45h272c8.285156 0 15-6.714844 15-15s-6.714844-15-15-15h-272c-8.269531 0-15-6.730469-15-15 0-8.257812 6.707031-14.976562 14.960938-14.996094zm312.152343-210.003906-51.429687 180h-248.652344l-40-180zm0 0" />
+              <path d="m150 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
+              <path d="m362 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
+            </svg>
+            <span id="badgeQtdNav" className={`badge bg-danger rounded-circle${cartFeedback ? " rpfood-cart-badge--pulse" : ""}`} style={{ position: "absolute", top: 0, right: "calc(50% - 18px)", fontSize: "0.55rem", minWidth: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {cartItemsCount}
+            </span>
+            <span>Pedido</span>
+          </button>
+        ) : null}
 
-        <button type="button" id="btnNavPerfil" className="rpfood-nav-button" onClick={() => openProfileScreen()}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B4F72" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <span>Perfil</span>
-        </button>
+        {!catalogOnlyMode ? (
+          <button type="button" id="btnNavPerfil" className="rpfood-nav-button" onClick={() => openProfileScreen()}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B4F72" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Perfil</span>
+          </button>
+        ) : null}
 
-        {loggedCustomer ? (
+        {!catalogOnlyMode && loggedCustomer ? (
           <button type="button" id="btnNavEnderecos" className="rpfood-nav-button" onClick={() => void openAddressesScreen()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B4F72" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -4075,7 +4225,7 @@ function App() {
           </button>
         ) : null}
 
-        {loggedCustomer ? (
+        {!catalogOnlyMode && loggedCustomer ? (
           <button type="button" id="btnNavAcompanhamento" className="rpfood-nav-button rpfood-nav-button--small" onClick={() => void handleTrackingNavigation()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B4F72" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -4095,6 +4245,10 @@ function App() {
         </button>
       </nav>
     );
+  }
+
+  if (!isProtectedAdminScreen(screen) && !tableAccess) {
+    return renderTableAccessGate();
   }
 
   if (activeProduct) {
@@ -4133,6 +4287,7 @@ function App() {
               priceLabel={formatMoney(calculateItemUnitPrice(activeProduct, draft.tamanho, selectedFractions))}
               product={activeProduct}
               productOptions={activeOptions}
+              readOnly={catalogOnlyMode}
             />
           </div>
         </div>
@@ -4474,97 +4629,70 @@ function App() {
           className="container"
           style={{ maxWidth: "100%", paddingLeft: 10, paddingRight: 10, paddingTop: 0, marginTop: 0 }}
         >
-          <div className="rpfood-home-page">
-            <section className="rpfood-home-hero" id="divNomeEmpresa">
-              <div className="rpfood-home-hero__main">
-                <h1 id="nomeEmpresa" className="rpfood-home-hero__title">
-                  {catalog?.empresa.nome || "RPMENU"}
-                </h1>
-                {loggedCustomer && customer?.nome ? (
-                  <p className="rpfood-home-hero__description">{customer.nome}</p>
-                ) : null}
-
-                <div id="infoTopo" className="rpfood-home-hero__chips">
-                  <span id="infoStatus" className="rpfood-home-chip rpfood-home-chip--status">
-                    <span id="infoStatusDot" className="rpfood-home-chip__dot" style={{ background: storeStatusColor }} />
-                    <span id="infoStatusTexto">{storeStatusLabel}</span>
-                  </span>
-                  {storeBusinessHours ? (
-                    <span id="infoHorario" className="rpfood-home-chip">
-                      {storeBusinessHours}
-                    </span>
-                  ) : null}
-                  {allowPickup ? (
-                    <span id="infoTempoRetirada" className="rpfood-home-chip">
-                      Balcao: {formatLeadTime(catalog?.configuracao.tempoRetirada)}
-                    </span>
-                  ) : null}
-                  {catalog?.configuracao.tempoEntrega ? (
-                    <span id="infoTempoEntrega" className="rpfood-home-chip">
-                      Entrega: {formatLeadTime(catalog.configuracao.tempoEntrega)}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="rpfood-home-hero__actions">
-                  <a
-                    href="produtostodascategoria.html"
-                    className="btn rpfood-home-search-btn"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      openProductsScreen();
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
-                    </svg>
-                    Bora procurar
-                  </a>
-
-                  {hasRepeatBanner ? (
-                    <button
-                      type="button"
-                      id="bannerRepetirPedidos"
-                      className="rpfood-home-secondary-action rpfood-home-secondary-action--repeat"
-                      onClick={openHistoryScreen}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="1 4 1 10 7 10" />
-                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                      </svg>
-                      Repetir pedido
-                      {latestSale ? (
-                        <span className="rpfood-home-secondary-action__meta">Ultimo: {formatMoney(latestSale.valorTotal)}</span>
-                      ) : null}
-                    </button>
-                  ) : (
-                    <button type="button" className="rpfood-home-secondary-action" onClick={openProductsScreen}>
-                      Ver cardapio
-                    </button>
-                  )}
-                </div>
+          <div className="rpfood-home-page rpmenu-legacy-home">
+            <header className="rpmenu-legacy-topbar" id="divNomeEmpresa">
+              <div className="rpmenu-legacy-brand" aria-label="RP MENU">
+                <span className="rpmenu-legacy-brand__mark" aria-hidden="true">RP</span>
+                <span className="rpmenu-legacy-brand__copy">
+                  <strong>RP MENU</strong>
+                  <small>{catalog?.empresa.nome || "Cardapio online"}</small>
+                </span>
               </div>
-            </section>
 
-            {(message || error) && (
-              <div className="rpfood-home-feedback">
+              <div className="rpmenu-legacy-topbar__actions">
+                <button
+                  type="button"
+                  className="rpmenu-legacy-icon-button"
+                  onClick={() => void openAboutScreen()}
+                  aria-label="Abrir dados da loja"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>Sobre</span>
+                </button>
+
+                {!catalogOnlyMode ? (
+                  <button
+                    type="button"
+                    className="rpmenu-legacy-cart-button"
+                    onClick={toggleCartPanel}
+                    aria-label="Abrir pedido"
+                  >
+                    <svg height="21" width="21" viewBox="0 -31 512.00026 512" fill="currentColor" aria-hidden="true">
+                      <path d="m164.960938 300.003906h.023437c.019531 0 .039063-.003906.058594-.003906h271.957031c6.695312 0 12.582031-4.441406 14.421875-10.878906l60-210c1.292969-4.527344.386719-9.394532-2.445313-13.152344-2.835937-3.757812-7.269531-5.96875-11.976562-5.96875h-366.632812l-10.722657-48.253906c-1.527343-6.863282-7.613281-11.746094-14.644531-11.746094h-90c-8.285156 0-15 6.714844-15 15s6.714844 15 15 15h77.96875c1.898438 8.550781 51.3125 230.917969 54.15625 243.710938-15.941406 6.929687-27.125 22.824218-27.125 41.289062 0 24.8125 20.1875 45 45 45h272c8.285156 0 15-6.714844 15-15s-6.714844-15-15-15h-272c-8.269531 0-15-6.730469-15-15 0-8.257812 6.707031-14.976562 14.960938-14.996094zm312.152343-210.003906-51.429687 180h-248.652344l-40-180zm0 0" />
+                      <path d="m150 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
+                      <path d="m362 405c0 24.8125 20.1875 45 45 45s45-20.1875 45-45-20.1875-45-45-45-45 20.1875-45 45zm45-15c8.269531 0 15 6.730469 15 15s-6.730469 15-15 15-15-6.730469-15-15 6.730469-15 15-15zm0 0" />
+                    </svg>
+                    <span>Pedido</span>
+                    <strong>{cartItemsCount}</strong>
+                  </button>
+                ) : null}
+              </div>
+            </header>
+
+            {(message || error || loading) && (
+              <div className="rpfood-home-feedback rpmenu-legacy-feedback">
+                {loading ? <div className="rpfood-home-feedback__ok">Carregando cardapio...</div> : null}
                 {message ? <div className="rpfood-home-feedback__ok">{message}</div> : null}
                 {error ? <div className="rpfood-home-feedback__error">{error}</div> : null}
               </div>
             )}
 
-            <section className="rpfood-home-section">
-              <div className="rpfood-home-section__head">
+            <section className="rpmenu-legacy-section">
+              <div className="rpmenu-legacy-section__head">
                 <div>
-                  <span className="rpfood-home-section__eyebrow">Em alta</span>
-                  <h2 className="rpfood-home-section__title">Mais vendidos</h2>
+                  <span>Aqui ta on</span>
+                  <h2>Destaques da casa</h2>
                 </div>
               </div>
 
-              <RailSlider label="Mais vendidos" railRef={featuredRailRef}>
+              <RailSlider label="Destaques" railRef={featuredRailRef}>
                 <div
                   ref={featuredRailRef}
-                  className="swiper-wrapper rpfood-scroll-row rpfood-home-featured-row"
+                  className="swiper-wrapper rpfood-scroll-row rpmenu-legacy-featured-row"
                   id="listadestaques"
                   onPointerDown={featuredRailPointerDown}
                   onPointerMove={featuredRailPointerMove}
@@ -4573,32 +4701,28 @@ function App() {
                   onWheel={handleHorizontalRailWheel}
                   onClickCapture={featuredRailClickCapture}
                 >
-                  {featuredProducts.map((product, index) => (
+                  {featuredProducts.slice(0, 20).map((product, index) => (
                     <div
                       key={`destaque-${product.codigo}`}
-                      className="swiper-slide rpfood-home-featured-slide"
+                      className="swiper-slide rpmenu-legacy-featured-slide"
                       {...clickableCardProps(() => void chooseProduct(product), `Abrir ${product.descricao}`)}
                     >
-                      <article className="rpfood-home-featured-card">
-                        <div className="rpfood-home-featured-card__media">
+                      <article className="rpmenu-legacy-featured-card">
+                        <div className="rpmenu-legacy-featured-card__media">
                           <SmartImage
                             fluid
-                            src={product.thumbnailUrl ?? product.imageUrl}
+                            src={product.imageUrl}
+                            placeholderSrc={product.thumbnailUrl ?? product.imageUrl}
                             alt={product.descricao}
-                            width={190}
-                            height={190}
+                            width={220}
+                            height={154}
                             {...getProgressiveImageProps(index, 2)}
                           />
-                          <span className="rpfood-home-featured-card__badge">Ta on</span>
+                          {product.imageUrl ? <span className="rpmenu-legacy-featured-card__badge">Ta on</span> : null}
                         </div>
-                        <div className="rpfood-home-featured-card__body">
-                          {/* Sem descricao: e uma vitrine rapida, e um unico card com
-                              texto longo esticava a altura de todo o carrossel. */}
-                          <h3>{truncateText(product.descricao, 34)}</h3>
-                          <div className="rpfood-home-featured-card__footer">
-                            <strong>{formatMoney(productPriceBySize(product, defaultProductSize(product)))}</strong>
-                            <span>Escolher</span>
-                          </div>
+                        <div className="rpmenu-legacy-featured-card__body">
+                          <h3>{truncateText(product.descricao, 36)}</h3>
+                          <strong>{formatMoney(productPriceBySize(product, defaultProductSize(product)))}</strong>
                         </div>
                       </article>
                     </div>
@@ -4607,30 +4731,19 @@ function App() {
               </RailSlider>
             </section>
 
-            <section className="rpfood-home-section">
-              <div className="rpfood-home-section__head">
+            <section className="rpmenu-legacy-section">
+              <div className="rpmenu-legacy-section__head">
                 <div>
-                  <span className="rpfood-home-section__eyebrow">Descubra</span>
-                  <h2 className="rpfood-home-section__title">Categorias</h2>
+                  <span>Categorias</span>
+                  <h2>Escolha por tipo</h2>
                 </div>
-                <div className="rpfood-home-section__head-actions">
-                  <a
-                    href="produtostodascategoria.html"
-                    className="rpfood-home-section__link"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      openProductsScreen();
-                    }}
-                    >
-                      Ver todas
-                    </a>
-                </div>
+                <button type="button" onClick={openProductsScreen}>Ver todas</button>
               </div>
 
               <RailSlider label="Categorias" railRef={categoriesRailRef}>
                 <div
                   ref={categoriesRailRef}
-                  className="swiper-wrapper rpfood-scroll-row rpfood-home-category-row"
+                  className="swiper-wrapper rpfood-scroll-row rpmenu-legacy-category-row"
                   id="listaCategorias"
                   onPointerDown={categoriesRailPointerDown}
                   onPointerMove={categoriesRailPointerMove}
@@ -4642,26 +4755,25 @@ function App() {
                   {catalog?.categorias.map((category, index) => (
                     <div
                       key={`categoria-card-${category.codigo}`}
-                      className="swiper-slide rpfood-home-category-slide"
+                      className="swiper-slide rpmenu-legacy-category-slide"
                       {...clickableCardProps(
                         () => openCategoryProductsScreen(category.codigo),
                         `Abrir categoria ${category.descricao}`,
                       )}
                     >
-                      <article className="rpfood-home-category-card">
-                        <div className="rpfood-home-category-card__media">
+                      <article className="rpmenu-legacy-category-card">
+                        <div className="rpmenu-legacy-category-card__media">
                           <SmartImage
                             fluid
-                            src={category.thumbnailUrl ?? category.imageUrl}
+                            src={category.imageUrl}
+                            placeholderSrc={category.thumbnailUrl ?? category.imageUrl}
                             alt={category.descricao}
-                            width={148}
-                            height={148}
+                            width={132}
+                            height={108}
                             {...getProgressiveImageProps(index, 3)}
                           />
                         </div>
-                        <div className="rpfood-home-category-card__body">
-                          <h3>{truncateText(category.descricao, 24)}</h3>
-                        </div>
+                        <h3>{truncateText(category.descricao, 24)}</h3>
                       </article>
                     </div>
                   ))}
@@ -4669,85 +4781,48 @@ function App() {
               </RailSlider>
             </section>
 
-            <section id="categorias_produtos" className="rpfood-home-menu-section">
-              <div className="rpfood-home-section__head">
+            <section id="categorias_produtos" className="rpmenu-legacy-section rpmenu-legacy-products-section">
+              <div className="rpmenu-legacy-section__head">
                 <div>
-                  <span className="rpfood-home-section__eyebrow">Cardapio</span>
-                  <h2 className="rpfood-home-section__title">Explore por categoria</h2>
+                  <span>Cardapio</span>
+                  <h2>Produtos</h2>
                 </div>
               </div>
 
-              <div className="tab-pane fade show active" id="pills-grid" role="tabpanel" aria-labelledby="pills-grid-tab">
-                <div className="accordion accordion-primary rpfood-home-accordion" id="accordion-one">
-                  {listedCategories.map((category) => {
-                    const isOpen = selectedCategoryId === category.codigo;
-                    return (
-                      <div key={category.codigo} className="accordion-item rpfood-home-accordion__item">
-                        <div
-                          className={isOpen ? "accordion-header rounded-lg rpfood-home-accordion__header is-open" : "accordion-header collapsed rounded-lg rpfood-home-accordion__header"}
-                          id={`heading_${category.codigo}`}
-                          aria-controls={`categoria_${category.codigo}`}
-                          aria-expanded={isOpen}
-                          {...clickableCardProps(
-                            () => setSelectedCategoryId(isOpen ? null : category.codigo),
-                            `${isOpen ? "Fechar" : "Abrir"} categoria ${category.descricao}`,
-                          )}
-                        >
-                          <span className="accordion-header-icon" />
-                          <span className="accordion-header-text">{category.descricao}</span>
-                          <span className="rpfood-home-accordion__count">
-                            {category.produtos.length.toLocaleString("pt-BR")} itens
-                          </span>
-                          <span className="accordion-header-indicator" />
-                        </div>
-                        <div id={`categoria_${category.codigo}`} className={isOpen ? "collapse show" : "collapse"} aria-labelledby={`heading_${category.codigo}`}>
-                          <div className="tab-pane fade show active" role="tabpanel" aria-labelledby="pills-grid-tab">
-                            <div className="row">
-                              {category.produtos.length ? (
-                                category.produtos.map((product, productIndex) => (
-                                  <div
-                                    key={`${category.codigo}-${product.codigo}`}
-                                    className="col-6 col-md-4 col-lg-3 col-xxl-2 mb-3"
-                                    {...clickableCardProps(() => void chooseProduct(product), `Abrir ${product.descricao}`)}
-                                  >
-                                    <article className="rpfood-home-product-card">
-                                      <div className="rpfood-home-product-card__media">
-                                        <SmartImage
-                                          fluid
-                                          src={product.thumbnailUrl ?? product.imageUrl}
-                                          alt={product.descricao}
-                                          width={150}
-                                          height={150}
-                                          {...getProgressiveImageProps(productIndex, 4)}
-                                        />
-                                      </div>
-                                      <div className="rpfood-home-product-card__body">
-                                        <h3>{product.descricao}</h3>
-                                        {product.observacao.trim() ? (
-                                          <p>{truncateText(product.observacao, 88)}</p>
-                                        ) : null}
-                                      </div>
-                                      <div className="rpfood-home-product-card__footer">
-                                        <strong>{formatMoney(productPriceBySize(product, defaultProductSize(product)))}</strong>
-                                        <span>Ver detalhes</span>
-                                      </div>
-                                    </article>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="col-12">
-                                  <div className="rpfood-home-empty-category">
-                                    {loading ? "Carregando..." : "Nenhum produto carregado nesta categoria."}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+              <div className="rpmenu-legacy-product-grid" id="pills-grid" role="list">
+                {allHomeProducts.length ? (
+                  allHomeProducts.map((product, productIndex) => (
+                    <article
+                      key={`home-produto-${product.codigo}`}
+                      className="rpmenu-legacy-product-card"
+                      {...clickableCardProps(() => void chooseProduct(product), `Abrir ${product.descricao}`)}
+                    >
+                      <div className="rpmenu-legacy-product-card__media">
+                        <SmartImage
+                          fluid
+                          src={product.imageUrl}
+                          placeholderSrc={product.thumbnailUrl ?? product.imageUrl}
+                          alt={product.descricao}
+                          width={192}
+                          height={126}
+                          {...getProgressiveImageProps(productIndex, 6)}
+                        />
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="rpmenu-legacy-product-card__body">
+                        <h3>{product.descricao}</h3>
+                        {product.observacao.trim() ? <p>{truncateText(product.observacao, 72)}</p> : null}
+                      </div>
+                      <div className="rpmenu-legacy-product-card__footer">
+                        <strong>{formatMoney(productPriceBySize(product, defaultProductSize(product)))}</strong>
+                        <span>Ver detalhes</span>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="rpmenu-legacy-empty">
+                    {loading ? "Carregando produtos..." : "Nenhum produto disponivel para venda."}
+                  </div>
+                )}
               </div>
             </section>
 

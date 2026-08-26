@@ -52,6 +52,7 @@ export interface Categoria {
   descricao: string;
   imageUrl: string;
   thumbnailUrl?: string;
+  temImagem?: boolean;
 }
 
 export interface Produto {
@@ -83,6 +84,7 @@ export interface Produto {
   restringirVenda: boolean;
   imageUrl: string;
   thumbnailUrl?: string;
+  temImagem?: boolean;
 }
 
 export interface Opcional {

@@ -20,6 +20,24 @@ VITE_RPMENU_EMPRESA_ID=1
 
 As variaveis antigas `VITE_RPFOOD_API_URL` e `VITE_RPFOOD_EMPRESA_ID` continuam aceitas como fallback para facilitar homologacao em ambientes ja configurados.
 
+### QR Code das mesas
+
+O dominio usado para montar os QR Codes fica em `public/rpmenu-config.json`:
+
+```json
+{
+  "dominio_qrcode": "https://comanda.rpfood.com.br"
+}
+```
+
+Preencha somente o dominio, sem `/login.html` e sem `?mesa=`.
+
+O link final de cada mesa continua no padrao:
+
+```text
+https://comanda.rpfood.com.br/login.html?mesa=4
+```
+
 ## Scripts
 
 ```bash

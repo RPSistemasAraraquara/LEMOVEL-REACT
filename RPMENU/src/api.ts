@@ -98,6 +98,15 @@ function toBoolean(value: unknown): boolean {
   return normalized === "true" || normalized === "1" || normalized === "sim" || normalized === "s" || normalized === "yes";
 }
 
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  const normalized = toStringValue(value).trim();
+  return normalized ? toBoolean(normalized) : undefined;
+}
+
 function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
@@ -237,12 +246,15 @@ function normalizeConfiguracao(raw: unknown): Configuracao {
 function normalizeCategoria(raw: unknown, companyId: number): Categoria {
   const record = asRecord(raw);
   const codigo = toNumber(pick(record, "codigo", "Codigo"));
+  const temImagem = toOptionalBoolean(pick(record, "temImagem", "TemImagem", "tem_imagem"));
+  const imageUrl = temImagem === false ? "" : buildCategoryImageUrl(companyId, codigo);
 
   return {
     codigo,
     descricao: toStringValue(pick(record, "descricao", "Descricao")),
-    imageUrl: buildCategoryImageUrl(companyId, codigo),
-    thumbnailUrl: buildCategoryImageUrl(companyId, codigo, "thumb"),
+    imageUrl,
+    thumbnailUrl: temImagem === false ? undefined : buildCategoryImageUrl(companyId, codigo, "thumb"),
+    temImagem: temImagem !== false,
   };
 }
 
@@ -250,6 +262,8 @@ function normalizeProduto(raw: unknown, fallbackCompanyId: number): Produto {
   const record = asRecord(raw);
   const companyId = toNumber(pick(record, "idEmpresa", "IdEmpresa"), fallbackCompanyId);
   const codigo = toNumber(pick(record, "codigo", "Codigo"));
+  const temImagem = toOptionalBoolean(pick(record, "temImagem", "TemImagem", "tem_imagem"));
+  const imageUrl = temImagem === false ? "" : buildProductImageUrl(companyId, codigo);
 
   return {
     codigo,
@@ -278,8 +292,9 @@ function normalizeProduto(raw: unknown, fallbackCompanyId: number): Produto {
     opcionalMinimo: toNumber(pick(record, "OpcionalMinimo", "opcionalMinimo")),
     opcionalMaximo: toNumber(pick(record, "OpcionalMaximo", "opcionalMaximo")),
     restringirVenda: toBoolean(pick(record, "restringirVenda", "RestringirVenda")),
-    imageUrl: buildProductImageUrl(companyId, codigo),
-    thumbnailUrl: buildProductImageUrl(companyId, codigo, "thumb"),
+    imageUrl,
+    thumbnailUrl: temImagem === false ? undefined : buildProductImageUrl(companyId, codigo, "thumb"),
+    temImagem: temImagem !== false,
   };
 }
 
