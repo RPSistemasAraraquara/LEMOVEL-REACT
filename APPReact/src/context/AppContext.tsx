@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState as RNAppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { roundLineAmount } from '../utils/money';
+import type { MonetaryPart } from '../utils/money';
 import {
   api,
   Category,
@@ -140,7 +142,7 @@ export const useApp = () => {
 
 const isPresent = (value: unknown): boolean => value !== undefined && value !== null;
 
-const roundTo2 = (value: number) => Number(Number(value).toFixed(2));
+const roundTo2 = (value: number) => roundLineAmount([{ value }]);
 
 type DashboardRefreshWaiter = {
   resolve: () => void;
@@ -583,22 +585,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const optionTotal = (item: Pick<CartItem, 'opcionais' | 'quantidade'>) => {
-    return item.opcionais.reduce(
-      (acc, optional) => acc + (optional.gratis ? 0 : optional.valor * item.quantidade),
-      0
-    );
-  };
-
   const getLineTotal = (item: CartItem) => {
-    const baseValue = item.fracoes?.length
-      ? item.fracoes.reduce(
-          (acc, fraction) => acc + Number(fraction.valorTotal || 0) + Number(fraction.acrescimo || 0),
-          0
-        )
-      : item.valorUnitario * item.quantidade;
-    const optionalValue = optionTotal(item);
-    return roundTo2(baseValue + optionalValue + item.acrescimo - item.desconto);
+    const baseParts: MonetaryPart[] = item.fracoes?.length
+      ? item.fracoes.flatMap((fraction) => [
+          { value: Number(fraction.valorTotal || 0) },
+          { value: Number(fraction.acrescimo || 0) }
+        ])
+      : [{ value: item.valorUnitario, quantity: item.quantidade }];
+    const optionalParts: MonetaryPart[] = item.opcionais
+      .filter((optional) => !optional.gratis)
+      .map((optional) => ({ value: optional.valor, quantity: item.quantidade }));
+    return roundLineAmount([
+      ...baseParts,
+      ...optionalParts,
+      { value: item.acrescimo },
+      { value: -item.desconto }
+    ]);
   };
 
   const getCartTotal = () => roundTo2(cart.reduce((acc, it) => acc + getLineTotal(it), 0));

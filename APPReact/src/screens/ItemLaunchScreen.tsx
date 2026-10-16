@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { TextInputEndEditingEvent } from 'react-native';
 import { CommonActions, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinkedMesaPickerModal } from '../components/LinkedMesaPickerModal';
@@ -20,6 +21,7 @@ import {
 } from '../services/api';
 import { Colors, Radius, Shadows, Space, Typography } from '../theme';
 import { RootStackParams } from '../navigation/AppNavigator';
+import { roundLineAmount } from '../utils/money';
 
 type LaunchRoute = RouteProp<RootStackParams, 'Lancamento'>;
 type Nav = NativeStackNavigationProp<RootStackParams, 'Lancamento'>;
@@ -41,6 +43,11 @@ const EMPTY_MENU_ITEM: MenuItem = {
 };
 
 const roundTo2 = (value: number) => Number(Number(value || 0).toFixed(2));
+
+const formatCalculationAmount = (value: number): string => {
+  const exact = value.toFixed(7).replace(/0+$/, '').replace(/\.$/, '');
+  return (exact.split('.')[1]?.length || 0) <= 2 ? value.toFixed(2) : exact;
+};
 
 const normalizeSizeValue = (value: unknown): number => {
   const asNumber = Number(String(value || 0).replace(',', '.'));
@@ -255,6 +262,7 @@ export const ItemLaunchScreen: React.FC = () => {
   } = useApp();
   const isReturningRef = useRef(false);
   const skipNextQuantityConfirmRef = useRef(false);
+  const quantityInputRef = useRef('1');
   const quantityFromRoute = Number(route.params?.quantity);
   const sizeFromRoute = route.params?.size;
   const [quantidade, setQuantidade] = useState(Math.max(1, Number.isFinite(quantityFromRoute) && quantityFromRoute > 0 ? quantityFromRoute : 1));
@@ -423,7 +431,9 @@ export const ItemLaunchScreen: React.FC = () => {
     const nextQuantity = Math.max(1, quantityFromRoute > 0 ? quantityFromRoute : 1);
 
     setQuantidade(nextQuantity);
-    setQuantidadeInput(formatQuantityInputValue(nextQuantity, Boolean(routeProduct?.usaQuantidadeDecimal)));
+    const nextQuantityInput = formatQuantityInputValue(nextQuantity, Boolean(routeProduct?.usaQuantidadeDecimal));
+    quantityInputRef.current = nextQuantityInput;
+    setQuantidadeInput(nextQuantityInput);
     setFlavorCount(1);
     setObservacao('');
     setFractionSearchByIndex({});
@@ -711,7 +721,16 @@ export const ItemLaunchScreen: React.FC = () => {
     return acc + value * optionalQty * quantidade;
   }, 0);
 
-  const lineTotal = (selectedPrice * quantidade + optionalTotal);
+  const lineTotal = roundLineAmount([
+    { value: selectedPrice, quantity: quantidade },
+    ...selectedOptionals.flatMap((optional) => {
+      const value = getOptionalPrice(optional);
+      const count = selectedOptionalQty[optional.idOpcional] || 0;
+      return Number.isFinite(value) && value >= 0 && count > 0
+        ? [{ value, quantity: quantidade, count }]
+        : [];
+    })
+  ]);
   const shouldShowFlavorCount = Boolean(resolvedProduct.permiteFracao);
   const selectedFlavorCount = shouldShowFlavorCount ? flavorCount : 1;
   const fractionMode = shouldShowFlavorCount && selectedFlavorCount > 1;
@@ -854,7 +873,8 @@ export const ItemLaunchScreen: React.FC = () => {
     const values = fractions.filter((item): item is number => item !== null);
     return values.length !== new Set(values).size;
   }, [fractions]);
-  const fractionOrderCount = fractionMode ? Math.max(1, Math.round(quantidade)) : 1;
+  const invalidFractionQuantity = fractionMode && (!Number.isInteger(quantidade) || quantidade <= 0);
+  const fractionOrderCount = fractionMode ? (invalidFractionQuantity ? 0 : quantidade) : 1;
   const fractionQuantity = selectedFlavorCount > 0 ? Number((1 / selectedFlavorCount).toFixed(3)) : 0;
   const fractionOptionalsTotalQuantity = fractionOptionalItemsByIndex.reduce((acc, optionals, index) => {
     return acc + optionals.reduce((subtotal, optional) => subtotal + getFractionOptionalQuantity(index, optional.idOpcional), 0);
@@ -876,6 +896,7 @@ export const ItemLaunchScreen: React.FC = () => {
   }, [fractionItems, getPriceBySize, resolvedProduct, selectedSize]);
   const fractionEstimatedTotal = useMemo(() => {
     if (!fractionMode) return lineTotal;
+    if (invalidFractionQuantity) return null;
     const total = fractionItems.reduce((acc, item) => {
       if (!item) return acc;
       const baseUnit = getPriceBySize(item, selectedSize);
@@ -887,6 +908,7 @@ export const ItemLaunchScreen: React.FC = () => {
     appSettings.cobrarMaiorValorFracionado,
     fractionItems,
     fractionMode,
+    invalidFractionQuantity,
     fractionOptionalTotal,
     fractionOrderCount,
     fractionQuantity,
@@ -978,22 +1000,30 @@ export const ItemLaunchScreen: React.FC = () => {
     if (allowDecimalQuantity) {
       const normalized = Math.max(step, Number(next.toFixed(3)));
       setQuantidade(normalized);
-      setQuantidadeInput(formatQuantityInputValue(normalized, true));
+      const formatted = formatQuantityInputValue(normalized, true);
+      quantityInputRef.current = formatted;
+      setQuantidadeInput(formatted);
       return;
     }
 
     const normalized = Math.max(1, Math.round(next));
     setQuantidade(normalized);
-    setQuantidadeInput(String(Math.max(1, Math.round(next))));
+    const formatted = String(normalized);
+    quantityInputRef.current = formatted;
+    setQuantidadeInput(formatted);
   };
 
   const changeQuantityByStep = (delta: number) => {
+    const next = Number((quantidade + delta).toFixed(3));
+    if (delta < 0 && next <= 0) return;
     skipNextQuantityConfirmRef.current = true;
-    changeQuantity(quantidade + delta);
+    changeQuantity(next);
   };
 
   const setQuantityByText = (raw: string) => {
+    skipNextQuantityConfirmRef.current = false;
     const normalizedInput = normalizeQuantityInputText(raw, allowDecimalQuantity);
+    quantityInputRef.current = normalizedInput;
     setQuantidadeInput(normalizedInput);
     const next = sanitizeQuantity(normalizedInput);
     const lower = allowDecimalQuantity ? next : Math.max(1, Math.floor(next));
@@ -1001,17 +1031,24 @@ export const ItemLaunchScreen: React.FC = () => {
     setQuantidade(normalized <= 0 ? (allowDecimalQuantity ? step : 1) : normalized);
   };
 
-  const confirmQuantity = () => {
+  const confirmQuantity = (event: TextInputEndEditingEvent) => {
     if (skipNextQuantityConfirmRef.current) {
       skipNextQuantityConfirmRef.current = false;
       return;
     }
+    const normalizedInput = normalizeQuantityInputText(event.nativeEvent.text, allowDecimalQuantity);
+    quantityInputRef.current = normalizedInput;
+    setQuantidadeInput(normalizedInput);
     if (allowDecimalQuantity) {
-      const next = sanitizeQuantity(quantidadeInput);
-      changeQuantity(Math.max(step, next || step));
+      const next = sanitizeQuantity(normalizedInput);
+      if (next > 0) {
+        setQuantidade(Number(next.toFixed(3)));
+      } else {
+        changeQuantity(step);
+      }
       return;
     }
-    const next = parseInt(quantidadeInput, 10);
+    const next = parseInt(normalizedInput, 10);
     changeQuantity(Number.isFinite(next) ? next : 1);
   };
 
@@ -1020,6 +1057,19 @@ export const ItemLaunchScreen: React.FC = () => {
       const restrictedProduct = findRestrictedLaunchProduct();
       if (restrictedProduct) {
         Alert.alert('Item restrito', buildMenuItemRestrictedMessage(restrictedProduct));
+        return;
+      }
+
+      const enteredQuantity = sanitizeQuantity(quantityInputRef.current);
+      if (enteredQuantity <= 0) {
+        Alert.alert('Quantidade inválida', 'Informe uma quantidade maior que zero.');
+        return;
+      }
+      const quantityToLaunch = allowDecimalQuantity
+        ? Number(enteredQuantity.toFixed(3))
+        : Math.max(1, Math.round(enteredQuantity));
+      if (fractionMode && !Number.isInteger(quantityToLaunch)) {
+        Alert.alert('Quantidade inválida', 'Para dividir em sabores, informe uma quantidade inteira (1, 2, 3...).');
         return;
       }
 
@@ -1104,7 +1154,7 @@ export const ItemLaunchScreen: React.FC = () => {
             }];
           });
 
-        for (let launchIndex = 0; launchIndex < fractionOrderCount; launchIndex += 1) {
+        for (let launchIndex = 0; launchIndex < quantityToLaunch; launchIndex += 1) {
           const fractionGroupId = `frac-${Date.now()}-${launchIndex}-${Math.random().toString(36).slice(2, 10)}`;
           addToCart({
             ...resolvedProduct,
@@ -1132,7 +1182,7 @@ export const ItemLaunchScreen: React.FC = () => {
 
       addToCart({
         ...resolvedProduct,
-        quantidade,
+        quantidade: quantityToLaunch,
         descricaoTamanho: sizePayloadLabel,
         tamanho: sizePayloadCode,
         desconto: 0,
@@ -1253,7 +1303,6 @@ export const ItemLaunchScreen: React.FC = () => {
           value={quantidadeInput}
           onChangeText={setQuantityByText}
           onEndEditing={confirmQuantity}
-          onBlur={confirmQuantity}
           keyboardType={allowDecimalQuantity ? 'decimal-pad' : 'number-pad'}
           style={styles.qtyInput}
         />
@@ -1261,6 +1310,9 @@ export const ItemLaunchScreen: React.FC = () => {
           <Text style={styles.qtyBtnText}>+</Text>
         </Pressable>
       </View>
+      {fractionMode && allowDecimalQuantity ? (
+        <Text style={styles.summaryTextMuted}>Para dividir em sabores, informe unidades inteiras. Para quantidade decimal, selecione 1 sabor.</Text>
+      ) : null}
 
       {!fractionMode ? (
         <>
@@ -1466,11 +1518,13 @@ export const ItemLaunchScreen: React.FC = () => {
       ) : null}
 
           <View style={styles.summary}>
-            <Text style={styles.summaryText}>Subtotal: R$ {(fractionMode ? fractionEstimatedTotal : lineTotal).toFixed(2)}</Text>
-            {priceLineItems.map((item) => (
+            <Text style={styles.summaryText}>
+              {invalidFractionQuantity ? 'Subtotal: informe uma quantidade inteira' : `Subtotal: R$ ${(fractionMode ? fractionEstimatedTotal : lineTotal)?.toFixed(2)}`}
+            </Text>
+            {!invalidFractionQuantity && priceLineItems.map((item) => (
               <View key={item.label} style={styles.summaryRow}>
                 <Text style={styles.summaryTextMuted}>{item.label}</Text>
-                <Text style={styles.summaryTextMuted}>R$ {item.value.toFixed(2)}</Text>
+                <Text style={styles.summaryTextMuted}>R$ {formatCalculationAmount(item.value)}</Text>
               </View>
             ))}
           </View>
