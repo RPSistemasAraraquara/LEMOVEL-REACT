@@ -728,6 +728,22 @@ export class TabletApi {
     return payload.map(parseTable);
   }
 
+  async callWaiter(numeroMesa: string): Promise<void> {
+    const normalizedMesa = sanitizeText(numeroMesa, '').slice(0, 20);
+    if (!normalizedMesa) {
+      throw new Error('Mesa nao informada para chamar o garcom.');
+    }
+
+    const { response, payload } = await this.request(`rpCheff/v1/empresa/${this.empresaId}/mesa/chamar-garcom`, {
+      method: 'POST',
+      body: JSON.stringify({ numeroMesa: normalizedMesa })
+    });
+
+    if (!response.ok) {
+      throw new Error(extractApiErrorMessage(payload, 'Nao foi possivel chamar o garcom.'));
+    }
+  }
+
   async openTable(tableId: number, terminalName: string, idUsuario: number, nomeMesaComanda?: string): Promise<TableOrder> {
     const body: Record<string, unknown> = {
       terminalAbertura: terminalName

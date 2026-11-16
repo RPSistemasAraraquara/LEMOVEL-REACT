@@ -9,6 +9,7 @@ uses
   APIRPCheff.DAO.CaixaItem,
   APIRPCheff.DAO.Categoria,
   APIRPCheff.DAO.CatracaMobile,
+  APIRPCheff.DAO.ChamaGarcom,
   APIRPCheff.DAO.Comanda,
   APIRPCheff.DAO.ConfiguracaoComanda,
   APIRPCheff.DAO.ConfiguracaoMesa,
@@ -42,6 +43,7 @@ uses
 type
   TAPIRPCheffDAOCaixaItem                     = APIRPCheff.DAO.CaixaItem.TAPIRPCheffDAOCaixaItem;
   TAPIRPCheffDAOCatracaMobile                 = APIRPCheff.DAO.CatracaMobile.TAPIRPCheffDAOCatracaMobile;
+  TAPIRPCheffDAOChamaGarcom                   = APIRPCheff.DAO.ChamaGarcom.TAPIRPCheffDAOChamaGarcom;
   TAPIRPCheffDAOEncerraVenda                  = APIRPCheff.DAO.EncerraVenda.TAPIRPCheffDAOEncerraVenda;
   TAPIRPCheffDAOMovimentoEstoque              = APIRPCheff.DAO.MovimentoEstoque.TAPIRPCheffDAOMovimentoEstoque;
   TAPIRPCheffDAOMovimentoEstoqueComposicao    = APIRPCheff.DAO.MovimentoEstoqueComposicao.TAPIRPCheffDAOMovimentoEstoqueComposicao;
@@ -67,6 +69,7 @@ type
     FCaixaItemDAO                       : TAPIRPCheffDAOCaixaItem;
     FCategoriaDAO                       : TAPIRPCheffDAOCategoria;
     FCatracaMobileDAO                   : TAPIRPCheffDAOCatracaMobile;
+    FChamaGarcomDAO                     : TAPIRPCheffDAOChamaGarcom;
     FComandaDAO                         : TAPIRPCheffDAOComanda;
     FConfiguracaoComandaDAO             : TAPIRPCheffDAOConfiguracaoComanda;
     FConfiguracaoMesaDAO                : TAPIRPCheffDAOConfiguracaoMesa;
@@ -111,6 +114,7 @@ type
     function CaixaItemDAO                     : TAPIRPCheffDAOCaixaItem;
     function CategoriaDAO                     : TAPIRPCheffDAOCategoria;
     function CatracaMobileDAO                 : TAPIRPCheffDAOCatracaMobile;
+    function ChamaGarcomDAO                   : TAPIRPCheffDAOChamaGarcom;
     function ComandaDAO                       : TAPIRPCheffDAOComanda;
     function ConfiguracaoComandaDAO           : TAPIRPCheffDAOConfiguracaoComanda;
     function ConfiguracaoMesaDAO              : TAPIRPCheffDAOConfiguracaoMesa;
@@ -201,6 +205,17 @@ begin
   Result := FCatracaMobileDAO;
 end;
 
+function TAPIRPCheffDAOFactory.ChamaGarcomDAO: TAPIRPCheffDAOChamaGarcom;
+begin
+  if not Assigned(FChamaGarcomDAO) then
+  begin
+    FChamaGarcomDAO := TAPIRPCheffDAOChamaGarcom.Create(FConnection);
+    FChamaGarcomDAO.IdEmpresa(FIdEmpresa);
+  end;
+  FChamaGarcomDAO.ManagerTransaction(True);
+  Result := FChamaGarcomDAO;
+end;
+
 function TAPIRPCheffDAOFactory.ComandaDAO: TAPIRPCheffDAOComanda;
 begin
   if not Assigned(FComandaDAO) then
@@ -251,6 +266,7 @@ begin
   FreeAndNil(FCaixaItemDAO);
   FreeAndNil(FCategoriaDAO);
   FreeAndNil(FCatracaMobileDAO);
+  FreeAndNil(FChamaGarcomDAO);
   FreeAndNil(FComandaDAO);
   FreeAndNil(FConfiguracaoComandaDAO);
   FreeAndNil(FConfiguracaoMesaDAO);
@@ -580,7 +596,5 @@ begin
 end;
 
 end.
-
-
 
 

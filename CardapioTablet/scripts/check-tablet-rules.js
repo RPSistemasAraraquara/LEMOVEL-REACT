@@ -30,6 +30,11 @@ const deviceAdminReceiver = read(path.join('android', 'app', 'src', 'main', 'jav
 const deviceAdminXml = read(path.join('android', 'app', 'src', 'main', 'res', 'xml', 'tablet_device_admin.xml'));
 const empresaDao = readExternal(path.join(apiRoot, 'Source', 'Model', 'DAO', 'APIRPCheff.DAO.Empresa.pas'));
 const empresaEntity = readExternal(path.join(apiRoot, 'Source', 'Model', 'Entity', 'APIRPCheff.Entity.Empresa.pas'));
+const chamaGarcomDao = readExternal(path.join(apiRoot, 'Source', 'Model', 'DAO', 'APIRPCheff.DAO.ChamaGarcom.pas'));
+const chamaGarcomService = readExternal(
+  path.join(apiRoot, 'Source', 'Model', 'Service', 'Mesa', 'ChamaGarcom', 'APIRPCheff.Service.Mesa.ChamaGarcom.pas')
+);
+const mesaController = readExternal(path.join(apiRoot, 'Source', 'Controller', 'APIRPCheff.Controller.Mesa.pas'));
 
 const checks = [
   {
@@ -135,19 +140,19 @@ const checks = [
     ok: !/setBanner\(`Mesa \$\{formatMesa\([^}]+\)\} liberada\.`/.test(app)
   },
   {
-    name: 'Rodape das telas protegidas mostra Cardapio Tablet versao 2.0.0',
+    name: 'Rodape das telas protegidas mostra Cardapio Tablet versao 3.0.0',
     ok:
       app.includes("APP_DISPLAY_BRAND = 'Cardapio Tablet'") &&
       app.includes("APP_DISPLAY_NAME = 'CARDAPIO TABLET'") &&
-      app.includes("APP_DISPLAY_VERSION = '2.0.0'") &&
+      app.includes("APP_DISPLAY_VERSION = '3.0.0'") &&
       app.includes('Versão') &&
       app.includes('function AppFooter') &&
       (app.match(/<AppFooter \/>/g) || []).length >= 3 &&
-      appConfig.includes('"version": "2.0.0"') &&
-      appConfig.includes('"versionCode": 2') &&
-      packageJson.includes('"version": "2.0.0"') &&
-      androidBuildGradle.includes('versionCode 2') &&
-      androidBuildGradle.includes('versionName "2.0.0"')
+      appConfig.includes('"version": "3.0.0"') &&
+      appConfig.includes('"versionCode": 3') &&
+      packageJson.includes('"version": "3.0.0"') &&
+      androidBuildGradle.includes('versionCode 3') &&
+      androidBuildGradle.includes('versionName "3.0.0"')
   },
   {
     name: 'Tela bloqueada usa marca Cardapio Tablet sem marca antiga',
@@ -180,6 +185,26 @@ const checks = [
       app.includes('api.getSale(session.idVenda, true)') &&
       app.includes('visibleOrderLines') &&
       !api.includes('cancelSaleItem')
+  },
+  {
+    name: 'Tela principal registra Chamar Garçom na API',
+    ok:
+      app.includes('const [callingWaiter, setCallingWaiter]') &&
+      app.includes('const callWaiter = useCallback') &&
+      app.includes('await api.callWaiter(formatMesa(currentTableNumber))') &&
+      app.includes('label="Chamar Garçom"') &&
+      app.includes('variant="waiter"') &&
+      app.includes('disabled={callingWaiter}') &&
+      app.includes("title: 'Chamar Garçom'") &&
+      app.includes('Solicitação de atendimento para a Mesa') &&
+      api.includes('async callWaiter(numeroMesa: string): Promise<void>') &&
+      api.includes('mesa/chamar-garcom') &&
+      api.includes('JSON.stringify({ numeroMesa: normalizedMesa })') &&
+      chamaGarcomDao.includes('create table if not exists chama_garcom') &&
+      chamaGarcomDao.includes('insert into chama_garcom (id_empresa, numero_mesa)') &&
+      chamaGarcomService.includes('NumeroMesa') &&
+      mesaController.includes("SwagPOST('chamar-garcom'") &&
+      mesaController.includes('MesaChamaGarcomService')
   },
   {
     name: 'Falha de rede no envio mostra mensagem elegante sem erro tecnico cru',

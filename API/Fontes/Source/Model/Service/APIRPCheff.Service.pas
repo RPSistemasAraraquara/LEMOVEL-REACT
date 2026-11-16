@@ -9,6 +9,7 @@ uses
   APIRPCheff.Service.Comanda.Consulta,
   APIRPCheff.Service.Comanda.Transferencia,
   APIRPCheff.Service.Mesa.Abertura,
+  APIRPCheff.Service.Mesa.ChamaGarcom,
   APIRPCheff.Service.Mesa.Consulta,
   APIRPCheff.Service.Mesa.Transferencia,
   APIRPCheff.Service.Mesa.Juncao,
@@ -30,6 +31,7 @@ type
     FComandaConsultaService      : TAPIRPCheffServiceComandaConsulta;
     FComandaTransferenciaService : TAPIRPCheffServiceComandaTransferencia;
     FMesaAberturaService         : TAPIRPCheffServiceMesaAbertura;
+    FMesaChamaGarcomService      : TAPIRPCheffServiceMesaChamaGarcom;
     FMesaConsultaService         : TAPIRPCheffServiceMesaConsulta;
     FMesaTransferenciaService    : TAPIRPCheffServiceMesaTransferencia;
     FMesaJuncaoService           : TAPIRPCheffServiceMesaJuncao;
@@ -50,6 +52,7 @@ type
     function ComandaConsultaService      : TAPIRPCheffServiceComandaConsulta;
     function ComandaTransferenciaService : TAPIRPCheffServiceComandaTransferencia;
     function MesaAberturaService         : TAPIRPCheffServiceMesaAbertura;
+    function MesaChamaGarcomService      : TAPIRPCheffServiceMesaChamaGarcom;
     function MesaConsultaService         : TAPIRPCheffServiceMesaConsulta;
     function MesaTransferenciaService    : TAPIRPCheffServiceMesaTransferencia;
     function MesaJuncaoService           : TAPIRPCheffServiceMesaJuncao;
@@ -114,6 +117,7 @@ begin
   FreeAndNil(FComandaConsultaService);
   FreeAndNil(FComandaTransferenciaService);
   FreeAndNil(FMesaAberturaService);
+  FreeAndNil(FMesaChamaGarcomService);
   FreeAndNil(FMesaConsultaService);
   FreeAndNil(FMesaTransferenciaService);
   FreeAndNil(FMesaJuncaoService);
@@ -135,6 +139,16 @@ begin
     FMesaAberturaService.DAO(FDAO);
   end;
   Result := FMesaAberturaService;
+end;
+
+function TAPIRPCheffService.MesaChamaGarcomService: TAPIRPCheffServiceMesaChamaGarcom;
+begin
+  if not Assigned(FMesaChamaGarcomService) then
+  begin
+    FMesaChamaGarcomService := TAPIRPCheffServiceMesaChamaGarcom.Create;
+    FMesaChamaGarcomService.DAO(FDAO);
+  end;
+  Result := FMesaChamaGarcomService;
 end;
 
 function TAPIRPCheffService.MesaConsultaService: TAPIRPCheffServiceMesaConsulta;

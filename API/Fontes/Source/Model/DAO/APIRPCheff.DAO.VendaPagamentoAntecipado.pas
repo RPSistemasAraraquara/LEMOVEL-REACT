@@ -107,25 +107,20 @@ begin
       Result.hash_terminal                          := ADataSet.FieldByName('hash_terminal').AsString;
       Result.autorizacao                            := ADataSet.FieldByName('autorizacao').AsString;
       Result.acquirerdocument                       := ADataSet.FieldByName('acquirerdocument').AsString;
-      if ADataSet.FieldByName('exibir_forma_app').AsBoolean then
-      begin
-        Result.formaPagamento.codigo                         := Result.idFormaPagamento;
-        Result.formaPagamento.idEmpresa                      := Result.idEmpresa;
-        Result.formaPagamento.descricao                      := ADataSet.FieldByName('for_002').AsString;
-        Result.formaPagamento.sfiCodigo                      := ADataSet.FieldByName('sfi_codigo').AsInteger;
-        Result.formaPagamento.cortesia                       := ADataSet.FieldByName('b_cortesia').AsBoolean;
-        Result.formaPagamento.utilizaControleCartao          := ADataSet.FieldByName('utiliza_controle_cartao').AsBoolean;
-        Result.formaPagamento.idContaCorrente                := ADataSet.FieldByName('id_contacorrente').AsInteger;
-        Result.formaPagamento.taxaCartao                     := ADataSet.FieldByName('taxa_cartao').AsCurrency;
-        Result.formaPagamento.prazoCartao                    := ADataSet.FieldByName('prazo_cartao').AsInteger;
-        Result.formaPagamento.utilizaPagamentoOnline         := ADataSet.FieldByName('utilizaPagamentoOnline').AsBoolean;
-        Result.formaPagamento.PermitePagamentoParceladoOnline:= ADataSet.FieldByName('permite_pag_parcelado').AsBoolean;
-        Result.formaPagamento.Juros                          := ADataSet.FieldByName('juros').AsFloat;
-        Result.formaPagamento.emiteFiscal                    := ADataSet.FieldByName('emite_fiscal').AsBoolean;
-        Result.formaPagamento.ExibirFormaPgtoAPP             := ADataSet.FieldByName('exibir_forma_app').AsBoolean;
-      end
-      else
-        Result.formaPagamento := nil;
+      Result.formaPagamento.codigo                         := Result.idFormaPagamento;
+      Result.formaPagamento.idEmpresa                      := Result.idEmpresa;
+      Result.formaPagamento.descricao                      := ADataSet.FieldByName('for_002').AsString;
+      Result.formaPagamento.sfiCodigo                      := ADataSet.FieldByName('sfi_codigo').AsInteger;
+      Result.formaPagamento.cortesia                       := ADataSet.FieldByName('b_cortesia').AsBoolean;
+      Result.formaPagamento.utilizaControleCartao          := ADataSet.FieldByName('utiliza_controle_cartao').AsBoolean;
+      Result.formaPagamento.idContaCorrente                := ADataSet.FieldByName('id_contacorrente').AsInteger;
+      Result.formaPagamento.taxaCartao                     := ADataSet.FieldByName('taxa_cartao').AsCurrency;
+      Result.formaPagamento.prazoCartao                    := ADataSet.FieldByName('prazo_cartao').AsInteger;
+      Result.formaPagamento.utilizaPagamentoOnline         := ADataSet.FieldByName('utilizaPagamentoOnline').AsBoolean;
+      Result.formaPagamento.PermitePagamentoParceladoOnline:= ADataSet.FieldByName('permite_pag_parcelado').AsBoolean;
+      Result.formaPagamento.Juros                          := ADataSet.FieldByName('juros').AsFloat;
+      Result.formaPagamento.emiteFiscal                    := ADataSet.FieldByName('emite_fiscal').AsBoolean;
+      Result.formaPagamento.ExibirFormaPgtoAPP             := ADataSet.FieldByName('exibir_forma_app').AsBoolean;
       Result.situacao.FromDBValue(ADataSet.FieldByName('id_situacao').AsInteger);
     except
       Result.Free;

@@ -35,6 +35,12 @@ type
     [SwagResponse(400)]
     procedure AbrirMesa;
 
+    [SwagPOST('chamar-garcom', 'Chamar Garcom')]
+    [SwagParamBody('chamada', TAPIRPCheffEntityChamaGarcom)]
+    [SwagResponse(201)]
+    [SwagResponse(400)]
+    procedure ChamarGarcom;
+
     [SwagPOST('{idMesa}/transferencia/{idMesaDestino}', 'Transferir Mesa')]
     [SwagParamPath('idMesa', 'identifica'#231#227'o da mesa origem')]
     [SwagParamPath('idMesaDestino', 'identifica'#231#227'o da mesa destino')]
@@ -82,6 +88,22 @@ begin
     Response(LMesa, Format('Mesa %d N'#227'o encontrada.', [LIdMesa]));
   finally
     FreeAndNil(LMesa);
+  end;
+end;
+
+procedure TAPIRPCheffControllerMesa.ChamarGarcom;
+var
+  LChamada: TAPIRPCheffEntityChamaGarcom;
+begin
+  LChamada := Self.FromJSONObject<TAPIRPCheffEntityChamaGarcom>;
+  try
+    LChamada.idEmpresa := IdEmpresa;
+    Controller.Service.MesaChamaGarcomService
+      .NumeroMesa(LChamada.numeroMesa)
+      .Execute;
+    FResponse.Status(201);
+  finally
+    FreeAndNil(LChamada);
   end;
 end;
 

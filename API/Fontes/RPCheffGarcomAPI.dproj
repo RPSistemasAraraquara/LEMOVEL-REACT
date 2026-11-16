@@ -175,8 +175,10 @@
         <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.Usuario.pas"/>
         <DCCReference Include="Source\Controller\APIRPCheff.Controller.Usuario.pas"/>
         <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.Mesa.pas"/>
+        <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.ChamaGarcom.pas"/>
         <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.Types.pas"/>
         <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.Mesa.pas"/>
+        <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.ChamaGarcom.pas"/>
         <DCCReference Include="Source\Controller\APIRPCheff.Controller.Mesa.pas"/>
         <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.Categoria.pas"/>
         <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.Categoria.pas"/>
@@ -197,6 +199,7 @@
         <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.Caixa.pas"/>
         <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.Caixa.pas"/>
         <DCCReference Include="Source\Model\Service\Mesa\Abertura\APIRPCheff.Service.Mesa.Abertura.pas"/>
+        <DCCReference Include="Source\Model\Service\Mesa\ChamaGarcom\APIRPCheff.Service.Mesa.ChamaGarcom.pas"/>
         <DCCReference Include="Source\Model\Service\APIRPCheff.Service.pas"/>
         <DCCReference Include="Source\Model\Entity\APIRPCheff.Entity.Promocao.pas"/>
         <DCCReference Include="Source\Model\DAO\APIRPCheff.DAO.Promocao.pas"/>

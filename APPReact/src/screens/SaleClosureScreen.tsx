@@ -878,6 +878,7 @@ export const SaleClosureScreen: React.FC = () => {
       }
 
       let content = '';
+      let preCloseError: unknown = null;
       try {
         const previewResponse = await api.preCloseSale(
           idVenda,
@@ -899,19 +900,27 @@ export const SaleClosureScreen: React.FC = () => {
           }
         );
         content = typeof previewResponse === 'string' ? previewResponse : '';
-      } catch {
+      } catch (error) {
+        preCloseError = error;
         content = '';
       }
 
       if (!content || !content.trim()) {
-        content = await loadSalePrintContent({
-          idVenda,
-          appSettings,
-          usarRotaMaquininha: true
-        }).catch(() => '');
+        try {
+          content = await loadSalePrintContent({
+            idVenda,
+            appSettings,
+            usarRotaMaquininha: true
+          });
+        } catch (error) {
+          throw preCloseError instanceof Error ? preCloseError : error;
+        }
       }
 
       if (!content || !content.trim()) {
+        if (preCloseError instanceof Error) {
+          throw preCloseError;
+        }
         throw new Error('Servidor não retornou conteúdo para a pré-visualização desta venda.');
       }
 
@@ -1037,6 +1046,7 @@ export const SaleClosureScreen: React.FC = () => {
         let previewLoaded = false;
         if (previewRequested) {
           let printContent = typeof previewResponse === 'string' ? previewResponse : '';
+          let previewLoadError = '';
           if (!printContent || !printContent.trim()) {
             try {
               printContent = await loadSalePrintContent({
@@ -1044,20 +1054,26 @@ export const SaleClosureScreen: React.FC = () => {
                 appSettings,
                 usarRotaMaquininha: true
               });
-            } catch {
-              printContent = '';
+            } catch (error: any) {
+              previewLoadError = error?.message || 'Falha ao buscar impressão da venda.';
             }
           }
           if (!printContent || !printContent.trim()) {
-            throw new Error('Servidor não retornou conteúdo para a pré-visualização desta venda.');
+            setPreviewRawPrintContent('');
+            setPreviewText('');
+            setShowPreview(false);
+            printPreviewMessage = previewLoadError
+              ? `\nPré-visualização indisponível: ${previewLoadError}`
+              : '\nPré-visualização indisponível: servidor não retornou conteúdo.';
+          } else {
+            const contentRaw = printContent;
+            const content = parsePrintCommandsToText(contentRaw);
+            setPreviewRawPrintContent(contentRaw);
+            setPreviewText(content);
+            setShowPreview(true);
+            previewLoaded = true;
+            printPreviewMessage = '\nPré-visualização carregada abaixo.';
           }
-          const contentRaw = printContent;
-          const content = parsePrintCommandsToText(contentRaw);
-          setPreviewRawPrintContent(contentRaw);
-          setPreviewText(content);
-          setShowPreview(true);
-          previewLoaded = true;
-          printPreviewMessage = '\nPré-visualização carregada abaixo.';
         } else {
           setPreviewRawPrintContent('');
           setPreviewText('');
@@ -1101,12 +1117,14 @@ export const SaleClosureScreen: React.FC = () => {
         refreshDashboard().catch(() => null);
         loadData().catch(() => null);
         setActionStatus({
-          kind: 'success',
+          kind: previewRequested && !previewLoaded ? 'info' : 'success',
           message: previewLoaded
             ? 'Pré-fechamento salvo e pré-visualização carregada.'
-            : printExecutionMessage
-              ? `Pré-fechamento salvo com sucesso. ${printExecutionMessage.trim()}`
-              : 'Pré-fechamento salvo com sucesso.'
+            : previewRequested
+              ? 'Pré-fechamento salvo, mas a pré-visualização não foi carregada.'
+              : printExecutionMessage
+                ? `Pré-fechamento salvo com sucesso. ${printExecutionMessage.trim()}`
+                : 'Pré-fechamento salvo com sucesso.'
         });
         logSyncDiagnostic(`fluxo fechamento pre fim ok idVenda=${idVenda} em ${Date.now() - operationStartedAt}ms`);
         Alert.alert('Concluído', `Pré-fechamento salvo com sucesso.${printPreviewMessage}${printExecutionMessage}`);

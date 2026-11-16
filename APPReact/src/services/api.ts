@@ -602,8 +602,8 @@ export const defaultMobileSettings: MobileAppSettings = {
   sincronizarAposLogin: true,
   modoExibicao: 'mesa',
   utilizaMaquininhaStone: true,
-  tipoIntegracao: 'pagbank',
-  modeloMaquininha: 'PagBank',
+  tipoIntegracao: 'stone',
+  modeloMaquininha: 'P2',
   integracaoNfce: false,
   usuario: '1',
   senha: '1'

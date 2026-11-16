@@ -7,6 +7,7 @@ uses
   APIRPCheff.Entity.CaixaItem,
   APIRPCheff.Entity.Categoria,
   APIRPCheff.Entity.CatracaMobile,
+  APIRPCheff.Entity.ChamaGarcom,
   APIRPCheff.Entity.Comanda,
   APIRPCheff.Entity.Composicao,
   APIRPCheff.Entity.Configuracao,
@@ -44,6 +45,7 @@ type
   TAPIRPCheffEntityCaixaItem                      = APIRPCheff.Entity.CaixaItem.TAPIRPCheffEntityCaixaItem;
   TAPIRPCheffEntityCategoria                      = APIRPCheff.Entity.Categoria.TAPIRPCheffEntityCategoria;
   TAPIRPCheffEntityCatracaMobile                  = APIRPCheff.Entity.CatracaMobile.TAPIRPCheffEntityCatracaMobile;
+  TAPIRPCheffEntityChamaGarcom                    = APIRPCheff.Entity.ChamaGarcom.TAPIRPCheffEntityChamaGarcom;
   TAPIRPCheffEntityComanda                        = APIRPCheff.Entity.Comanda.TAPIRPCheffEntityComanda;
   TAPIRPCheffEntityComposicao                     = APIRPCheff.Entity.Composicao.TAPIRPCheffEntityComposicao;
   TAPIRPCheffEntityConfiguracaoComanda            = APIRPCheff.Entity.Configuracao.TAPIRPCheffEntityConfiguracaoComanda;

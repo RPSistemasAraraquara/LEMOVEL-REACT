@@ -122,7 +122,7 @@ const MODULE_DISABLED_MESSAGE = 'Modulo não habilitado';
 const API_RECONNECT_MESSAGE = 'Sem resposta da API. Verifique a rede ou configure o IP do servidor.';
 const APP_DISPLAY_BRAND = 'Cardapio Tablet';
 const APP_DISPLAY_NAME = 'CARDAPIO TABLET';
-const APP_DISPLAY_VERSION = '2.0.0';
+const APP_DISPLAY_VERSION = '3.0.0';
 const EMERGENCY_API_ADMIN_LOGIN = 'ADM';
 const EMERGENCY_API_ADMIN_PASSWORD = '18021950';
 const PRODUCT_TITLE_CONNECTORS = new Set(['a', 'ao', 'aos', 'as', 'com', 'da', 'das', 'de', 'do', 'dos', 'e', 'em', 'na', 'nas', 'no', 'nos', 'para', 'por', 'sem']);
@@ -674,6 +674,7 @@ export default function App() {
   const [settingsAccessMode, setSettingsAccessMode] = useState<SettingsAccessMode>('initial');
   const [startupConnectionIssue, setStartupConnectionIssue] = useState(false);
   const [sendingCart, setSendingCart] = useState(false);
+  const [callingWaiter, setCallingWaiter] = useState(false);
   const [networkFailureVisible, setNetworkFailureVisible] = useState(false);
   const [appDialog, setAppDialog] = useState<AppDialog | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
@@ -1588,6 +1589,38 @@ export default function App() {
       }),
     [syncCurrentMenu]
   );
+
+  const callWaiter = useCallback(async () => {
+    if (callingWaiter) return;
+
+    if (!session) {
+      await lockTablet(CUSTOMER_LOCK_MESSAGE);
+      return;
+    }
+
+    const currentTableNumber = session?.mesaNumero || settings.mesaNumero;
+    setCallingWaiter(true);
+    setBusyLabel('Chamando garcom...');
+
+    try {
+      await api.callWaiter(formatMesa(currentTableNumber));
+      showAppDialog({
+        title: 'Chamar Garçom',
+        message: `Solicitação de atendimento para a Mesa ${formatMesa(currentTableNumber)} registrada. Aguarde o garçom.`,
+        tone: 'success',
+        primaryLabel: 'OK'
+      });
+    } catch (error) {
+      showAppDialog({
+        title: 'Chamar Garçom',
+        message: getFriendlyErrorMessage(error, 'Nao foi possivel chamar o garcom.'),
+        tone: 'warning'
+      });
+    } finally {
+      setCallingWaiter(false);
+      setBusyLabel('');
+    }
+  }, [api, callingWaiter, lockTablet, session, settings.mesaNumero, showAppDialog]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -2891,6 +2924,7 @@ export default function App() {
         </View>
         <View style={styles.topActions}>
           <ActionButton label="Configuracao" variant="config" compact onPress={() => openSettingsAuth('menu')} />
+          <ActionButton label="Chamar Garçom" variant="waiter" compact onPress={callWaiter} disabled={callingWaiter} />
           <ActionButton label="Visualizar Pedido" variant="order" compact onPress={openOrderPreview} />
           <ActionButton label="Atualizar" variant="secondary" compact onPress={refreshCurrentMenu} />
           <ActionButton label={`Carrinho (${cart.length})`} variant="accent" compact onPress={() => setMode('cart')} />
@@ -3559,7 +3593,7 @@ function ActionButton({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' | 'accent' | 'config' | 'order';
+  variant?: 'primary' | 'secondary' | 'danger' | 'accent' | 'config' | 'order' | 'waiter';
   compact?: boolean;
   disabled?: boolean;
 }) {
@@ -3573,6 +3607,7 @@ function ActionButton({
         variant === 'accent' && styles.actionButtonAccent,
         variant === 'config' && styles.actionButtonConfig,
         variant === 'order' && styles.actionButtonOrder,
+        variant === 'waiter' && styles.actionButtonWaiter,
         disabled && styles.actionButtonDisabled
       ]}
       onPress={onPress}
@@ -3589,6 +3624,7 @@ function ActionButton({
           variant === 'secondary' && styles.actionButtonSecondaryText,
           variant === 'config' && styles.actionButtonConfigText,
           variant === 'order' && styles.actionButtonOrderText,
+          variant === 'waiter' && styles.actionButtonWaiterText,
           disabled && styles.actionButtonDisabledText
         ]}
       >
@@ -4533,6 +4569,11 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     minWidth: 170
   },
+  actionButtonWaiter: {
+    backgroundColor: colors.warning,
+    borderColor: '#b45309',
+    minWidth: 150
+  },
   actionButtonDisabled: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border
@@ -4551,6 +4592,10 @@ const styles = StyleSheet.create({
   },
   actionButtonOrderText: {
     color: colors.primaryDark,
+    fontWeight: '900'
+  },
+  actionButtonWaiterText: {
+    color: colors.surface,
     fontWeight: '900'
   },
   actionButtonConfigBadge: {
@@ -4677,8 +4722,11 @@ const styles = StyleSheet.create({
   },
   topActions: {
     flexDirection: 'row',
+    flexShrink: 1,
+    flexWrap: 'wrap',
     gap: spacing.sm,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'flex-end'
   },
   menuBody: {
     flex: 1,

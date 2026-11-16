@@ -6,8 +6,17 @@
     "icon": "./assets/Logo.png",
     "orientation": "portrait",
     "ios": {
+      "bundleIdentifier": "br.com.rpsistema.applemovel",
+      "appleTeamId": "2KB42K3H4T",
+      "version": "55.0.0",
+      "buildNumber": "57",
+      "supportsTablet": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "Permitir abrir o Leitor"
+        "NSCameraUsageDescription": "Permitir abrir o Leitor",
+        "NSLocalNetworkUsageDescription": "O RPMOVEL usa a rede local para se conectar ao servidor do Le Cheff e enviar lançamentos de mesas e comandas.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
