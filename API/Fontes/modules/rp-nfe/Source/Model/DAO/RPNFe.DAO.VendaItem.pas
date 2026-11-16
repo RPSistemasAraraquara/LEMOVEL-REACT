@@ -102,13 +102,38 @@ begin
 end;
 
 procedure TRPNFeDAOVendaItem.Select;
+var
+  LColunaServico: string;
+  LColunaIssServico: string;
+  LDataSet: TDataSet;
 begin
-  Query.SQL('select vendaItem.ite_001, vendaItem.ite_002, ')
+  // A V37399 removeu estes campos. Bases anteriores ainda usam seus valores.
+  LDataSet := Query.Clear
+    .SQL('select count(*) filter (where attname = ''b_servico'') > 0 as tem_b_servico,')
+    .SQL('       count(*) filter (where attname = ''iss_servico'') > 0 as tem_iss_servico')
+    .SQL('from pg_catalog.pg_attribute')
+    .SQL('where attrelid = pg_catalog.to_regclass(''materiais'')')
+    .SQL('and attnum > 0 and not attisdropped')
+    .SQL('and attname in (''b_servico'', ''iss_servico'')')
+    .OpenDataSet;
+  try
+    LColunaServico := 'false as b_servico';
+    if LDataSet.FieldByName('tem_b_servico').AsBoolean then
+      LColunaServico := 'materiais.b_servico';
+
+    LColunaIssServico := 'cast('''' as text) as iss_servico';
+    if LDataSet.FieldByName('tem_iss_servico').AsBoolean then
+      LColunaIssServico := 'materiais.iss_servico';
+  finally
+    LDataSet.Free;
+  end;
+
+  Query.Clear.SQL('select vendaItem.ite_001, vendaItem.ite_002, ')
     .SQL('  round((vendaItem.ite_005 / vendaItem.ite_002), 3) AS valorUnitario,')
     .SQL('  vendaItem.ite_005 as valorTotal,')
     .SQL('  materiais.mat_001, materiais.mat_003, materiais.mat_004, materiais.ncm,')
-    .SQL('  materiais.cest, materiais.cfop_consumidor, materiais.b_servico, materiais.iss,')
-    .SQL('  materiais.iss_exigibilidade, materiais.iss_incentivo, materiais.iss_servico,')
+    .SQL('  materiais.cest, materiais.cfop_consumidor, %s, materiais.iss,', [LColunaServico])
+    .SQL('  materiais.iss_exigibilidade, materiais.iss_incentivo, %s,', [LColunaIssServico])
     .SQL('  materiais.orm_codigo, materiais.cst_consumidor, materiais.cso_codigo,')
     .SQL('  materiais.icms, materiais.pis_codigo_saida, materiais.pis,')
     .SQL('  materiais.cof_codigo_saida, materiais.cofins, materiais.redBaseCalcIcms,')
