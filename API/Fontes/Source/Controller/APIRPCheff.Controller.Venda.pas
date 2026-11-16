@@ -389,7 +389,11 @@ begin
       LResposta := TJSONObject.Create;
       LResposta.AddPair('chave', LService.Chave);
       LResposta.AddPair('numero', TJSONNumber.Create(LService.Numero));
-      LResposta.AddPair('mensagem', 'NFC-e emitida com sucesso.');
+      LResposta.AddPair('contingencia', TJSONBool.Create(LService.Contingencia));
+      if LService.Contingencia then
+        LResposta.AddPair('mensagem', 'NFC-e em contingência gravada para envio posterior.')
+      else
+        LResposta.AddPair('mensagem', 'NFC-e autorizada com sucesso.');
       FResponse.Send<TJSONObject>(LResposta).Status(200);
     except
       on E: Exception do
@@ -448,7 +452,11 @@ begin
       LResposta := TJSONObject.Create;
       LResposta.AddPair('chave', LService.Chave);
       LResposta.AddPair('numero', TJSONNumber.Create(LService.Numero));
-      LResposta.AddPair('mensagem', 'NFC-e em contingência gravada para envio posterior.');
+      LResposta.AddPair('contingencia', TJSONBool.Create(LService.Contingencia));
+      if LService.Contingencia then
+        LResposta.AddPair('mensagem', 'NFC-e em contingência gravada para envio posterior.')
+      else
+        LResposta.AddPair('mensagem', 'NFC-e autorizada com sucesso.');
       FResponse.Send<TJSONObject>(LResposta).Status(200);
     except
       on E: Exception do

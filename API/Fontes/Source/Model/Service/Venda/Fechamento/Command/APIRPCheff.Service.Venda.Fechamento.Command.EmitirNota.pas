@@ -30,6 +30,9 @@ type
 
 implementation
 
+uses
+  RPNFe.Service.Emissao;
+
 { TAPIRPCheffServiceVendaFechamentoCommandEmitirNota }
 
 function TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.DeveEmitirNota(const AFechamento: TAPIRPCheffEntityVendaPostFechamento): Boolean;
@@ -87,6 +90,8 @@ begin
       .CertSenha(APP_RESOURCES.NFCE_CERT_SENHA)
       .CertSerie(APP_RESOURCES.NFCE_CERT_SERIE)
       .Contingencia(False)
+      .CpfCnpjNota(AFechamento.cpfCnpjNota)
+      .IdEmpresa(AFechamento.idEmpresa)
       .IdVenda(FParent.Venda.idVenda);
 
     LNotaEletronica := FParent.Components.RPNFe.Service.EmissaoService.Execute;
@@ -100,10 +105,10 @@ begin
       LNotaEletronica.Free;
     end;
   except
+    on E: ERPNFeEmissaoPendente do
+      FParent.NotaFiscalAviso := E.Message;
     on E: Exception do
-    begin
       FParent.NotaFiscalAviso := TraduzirErroEmissao(E.Message);
-    end;
   end;
 end;
 
@@ -135,7 +140,7 @@ begin
       'Informe a origem (nacional/importado) no cadastro do produto.'
   else if Pos('DUPLICIDADE', LMensagem) > 0 then
     LOrientacao := 'A numeracao desta NFC-e ja foi usada na SEFAZ. ' +
-      'Ajuste o proximo numero da NFC-e na configuracao fiscal e tente de novo.'
+      'Confira a situacao fiscal da NFC-e na SEFAZ antes de realizar outra emissao.'
   else if (Pos('CERTIFICADO', LMensagem) > 0) or (Pos('PFX', LMensagem) > 0) then
     LOrientacao := 'Problema com o certificado digital (arquivo, senha ou validade). ' +
       'Confira a configuracao do certificado.'
@@ -147,7 +152,7 @@ begin
     (Pos('SOCKET', LMensagem) > 0) or (Pos('HOST', LMensagem) > 0) or
     (Pos('WINHTTP', LMensagem) > 0) or (Pos('SSL', LMensagem) > 0) then
     LOrientacao := 'Sem comunicacao com a SEFAZ (internet ou servico fora do ar). ' +
-      'A venda foi fechada e fica com pendencia fiscal - reemita a nota quando a conexao voltar.'
+      'Confira a situacao fiscal da NFC-e quando a conexao voltar.'
   else if Pos('SCHEMA', LMensagem) > 0 then
     LOrientacao := 'O XML da nota foi recusado na validacao (schema). ' +
       'Confira os dados fiscais dos produtos vendidos.'

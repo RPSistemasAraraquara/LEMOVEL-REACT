@@ -16,7 +16,7 @@ type
   protected
     function DataSetToEntity(ADataSet: TDataSet): TRPNFeEntityVendaItem; override;
   public
-    function Listar(AIdVenda: Integer): TObjectList<TRPNFeEntityVendaItem>;
+    function Listar(AIdEmpresa, AIdVenda: Integer): TObjectList<TRPNFeEntityVendaItem>;
   end;
 
 implementation
@@ -91,12 +91,13 @@ begin
   end;
 end;
 
-function TRPNFeDAOVendaItem.Listar(AIdVenda: Integer): TObjectList<TRPNFeEntityVendaItem>;
+function TRPNFeDAOVendaItem.Listar(AIdEmpresa, AIdVenda: Integer): TObjectList<TRPNFeEntityVendaItem>;
 begin
   Select;
-  Query.SQL('where vendaItem.ven_001 = :idVenda')
+  Query.SQL('where vendaItem.emp_001 = :idEmpresa and vendaItem.ven_001 = :idVenda')
     .SQL('and vendaItem.sit_001 not in (0, 1, 2, 3)')
     .SQL('order by vendaItem.ite_001')
+    .ParamAsInteger('idEmpresa', AIdEmpresa)
     .ParamAsInteger('idVenda', AIdVenda);
   Result := OpenQueryToList;
 end;

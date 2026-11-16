@@ -269,6 +269,12 @@ export type SaleClosurePayload = {
 
 export type MachinePaymentType = 'tmpNenhum' | 'tmpVero' | 'tmpStone' | 'tmpPlugPag' | 'tmpCielo';
 
+type NfceEmissionResult = {
+  chave: string;
+  numero: number;
+  contingencia?: boolean;
+};
+
 export type SalePrintRequest = {
   numeroColunas?: number;
   impressaoInterna?: boolean;
@@ -5011,13 +5017,12 @@ export class ApiClient {
     }
   }
 
-  // Reemite a NFC-e de uma venda FECHADA que ficou sem nota (rejeicao da
-  // SEFAZ, queda de rede). O servidor aloca numeracao nova e valida se a
-  // venda ja tem nota autorizada. Nao-idempotente: sem retry automatico.
+  // Retoma a emissão fiscal de uma venda fechada. A API consulta uma
+  // tentativa anterior quando houver, e a chamada não tem retry automático.
   async reemitirNfce(
     idVenda: number,
     options: { tipoMaquina?: MachinePaymentType } = {}
-  ): Promise<{ chave: string; numero: number }> {
+  ): Promise<NfceEmissionResult> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (options.tipoMaquina) {
       headers.tipoMaquina = options.tipoMaquina;
@@ -5039,11 +5044,12 @@ export class ApiClient {
     const data = (payload || {}) as Record<string, unknown>;
     return {
       chave: sanitizeText(data.chave, ''),
-      numero: parseNumber(data.numero, 0)
+      numero: parseNumber(data.numero, 0),
+      contingencia: typeof data.contingencia === 'boolean' ? data.contingencia : undefined
     };
   }
 
-  async emitirNfceDepois(idVenda: number, mensagemErro = ''): Promise<{ chave: string; numero: number }> {
+  async emitirNfceDepois(idVenda: number, mensagemErro = ''): Promise<NfceEmissionResult> {
     const requestPayload = mensagemErro.trim()
       ? { mensagemErro: mensagemErro.trim() }
       : {};
@@ -5063,7 +5069,8 @@ export class ApiClient {
     const data = (payload || {}) as Record<string, unknown>;
     return {
       chave: sanitizeText(data.chave, ''),
-      numero: parseNumber(data.numero, 0)
+      numero: parseNumber(data.numero, 0),
+      contingencia: typeof data.contingencia === 'boolean' ? data.contingencia : undefined
     };
   }
 

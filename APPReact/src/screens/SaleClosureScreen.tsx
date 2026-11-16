@@ -497,20 +497,21 @@ export const SaleClosureScreen: React.FC = () => {
     setPrintProcessingMessage('');
   };
 
-  // Reemissao de NFC-e de venda fechada sem nota + impressao do DANFCe na
-  // maquininha. Retorna true quando a nota foi emitida (mesmo se a impressao
-  // falhar - a nota ja esta autorizada na SEFAZ).
+  // Retoma a emissão e imprime o DANFCe na maquininha. Retorna true quando
+  // a API confirma que a NFC-e foi registrada, mesmo se a impressão falhar.
   const reemitirNfceComImpressao = async (idVendaReemitir: number): Promise<boolean> => {
     try {
       showPrintProcessing('Reemitindo NFC-e...');
       const resultado = await api.reemitirNfce(idVendaReemitir, {
         tipoMaquina: resolveMachineType(appSettings, true)
       });
+      const emContingencia = resultado.contingencia === true;
+      const descricaoNota = emContingencia ? 'NFC-e em contingência gravada' : 'NFC-e autorizada';
       logSyncDiagnostic(`reemissao nfce ok idVenda=${idVendaReemitir} numero=${resultado.numero}`);
       hidePrintProcessing();
 
       try {
-        showPrintProcessing('Imprimindo NFC-e...');
+        showPrintProcessing(emContingencia ? 'Imprimindo NFC-e em contingência...' : 'Imprimindo NFC-e...');
         await executeSalePrint({
           idVenda: idVendaReemitir,
           appSettings,
@@ -518,14 +519,14 @@ export const SaleClosureScreen: React.FC = () => {
         });
         hidePrintProcessing();
         await new Promise<void>((resolve) => {
-          Alert.alert('NFC-e', 'NFC-e emitida e impressa com sucesso. 🎉', [{ text: 'OK', onPress: () => resolve() }], { cancelable: false });
+          Alert.alert('NFC-e', `${descricaoNota} e impressa com sucesso. 🎉`, [{ text: 'OK', onPress: () => resolve() }], { cancelable: false });
         });
       } catch (printError: any) {
         hidePrintProcessing();
         await new Promise<void>((resolve) => {
           Alert.alert(
             'NFC-e',
-            `NFC-e emitida com sucesso, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
+            `${descricaoNota} com sucesso, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
             [{ text: 'OK', onPress: () => resolve() }],
             { cancelable: false }
           );
@@ -549,13 +550,15 @@ export const SaleClosureScreen: React.FC = () => {
 
   const emitirNfceDepois = async (idVendaEmitirDepois: number, mensagemErro = ''): Promise<boolean> => {
     try {
-      showPrintProcessing('Gravando NFC-e para envio posterior...');
+      showPrintProcessing('Verificando NFC-e...');
       const resultado = await api.emitirNfceDepois(idVendaEmitirDepois, mensagemErro);
       hidePrintProcessing();
-      logSyncDiagnostic(`nfce contingencia gravada idVenda=${idVendaEmitirDepois} numero=${resultado.numero}`);
+      const emContingencia = resultado.contingencia ?? true;
+      const descricaoNota = emContingencia ? 'NFC-e em contingência gravada' : 'NFC-e autorizada';
+      logSyncDiagnostic(`nfce emitirDepois ok idVenda=${idVendaEmitirDepois} numero=${resultado.numero} contingencia=${emContingencia}`);
 
       try {
-        showPrintProcessing('Imprimindo NFC-e em contingência...');
+        showPrintProcessing(emContingencia ? 'Imprimindo NFC-e em contingência...' : 'Imprimindo NFC-e...');
         await executeSalePrint({
           idVenda: idVendaEmitirDepois,
           appSettings,
@@ -564,12 +567,12 @@ export const SaleClosureScreen: React.FC = () => {
         hidePrintProcessing();
         setActionStatus({
           kind: 'success',
-          message: `NFC-e em contingência gravada e impressa. Nº ${resultado.numero}.`
+          message: `${descricaoNota} e impressa. Nº ${resultado.numero}.`
         });
         await new Promise<void>((resolve) => {
           Alert.alert(
             'NFC-e',
-            `NFC-e em contingência gravada e impressa.\nNúmero: ${resultado.numero}`,
+            `${descricaoNota} e impressa.\nNúmero: ${resultado.numero}`,
             [{ text: 'OK', onPress: () => resolve() }],
             { cancelable: false }
           );
@@ -578,12 +581,12 @@ export const SaleClosureScreen: React.FC = () => {
         hidePrintProcessing();
         setActionStatus({
           kind: 'success',
-          message: `NFC-e em contingência gravada. Impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`
+          message: `${descricaoNota}. Impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`
         });
         await new Promise<void>((resolve) => {
           Alert.alert(
             'NFC-e',
-            `NFC-e em contingência gravada, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
+            `${descricaoNota}, mas a impressão falhou: ${printError?.message || 'Falha ao imprimir.'}`,
             [{ text: 'OK', onPress: () => resolve() }],
             { cancelable: false }
           );

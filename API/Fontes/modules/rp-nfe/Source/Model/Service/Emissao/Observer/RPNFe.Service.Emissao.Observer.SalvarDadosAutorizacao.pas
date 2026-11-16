@@ -21,6 +21,10 @@ procedure TRPNFeServiceEmissaoObserverSalvarDadosAutorizacao.Execute(
   const ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
 begin
   inherited;
+  // A NFC-e foi gravada na mesma transacao que encerrou a tentativa.
+  if ANotaEletronica.Modelo = 65 then
+    Exit;
+
   FParent.DAO.VendaDAO
     .AtualizarEmissao(FParent.Venda.IdEmpresa, FParent.Venda.Id, ANotaEletronica);
 

@@ -102,7 +102,8 @@ begin
   end;
 
   LNFe.Ide.idDest := doInterna;
-  if FParent.Empresa.UF = FParent.Venda.Cliente.UF then
+  if (LNFe.Ide.modelo <> 65) and
+     (FParent.Empresa.UF = FParent.Venda.Cliente.UF) then
   begin
     LNFe.Ide.idDest := doInterestadual;
     if FParent.Venda.Cliente.UF = 'EX' then

@@ -295,6 +295,13 @@ type
     property Manual: Boolean read FManual write FManual;
   end;
 
+  TRPNFeEntityTentativaNFCe = record
+    Chave: string;
+    XmlAssinado: string;
+    Ambiente: Integer;
+    Contingencia: Boolean;
+  end;
+
   TRPNFeEntityNFeNotaEletronica = class
   private
     FSerie: Integer;

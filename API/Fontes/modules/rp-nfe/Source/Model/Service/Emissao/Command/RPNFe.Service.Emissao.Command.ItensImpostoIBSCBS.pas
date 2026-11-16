@@ -99,8 +99,6 @@ const
   vpDifCBS = 0.0;
   vpCredPresIBS = 0.0;
   pCredPresCBS = 0.0;
-  adRemIBS = 0.0;
-  adRemCBS = 0.0;
 var
   LClassTrib: TRPNFeEntityClassTribRT;
   LCst: string;
@@ -115,13 +113,10 @@ var
   TemReducaoAliquota: Boolean;
   Diferimento: Boolean;
   vgTribRegular: Boolean;
-  ibsmono: Boolean;
   IBSSuspenso: Boolean;
   CBSSuspenso: Boolean;
   vTotalIBS: Double;
   vTotalCBS: Double;
-  vItemIBSMono: Double;
-  vItemCBSMono: Double;
   vCredPresIBSItem: Double;
   vCredPresCBSItem: Double;
 begin
@@ -177,13 +172,18 @@ begin
   if not Assigned(LClassTrib) then
     raise Exception.CreateFmt('Classificacao tributaria %s nao cadastrada (dfe_classtrib_rt).', [LClasse]);
   try
+    // Mesmo bloqueio aplicado pelo emissor RPCHEFF_VCL ao consultar a cClassTrib.
+    if LClassTrib.IndIbsCbsMono then
+      raise Exception.CreateFmt(
+        'Emissao bloqueada: a cClassTrib %s do produto %d exige tributacao monofasica, ainda nao implementada nesta versao.',
+        [LClasse, AVendaItem.Produto.Codigo]);
+
     if not LClassTrib.IndNfce then
       raise Exception.CreateFmt('Classificacao %s nao permitida para NFCE.', [LClasse]);
 
     TemReducaoAliquota := LClassTrib.IndRedAliq;
     Diferimento := LClassTrib.IndDif;
     vgTribRegular := LClassTrib.IndTribRegular;
-    ibsmono := LClassTrib.IndIbsCbsMono;
     vpRedAliqIBS := LClassTrib.PRedIbs;
     vpRedAliqCBS := LClassTrib.PRedCbs;
   finally
@@ -197,29 +197,6 @@ begin
       Format('CST: %s cClassTrib: %s |IBS: R$%.2f CBS: R$%.2f IS: R$%.2f Total RT: R$%.2f',
       [CSTIBSCBSToStr(ANFeProduto.Imposto.IBSCBS.CST),
        ANFeProduto.Imposto.IBSCBS.cClassTrib, 0.0, 0.0, 0.0, 0.0]);
-    Exit;
-  end;
-
-  // ====== Tributacao monofasica ======
-  if ibsmono then
-  begin
-    if not TFuncoesAdicionaisRT.CalcularGIBSCBSMono(ANFeProduto, vBCRefTrib,
-      adRemIBS, adRemCBS, LClasse, ANFeProduto.Prod.qTrib, vpDifIBS, vpDifCBS) then
-      raise Exception.CreateFmt('Erro ao preencher gIBSCBSMono do produto %d.',
-        [AVendaItem.Produto.Codigo]);
-
-    vItemIBSMono := TFuncoesAdicionaisRT.ArredondaValorParaSefaz(
-      ANFeProduto.Imposto.IBSCBS.gIBSCBSMono.vTotIBSMonoItem);
-    vItemCBSMono := TFuncoesAdicionaisRT.ArredondaValorParaSefaz(
-      ANFeProduto.Imposto.IBSCBS.gIBSCBSMono.vTotCBSMonoItem);
-
-    FTotalVIBSMono := FTotalVIBSMono + vItemIBSMono;
-    FTotalVCBSMono := FTotalVCBSMono + vItemCBSMono;
-
-    ANFeProduto.infAdProd := ANFeProduto.infAdProd +
-      Format('CST: %s cClassTrib: %s ',
-      [CSTIBSCBSToStr(ANFeProduto.Imposto.IBSCBS.CST),
-       ANFeProduto.Imposto.IBSCBS.cClassTrib]);
     Exit;
   end;
 

@@ -11,12 +11,15 @@ uses
   RPNFe.DAO.Factory;
 
 type
+  ERPNFeEmissaoPendente = class(Exception);
+
   TRPNFeServiceEmissaoObserver = class;
 
   TRPNFeServiceEmissao = class
   protected
     FComponents: TRPNFeComponents;
     FDAO: TRPNFeDAOFactory;
+    FIdEmpresa: Integer;
     FIdVenda: Integer;
     FEmpresa: TRPNFeEntityEmpresa;
     FVenda: TRPNFeEntityVenda;
@@ -36,11 +39,14 @@ type
     FCertSenha: string;
     FCertSerie: string;
     FContingencia: Boolean;
+    FCpfCnpjNota: string;
     FObservers: TObjectList<TRPNFeServiceEmissaoObserver>;
 
     procedure CarregarVenda;
-    procedure CarregarEmpresa;
-    procedure ExecuteCommands;
+    procedure CarregarItensEPagamentos;
+    procedure CarregarEmpresa(APrepararNumeracao: Boolean);
+    procedure PrepararXML;
+    procedure EmitirNFCe(ABackend: Integer);
     procedure SetNotaEletronica(AValue: TRPNFeEntityNFeNotaEletronica);
 
     procedure Notificar(const ANotaEletronica: TRPNFeEntityNFeNotaEletronica);
@@ -52,6 +58,7 @@ type
     function Components: TRPNFeComponents; overload;
     function DAO(AValue: TRPNFeDAOFactory): TRPNFeServiceEmissao; overload;
     function DAO: TRPNFeDAOFactory; overload;
+    function IdEmpresa(AValue: Integer): TRPNFeServiceEmissao;
     function IdVenda(AValue: Integer): TRPNFeServiceEmissao;
     function Venda: TRPNFeEntityVenda;
     function Empresa: TRPNFeEntityEmpresa;
@@ -72,6 +79,7 @@ type
     function CertSerie(const AValue: string): TRPNFeServiceEmissao;
     function Contingencia(AValue: Boolean): TRPNFeServiceEmissao; overload;
     function Contingencia: Boolean; overload;
+    function CpfCnpjNota(const AValue: string): TRPNFeServiceEmissao;
 
     function Execute: TRPNFeEntityNFeNotaEletronica;
 
@@ -141,7 +149,7 @@ begin
   FObservers.Add(AValue);
 end;
 
-procedure TRPNFeServiceEmissao.CarregarEmpresa;
+procedure TRPNFeServiceEmissao.CarregarEmpresa(APrepararNumeracao: Boolean);
 begin
   FComponents.Log.Write('Carregando empresa pelo codigo %d', [FVenda.IdEmpresa]);
   FreeAndNil(FEmpresa);
@@ -158,7 +166,7 @@ begin
   // o incremento em empresas.numero_nfce seria ignorado. O piso e PERSISTIDO
   // no banco (greatest) para que a proxima emissao ja parta dele; depois
   // disso o override vira inocuo e o banco assume a numeracao.
-  if (FNumero > 0) and (FNumero - 1 > FEmpresa.NFCeNumero) then
+  if APrepararNumeracao and (FNumero > 0) and (FNumero - 1 > FEmpresa.NFCeNumero) then
   begin
     FDAO.EmpresaDAO.SementeNumeroNFCe(FEmpresa.Id, FNumero - 1);
     FEmpresa.NFCeNumero := FNumero - 1;
@@ -171,12 +179,16 @@ procedure TRPNFeServiceEmissao.CarregarVenda;
 begin
   FComponents.Log.Write('Carregando venda pelo id %d', [FIdVenda]);
   FreeAndNil(FVenda);
-  FVenda := FDAO.VendaDAO.Buscar(FIdVenda);
+  FVenda := FDAO.VendaDAO.Buscar(FIdEmpresa, FIdVenda);
   if not Assigned(FVenda) then
     raise Exception.CreateFmt('Venda %d n�o encontrada ou n�o encerrada.', [FIdVenda]);
 
+end;
+
+procedure TRPNFeServiceEmissao.CarregarItensEPagamentos;
+begin
   FComponents.Log.Write('Carregando itens da venda');
-  FVenda.Itens := FDAO.VendaItemDAO.Listar(FIdVenda);
+  FVenda.Itens := FDAO.VendaItemDAO.Listar(FIdEmpresa, FIdVenda);
   FComponents.Log.Write('%d itens encontrados.', [FVenda.Itens.Count]);
 
   FComponents.Log.Write('Carregando pagamentos.');
@@ -327,6 +339,19 @@ begin
   Result := FContingencia;
 end;
 
+function TRPNFeServiceEmissao.CpfCnpjNota(const AValue: string): TRPNFeServiceEmissao;
+var
+  LDigito: Char;
+begin
+  Result := Self;
+  FCpfCnpjNota := '';
+  for LDigito in AValue do
+    if CharInSet(LDigito, ['0'..'9']) then
+      FCpfCnpjNota := FCpfCnpjNota + LDigito;
+  if (Length(FCpfCnpjNota) <> 11) and (Length(FCpfCnpjNota) <> 14) then
+    FCpfCnpjNota := '';
+end;
+
 constructor TRPNFeServiceEmissao.Create;
 begin
   FObservers := TObjectList<TRPNFeServiceEmissaoObserver>.Create;
@@ -349,6 +374,7 @@ begin
   FVenda.Free;
   FConfig.Free;
   FObservers.Free;
+  FNotaEletronica.Free;
   inherited;
 end;
 
@@ -358,35 +384,54 @@ begin
 end;
 
 function TRPNFeServiceEmissao.Execute: TRPNFeEntityNFeNotaEletronica;
+var
+  LBackend: Integer;
+  LConfig: TRPNFeEntityConfiguracao;
+  LEnvio: TRPNFeServiceEmissaoCommandEnviarNota;
 begin
-  // Carrega venda e configuracao (CONFIGURACAO.XML + certificado) FORA do
-  // lock para encurtar o tempo com o emissor bloqueado.
   CarregarVenda;
-  Configuracao;
+  LConfig := Configuracao;
 
-  // O emissor (ACBr/FastReport) e compartilhado por todas as threads:
-  // serializa emissao e impressao para nao colidirem (Abort/travamento).
-  // CarregarEmpresa fica DENTRO do lock: a leitura de numero_nfce + o
-  // incremento (DadosIde) precisam ser atomicos entre emissoes.
+  // O ACBr e a impressao compartilham o emissor dentro do processo.
   EmissorLock.Enter;
   try
     try
-      CarregarEmpresa;
-      FComponents.Emissor.Configuracao(Configuracao)
-        .Empresa(FEmpresa);
-      ExecuteCommands;
-      // Nota autorizada: dispara os observers (gravam chave/protocolo na venda
-      // e VEN_SATSTATUS=23 no encerravenda). Em rejeicao o EnviarNota levanta
-      // excecao e nem chega aqui.
-      if Assigned(FNotaEletronica) and (not FNotaEletronica.Erro) then
+      if LConfig.Modelo = 65 then
+      begin
+        LBackend := FDAO.VendaDAO.BloquearEmissaoNFCe(FIdEmpresa, FIdVenda);
+        try
+          EmitirNFCe(LBackend);
+        finally
+          try
+            FDAO.VendaDAO.DesbloquearEmissaoNFCe(FIdEmpresa, FIdVenda, LBackend);
+          except
+            on E: Exception do
+              FComponents.Log.Write(E);
+          end;
+        end;
+      end
+      else
+      begin
+        CarregarItensEPagamentos;
+        CarregarEmpresa(True);
+        FComponents.Emissor.Configuracao(LConfig).Empresa(FEmpresa);
+        PrepararXML;
+        LEnvio := TRPNFeServiceEmissaoCommandEnviarNota.Create(Self, SetNotaEletronica);
+        try
+          LEnvio.Execute;
+        finally
+          LEnvio.Free;
+        end;
+      end;
+
+      if Assigned(FNotaEletronica) and not FNotaEletronica.Erro then
         Notificar(FNotaEletronica);
       Result := FNotaEletronica;
-      // A posse da entidade passa ao caller (que a libera): limpa a referencia
-      // para nao ficar dangling em reuso do service.
       FNotaEletronica := nil;
     except
       on E: Exception do
       begin
+        FreeAndNil(FNotaEletronica);
         FComponents.Log.Write(E);
         raise;
       end;
@@ -396,7 +441,88 @@ begin
   end;
 end;
 
-procedure TRPNFeServiceEmissao.ExecuteCommands;
+procedure TRPNFeServiceEmissao.EmitirNFCe(ABackend: Integer);
+var
+  LRetomada: Boolean;
+  LTentativaRegistrada: Boolean;
+  LTentativa: TRPNFeEntityTentativaNFCe;
+  LACBr: TACBrNFe;
+  LEnvio: TRPNFeServiceEmissaoCommandEnviarNota;
+begin
+  LRetomada := FDAO.VendaDAO.BuscarTentativaNFCe(FIdEmpresa, FIdVenda, ABackend, LTentativa);
+  LTentativaRegistrada := LRetomada;
+  try
+    if not LRetomada then
+    begin
+      if FCpfCnpjNota <> '' then
+      begin
+        FDAO.VendaDAO.AtualizarCpfConsumidorNFCe(FIdEmpresa, FIdVenda, ABackend, FCpfCnpjNota);
+        CarregarVenda;
+      end;
+      CarregarItensEPagamentos;
+    end;
+
+    CarregarEmpresa(not LRetomada);
+    FComponents.Emissor.Configuracao(Configuracao).Empresa(FEmpresa);
+    LEnvio := TRPNFeServiceEmissaoCommandEnviarNota.Create(Self, SetNotaEletronica);
+    try
+      if LRetomada then
+      begin
+        FNotaEletronica := TRPNFeEntityNFeNotaEletronica.Create;
+        LEnvio.Recuperar(FNotaEletronica, LTentativa);
+      end
+      else
+      begin
+        PrepararXML;
+        LACBr := FComponents.Emissor.ACBr;
+        if not FContingencia then
+          LACBr.NotasFiscais.Validar;
+
+        LTentativa.Chave := LACBr.NotasFiscais[0].NumID;
+        LTentativa.XmlAssinado := LACBr.NotasFiscais[0].XMLAssinado;
+        LTentativa.Ambiente := 2;
+        if Configuracao.Producao then
+          LTentativa.Ambiente := 1;
+        LTentativa.Contingencia := FContingencia;
+        FDAO.VendaDAO.RegistrarTentativaNFCe(FIdEmpresa, FIdVenda, ABackend, LTentativa);
+        LTentativaRegistrada := True;
+
+        try
+          LEnvio.Execute;
+        except
+          on E: ERPNFeRejeicaoConfirmada do
+          begin
+            FDAO.VendaDAO.RetirarTentativaNFCe(FIdEmpresa, FIdVenda, ABackend, LTentativa.Chave);
+            LTentativaRegistrada := False;
+            raise;
+          end;
+        end;
+      end;
+
+      if not Assigned(FNotaEletronica) or FNotaEletronica.Erro then
+        raise Exception.Create('A tentativa fiscal nao retornou um documento valido.');
+      FDAO.VendaDAO.ConcluirEmissaoNFCe(FIdEmpresa, FIdVenda, ABackend, LTentativa, FNotaEletronica);
+    finally
+      LEnvio.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      if not LTentativaRegistrada then
+        raise;
+      FComponents.Log.Write(E);
+      if LTentativa.Contingencia then
+        raise ERPNFeEmissaoPendente.CreateFmt(
+          'NFC-e em contingencia com registro pendente (chave %s). Use Reemitir para concluir o registro dessa nota.',
+          [LTentativa.Chave]);
+      raise ERPNFeEmissaoPendente.CreateFmt(
+        'NFC-e com confirmacao pendente (chave %s). Use Reemitir para consultar essa mesma chave na SEFAZ.',
+        [LTentativa.Chave]);
+    end;
+  end;
+end;
+
+procedure TRPNFeServiceEmissao.PrepararXML;
 var
   LInvoker: TRPServiceEmissaoInvoker;
 begin
@@ -418,12 +544,17 @@ begin
       // (o vNFTot depende do ICMSTot.vNF ja consolidado).
       .AddCommand(TRPNFeServiceEmissaoCommandItensImpostoIBSCBS.Create(Self))
       .AddCommand(TRPNFeServiceEmissaoCommandResponsavelTecnico.Create(Self))
-      .AddCommand(TRPNFeServiceEmissaoCommandAssinarXML.Create(Self))
-      .AddCommand(TRPNFeServiceEmissaoCommandEnviarNota.Create(Self, Self.SetNotaEletronica));
+      .AddCommand(TRPNFeServiceEmissaoCommandAssinarXML.Create(Self));
     LInvoker.Execute;
   finally
     LInvoker.Free;
   end;
+end;
+
+function TRPNFeServiceEmissao.IdEmpresa(AValue: Integer): TRPNFeServiceEmissao;
+begin
+  Result := Self;
+  FIdEmpresa := AValue;
 end;
 
 function TRPNFeServiceEmissao.IdVenda(AValue: Integer): TRPNFeServiceEmissao;

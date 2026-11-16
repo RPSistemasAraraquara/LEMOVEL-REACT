@@ -13,10 +13,8 @@ uses
   APIRPCheff.DAO.Factory;
 
 type
-  // Reemissao de NFC-e para venda FECHADA que ficou sem nota (rejeicao da
-  // SEFAZ, queda de rede, etc.). Acao explicita do operador: emite com a
-  // proxima numeracao (alocacao atomica) usando a MESMA configuracao fiscal
-  // do fechamento. Falha vira excecao com a mensagem ja traduzida.
+  // Retoma a emissao de NFC-e de uma venda fechada com a configuracao
+  // fiscal do fechamento.
   TAPIRPCheffServiceVendaReemitirNota = class
   private
     FDAO         : TAPIRPCheffDAOFactory;
@@ -26,9 +24,9 @@ type
     FTipoMaquina : TRPTipoMaquinaPagamento;
     FChave       : string;
     FNumero      : Integer;
+    FContingencia : Boolean;
 
     procedure ValidarVenda;
-    procedure AtualizarCpfNota;
     procedure Imprimir(const ANota: TRPNFeEntityNFeNotaEletronica);
     function DeveImprimirNaImpressoraWindows: Boolean;
     function SoDigitosValidos(const AValor: string): string;
@@ -43,6 +41,7 @@ type
 
     property Chave: string read FChave;
     property Numero: Integer read FNumero;
+    property Contingencia: Boolean read FContingencia;
   end;
 
   TAPIRPCheffServiceVendaEmitirNotaContingencia = class
@@ -55,9 +54,9 @@ type
     FMensagemErroOriginal: string;
     FChave       : string;
     FNumero      : Integer;
+    FContingencia : Boolean;
 
     procedure ValidarVenda;
-    procedure AtualizarCpfNota;
     procedure RegistrarErroOriginal(const ANota: TRPNFeEntityNFeNotaEletronica);
     function TipoErroFiscal(const AErro: string): string;
     function SoDigitosValidos(const AValor: string): string;
@@ -73,11 +72,13 @@ type
 
     property Chave: string read FChave;
     property Numero: Integer read FNumero;
+    property Contingencia: Boolean read FContingencia;
   end;
 
 implementation
 
 uses
+  RPNFe.Service.Emissao,
   APIRPCheff.Service.Venda.Fechamento.Command.EmitirNota;
 
 { TAPIRPCheffServiceVendaReemitirNota }
@@ -156,24 +157,6 @@ begin
   end;
 end;
 
-procedure TAPIRPCheffServiceVendaReemitirNota.AtualizarCpfNota;
-var
-  LEncerraVenda: TAPIRPCheffEntityEncerraVenda;
-  LCpfCnpj: string;
-begin
-  LCpfCnpj := SoDigitosValidos(FCpfCnpjNota);
-  if LCpfCnpj = '' then
-    Exit;
-
-  LEncerraVenda := FDAO.EncerraVendaDAO.Buscar(FIdVenda);
-  try
-    if Assigned(LEncerraVenda) then
-      FDAO.EncerraVendaDAO.AtualizarCpfConsumidor(LEncerraVenda.idEncerraVenda, LCpfCnpj);
-  finally
-    FreeAndNil(LEncerraVenda);
-  end;
-end;
-
 procedure TAPIRPCheffServiceVendaReemitirNota.Imprimir(const ANota: TRPNFeEntityNFeNotaEletronica);
 begin
   // Mesma impressao do fechamento (impressora ESC/POS do servidor, quando
@@ -208,7 +191,6 @@ var
   LNotaEletronica: TRPNFeEntityNFeNotaEletronica;
 begin
   ValidarVenda;
-  AtualizarCpfNota;
 
   try
     FComponents.RPNFe.Service.EmissaoService
@@ -224,18 +206,23 @@ begin
       .CertSenha(APP_RESOURCES.NFCE_CERT_SENHA)
       .CertSerie(APP_RESOURCES.NFCE_CERT_SERIE)
       .Contingencia(False)
+      .CpfCnpjNota(SoDigitosValidos(FCpfCnpjNota))
+      .IdEmpresa(FDAO.IdEmpresa)
       .IdVenda(FIdVenda);
 
     LNotaEletronica := FComponents.RPNFe.Service.EmissaoService.Execute;
     try
       FChave := LNotaEletronica.ChaveNFe;
       FNumero := LNotaEletronica.NumeroNFe;
+      FContingencia := LNotaEletronica.Contingencia;
       if DeveImprimirNaImpressoraWindows then
         Imprimir(LNotaEletronica);
     finally
       LNotaEletronica.Free;
     end;
   except
+    on E: ERPNFeEmissaoPendente do
+      raise;
     on E: Exception do
       raise Exception.Create(
         TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.TraduzirErroEmissao(E.Message));
@@ -365,30 +352,11 @@ begin
   end;
 end;
 
-procedure TAPIRPCheffServiceVendaEmitirNotaContingencia.AtualizarCpfNota;
-var
-  LEncerraVenda: TAPIRPCheffEntityEncerraVenda;
-  LCpfCnpj: string;
-begin
-  LCpfCnpj := SoDigitosValidos(FCpfCnpjNota);
-  if LCpfCnpj = '' then
-    Exit;
-
-  LEncerraVenda := FDAO.EncerraVendaDAO.Buscar(FIdVenda);
-  try
-    if Assigned(LEncerraVenda) then
-      FDAO.EncerraVendaDAO.AtualizarCpfConsumidor(LEncerraVenda.idEncerraVenda, LCpfCnpj);
-  finally
-    FreeAndNil(LEncerraVenda);
-  end;
-end;
-
 procedure TAPIRPCheffServiceVendaEmitirNotaContingencia.Execute;
 var
   LNotaEletronica: TRPNFeEntityNFeNotaEletronica;
 begin
   ValidarVenda;
-  AtualizarCpfNota;
 
   try
     FComponents.RPNFe.Service.EmissaoService
@@ -404,17 +372,23 @@ begin
       .CertSenha(APP_RESOURCES.NFCE_CERT_SENHA)
       .CertSerie(APP_RESOURCES.NFCE_CERT_SERIE)
       .Contingencia(True)
+      .CpfCnpjNota(SoDigitosValidos(FCpfCnpjNota))
+      .IdEmpresa(FDAO.IdEmpresa)
       .IdVenda(FIdVenda);
 
     LNotaEletronica := FComponents.RPNFe.Service.EmissaoService.Execute;
     try
       FChave := LNotaEletronica.ChaveNFe;
       FNumero := LNotaEletronica.NumeroNFe;
-      RegistrarErroOriginal(LNotaEletronica);
+      FContingencia := LNotaEletronica.Contingencia;
+      if FContingencia then
+        RegistrarErroOriginal(LNotaEletronica);
     finally
       LNotaEletronica.Free;
     end;
   except
+    on E: ERPNFeEmissaoPendente do
+      raise;
     on E: Exception do
       raise Exception.Create(
         TAPIRPCheffServiceVendaFechamentoCommandEmitirNota.TraduzirErroEmissao(E.Message));

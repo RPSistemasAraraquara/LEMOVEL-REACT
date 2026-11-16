@@ -171,7 +171,7 @@ uses
   ACBrDFe.Conversao, pcnConversao, pcnConversaoNFe,
   ACBrDFeConfiguracoes, ACBrDFeSSL, ACBrDFeOpenSSL, ACBrDFeUtil,
   Spin, OleCtrls, SHDocVw, ACBrMail, ACBrNFeDANFEClass,
-  ACBrNFeDANFeRLClass, ACBrDFe,
+  ACBrNFeDANFeRLClass, ACBrDFe, ACBrDFe.RTC.Classes,
   ShellAPI, XMLIntf, XMLDoc, zlib
 
   {uses ACBrReg padrão - fatatoração 2025.06}
@@ -1654,118 +1654,54 @@ class function TFuncoesAdicionaisRT.CalcularGIBSCBSMono(
   const pDifCBS: Double = 0
 ): Boolean;
 var
+  LMono: TgIBSCBSMono;
   LqBCMono: Double;
   LvIBSMono, LvCBSMono: Double;
-  LvIBSMonoReten, LvCBSMonoReten: Double;
-  LvIBSMonoDif, LvCBSMonoDif: Double;
 begin
-  Result := False;
+  if not Assigned(Produto) then
+    raise Exception.Create('Produto nao inicializado em CalcularGIBSCBSMono.');
 
-  try
-    if not Assigned(Produto) then
-      raise Exception.Create('Produto não inicializado em CalcularGIBSCBSMono.');
+  if not Assigned(Produto.Imposto) or not Assigned(Produto.Imposto.IBSCBS) then
+    raise Exception.Create('Estrutura IBSCBS nao inicializada.');
 
-    if not Assigned(Produto.Imposto) or not Assigned(Produto.Imposto.IBSCBS) then
-      raise Exception.Create('Estrutura IBSCBS não inicializada.');
+  if (pDifIBS > 0) or (pDifCBS > 0) or (cClassTrib = '620003') then
+    raise Exception.Create('Diferimento monofasico nao compativel com o leiaute RTC atual do ACBr.');
 
+  if qBCMono > 0 then
+    LqBCMono := qBCMono
+  else
+    LqBCMono := Produto.Prod.qTrib;
 
-    // Base
-    if qBCMono > 0 then
-      LqBCMono := qBCMono
-    else
-      LqBCMono := Produto.Prod.qTrib;
+  LvIBSMono := ArredondaValorParaSefaz(LqBCMono * (adRemIBS / 100));
+  LvCBSMono := ArredondaValorParaSefaz(LqBCMono * (adRemCBS / 100));
 
-    // Cálculos principais
-    LvIBSMono := ArredondaValorParaSefaz(LqBCMono * (adRemIBS / 100));
-    LvCBSMono := ArredondaValorParaSefaz(LqBCMono * (adRemCBS / 100));
+  LMono := Produto.Imposto.IBSCBS.gIBSCBSMono;
+  LMono.gIBSMonoAdRem.gMonoPadrao.qBCMono := LqBCMono;
+  LMono.gIBSMonoAdRem.gMonoPadrao.adRemIBS := adRemIBS;
+  LMono.gIBSMonoAdRem.gMonoPadrao.vIBSMono := LvIBSMono;
+  LMono.gCBSMonoAdRem.gMonoPadrao.qBCMono := LqBCMono;
+  LMono.gCBSMonoAdRem.gMonoPadrao.adRemCBS := adRemCBS;
+  LMono.gCBSMonoAdRem.gMonoPadrao.vCBSMono := LvCBSMono;
 
-    LvIBSMonoReten := 0;
-    LvCBSMonoReten := 0;
-    LvIBSMonoDif   := 0;
-    LvCBSMonoDif   := 0;
-
-    // =============== gMonoPadrao ==================
-    with Produto.Imposto.IBSCBS.gIBSCBSMono.gMonoPadrao do
-    begin
-      qBCMono  := LqBCMono;
-      adRemIBS := adRemIBS;
-      adRemCBS := adRemCBS;
-      vIBSMono := LvIBSMono;
-      vCBSMono := LvCBSMono;
-    end;
-
-    // =============== gMonoDif =====================
-    if (pDifIBS > 0) or (pDifCBS > 0) then
-    begin
-      LvIBSMonoDif := ArredondaValorParaSefaz(LvIBSMono * (pDifIBS / 100));
-      LvCBSMonoDif := ArredondaValorParaSefaz(LvCBSMono * (pDifCBS / 100));
-    end;
-
-    with Produto.Imposto.IBSCBS.gIBSCBSMono.gMonoDif do
-    begin
-      pDifIBS     := pDifIBS;
-      vIBSMonoDif := LvIBSMonoDif;
-      pDifCBS     := pDifCBS;
-      vCBSMonoDif := LvCBSMonoDif;
-    end;
-
-    // =============== gMonoReten (Tributação Monofásica Sujeita a Retenção) =====================
-    if cClassTrib = '620002' then
-    begin
-      with Produto.Imposto.IBSCBS.gIBSCBSMono.gMonoReten do
-      begin
-        qBCMonoReten  := LqBCMono;
-        adRemIBSReten := adRemIBS;
-        vIBSMonoReten := 0;
-        adRemCBSReten := adRemCBS;
-        vCBSMonoReten := 0;
-      end;
-    end;
-
-    // =============== 620003: gMonoPadrao + gMonoDif =====================
-    if cClassTrib = '620003' then
-    begin
-      // gMonoPadrao já preenchido acima
-
-      // gMonoDif obrigatório para 620003
-      with Produto.Imposto.IBSCBS.gIBSCBSMono.gMonoDif do
-      begin
-        pDifIBS     := pDifIBS;
-        vIBSMonoDif := LvIBSMonoDif;
-        pDifCBS     := pDifCBS;
-        vCBSMonoDif := LvCBSMonoDif;
-      end;
-    end;
-
-    // =============== gMonoRet (RETIDA ANTERIORMENTE) =====================
-    if (cClassTrib = '620004') or (cClassTrib = '620005') or (cClassTrib = '620006') then
-    begin
-      with Produto.Imposto.IBSCBS.gIBSCBSMono.gMonoRet do
-      begin
-        qBCMonoRet  := LqBCMono;
-        adRemIBSRet := adRemIBS;
-        adRemCBSRet := adRemCBS;
-        vIBSMonoRet := 0.00;
-        vCBSMonoRet := 0.00;
-      end;
-    end;
-
-    // =============== Totais ======================
-    with Produto.Imposto.IBSCBS.gIBSCBSMono do
-    begin
-      vTotIBSMonoItem := ArredondaValorParaSefaz(LvIBSMono + LvIBSMonoReten - LvIBSMonoDif);
-      vTotCBSMonoItem := ArredondaValorParaSefaz(LvCBSMono + LvCBSMonoReten - LvCBSMonoDif);
-    end;
-
-    Result := True;
-
-  except
-    on E: Exception do
-    begin
-      ShowMessage('Erro ao calcular gIBSCBSMono: ' + E.Message);
-      Result := False;
-    end;
+  if cClassTrib = '620002' then
+  begin
+    LMono.gIBSMonoAdRem.gMonoReten.qBCMonoReten := LqBCMono;
+    LMono.gIBSMonoAdRem.gMonoReten.adRemIBSReten := adRemIBS;
+    LMono.gIBSMonoAdRem.gMonoReten.vIBSMonoReten := 0;
+    LMono.gCBSMonoAdRem.gMonoReten.qBCMonoReten := LqBCMono;
+    LMono.gCBSMonoAdRem.gMonoReten.adRemCBSReten := adRemCBS;
+    LMono.gCBSMonoAdRem.gMonoReten.vCBSMonoReten := 0;
   end;
+
+  if (cClassTrib = '620004') or (cClassTrib = '620005') or (cClassTrib = '620006') then
+  begin
+    LMono.gIBSMonoAdRem.gMonoRet.vIBSMonoRet := 0;
+    LMono.gCBSMonoAdRem.gMonoRet.vCBSMonoRet := 0;
+  end;
+
+  LMono.vTotIBSMonoItem := ArredondaValorParaSefaz(LvIBSMono);
+  LMono.vTotCBSMonoItem := ArredondaValorParaSefaz(LvCBSMono);
+  Result := True;
 end;
 
 

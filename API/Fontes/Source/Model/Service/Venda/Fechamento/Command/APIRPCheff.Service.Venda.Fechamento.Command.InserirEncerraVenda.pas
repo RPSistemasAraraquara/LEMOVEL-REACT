@@ -42,14 +42,6 @@ begin
   try
     if Assigned(LEncerraVenda) then
     begin
-      // Retentativa de fechamento: honra o CPF/CNPJ informado NESTA tentativa
-      // (a emissao pos-commit le encerravenda.ven_cpfconsum).
-      if LCpfCnpjNota <> '' then
-      begin
-        LDAO := FParent.DAO.EncerraVendaDAO;
-        LDAO.ManagerTransaction(False);
-        LDAO.AtualizarCpfConsumidor(LEncerraVenda.idEncerraVenda, LCpfCnpjNota);
-      end;
       FParent.IdEncerraVenda(LEncerraVenda.idEncerraVenda);
       Exit;
     end
