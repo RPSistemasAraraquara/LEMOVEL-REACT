@@ -25,6 +25,7 @@ implementation
 
 uses
   System.SysUtils,
+  APIRPCheff.DAO.VendaItem,
   APIRPCheff.Service.Venda.Consulta,
   APIRPCheff.Context.Venda.PagamentoParcial,
   APIRPCheff.Service.Venda.PagamentoParcial.Command,
@@ -56,20 +57,33 @@ var
   LInvoker            : TAPIRPCheffServiceVendaPagamentoParcialInvoker;
   LContext            : TAPIRPCheffContextVendaPagamentoParcial;
   LServiceConsultaVenda: TAPIRPCheffServiceVendaConsulta;
+  LVendaItemDAO        : TAPIRPCheffDAOVendaItem;
 begin
   LContext := Default(TAPIRPCheffContextVendaPagamentoParcial);
 
   LServiceConsultaVenda := TAPIRPCheffServiceVendaConsulta.Create;
   try
-    LServiceConsultaVenda.DAO(FDAO).AplicarTaxaServico(True);
+    LServiceConsultaVenda.DAO(FDAO);
 
     LContext.PagamentoAntecipado := FPagamentoAntecipado;
     LContext.Venda := nil;
 
-    FDAO.VendaItemDAO.RatearTaxaGarcomPorItens(FPagamentoAntecipado.idVenda);
-    LContext.Venda := LServiceConsultaVenda.Buscar(FPagamentoAntecipado.idVenda, True);
-
     try
+      FDAO.StartTransaction;
+      try
+        FDAO.VendaDAO.PersistirTaxaGarcom(FPagamentoAntecipado.idEmpresa, FPagamentoAntecipado.idVenda);
+        LVendaItemDAO := FDAO.VendaItemDAO;
+        LVendaItemDAO.ManagerTransaction(False);
+        LVendaItemDAO.RatearTaxaGarcomPorItens(FPagamentoAntecipado.idVenda);
+        LContext.Venda := LServiceConsultaVenda.Buscar(FPagamentoAntecipado.idVenda, True);
+        if not Assigned(LContext.Venda) then
+          raise Exception.Create('Venda nao encontrada.');
+        FDAO.Commit;
+      except
+        FDAO.Rollback;
+        raise;
+      end;
+
       FPagamentoAntecipado.idCaixa := LContext.Venda.idCaixa;
 
       LInvoker := TAPIRPCheffServiceVendaPagamentoParcialInvoker.Create;

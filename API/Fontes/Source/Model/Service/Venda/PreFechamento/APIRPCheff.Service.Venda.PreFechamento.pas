@@ -4,7 +4,6 @@ interface
 
 uses
   System.SysUtils,
-  System.Math,
   APIRPCheff.Entity.Classes,
   APIRPCheff.Entity.Types,
   APIRPCheff.Components,
@@ -13,18 +12,10 @@ uses
 type
   TAPIRPCheffServiceVendaPreFechamento = class
   private
-    FComponents   : TAPIRPCheffComponents;
-    FDAO          : TAPIRPCheffDAOFactory;
-    FPatch        : TAPIRPCheffEntityVendaPatchPreFechamento;
-    FVenda        : TAPIRPCheffEntityVenda;
-    FConfiguracao : TAPIRPCheffEntityConfiguracaoMesaComanda;
-
-    procedure CarregarConfiguracao;
-    procedure CarregarVenda;
-    procedure CalcularTaxaServico;
-    procedure ValidarVenda;
+    FComponents : TAPIRPCheffComponents;
+    FDAO        : TAPIRPCheffDAOFactory;
+    FPatch      : TAPIRPCheffEntityVendaPatchPreFechamento;
   public
-    destructor Destroy; override;
 
     function Components(const AValue: TAPIRPCheffComponents): TAPIRPCheffServiceVendaPreFechamento;
     function DAO(const AValue: TAPIRPCheffDAOFactory): TAPIRPCheffServiceVendaPreFechamento;
@@ -35,58 +26,6 @@ type
 implementation
 
 { TAPIRPCheffServiceVendaPreFechamento }
-
-destructor TAPIRPCheffServiceVendaPreFechamento.Destroy;
-begin
-  FreeAndNil(FConfiguracao);
-  FreeAndNil(FVenda);
-  inherited;
-end;
-
-procedure TAPIRPCheffServiceVendaPreFechamento.CalcularTaxaServico;
-var
-  LValorVenda: Currency;
-  LValorVendaSomenteProdutosTaxa:Currency;
-  LValorTaxa: Currency;
-  LPercentual: Currency;
-begin
-  FreeAndNil(FVenda.itens);
-  FVenda.itens := FDAO.VendaItemDAO.Listar(FVenda.idVenda, siOK);
-  LValorVenda := FVenda.TotalItens;
-
-  if (not FPatch.CobrarTaxaGarcom) or (FPatch.valorTaxaServico <= 0) then
-  begin
-    FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, 0, 0);
-    Exit;
-  end;
-
-  if Assigned(FConfiguracao) and FConfiguracao.utilizaTaxaServico then
-  begin
-    LValorVendaSomenteProdutosTaxa  := FDAO.VendaItemDAO.ListarProdutosSomenteTaxaGarcom(FVenda.idVenda);
-    LPercentual                     := FConfiguracao.percentualTaxaServico;
-    LValorTaxa                      := SimpleRoundTo(LValorVendaSomenteProdutosTaxa * (LPercentual / 100), -2);
-    FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, LValorTaxa, LPercentual);
-    Exit;
-  end;
-
-  FDAO.VendaDAO.AtualizarTotalVenda(FVenda.idEmpresa, FVenda.idVenda, LValorVenda, 0, 0);
-end;
-
-procedure TAPIRPCheffServiceVendaPreFechamento.CarregarConfiguracao;
-begin
-  FreeAndNil(FConfiguracao);
-  if FVenda.tipoVenda = tvMesa then
-    FConfiguracao := FDAO.ConfiguracaoMesaDAO.Buscar(FVenda.idEmpresa)
-  else
-  if FVenda.tipoVenda = tvComanda then
-    FConfiguracao := FDAO.ConfiguracaoComandaDAO.Buscar(FVenda.idEmpresa);
-end;
-
-procedure TAPIRPCheffServiceVendaPreFechamento.CarregarVenda;
-begin
-  FreeAndNil(FVenda);
-  FVenda := FDAO.IdEmpresa(FPatch.idEmpresa).VendaDAO.Buscar(FPatch.idVenda);
-end;
 
 function TAPIRPCheffServiceVendaPreFechamento.Components(const AValue: TAPIRPCheffComponents): TAPIRPCheffServiceVendaPreFechamento;
 begin
@@ -101,30 +40,54 @@ begin
 end;
 
 procedure TAPIRPCheffServiceVendaPreFechamento.Execute;
+var
+  LVendaDAO: TAPIRPCheffDAOVenda;
+  LVenda: TAPIRPCheffEntityVenda;
+  LValorTaxa: Currency;
+  LIgnorarTaxa: Boolean;
 begin
-  CarregarVenda;
-  ValidarVenda;
-  CarregarConfiguracao;
-  FDAO.VendaDAO.PreFechamento(FPatch);
-  CalcularTaxaServico;
+  LVendaDAO := FDAO.IdEmpresa(FPatch.idEmpresa).VendaDAO;
+  LVendaDAO.IdEmpresa(FPatch.idEmpresa);
+  LVendaDAO.ManagerTransaction(False);
+  FDAO.StartTransaction;
+  try
+    // PreFechamento valida a situacao e bloqueia a venda nesta transacao.
+    LVendaDAO.PreFechamento(FPatch);
+    LVenda := LVendaDAO.Buscar(FPatch.idVenda);
+    try
+      FreeAndNil(LVenda.itens);
+      LVenda.itens := FDAO.VendaItemDAO.Listar(LVenda.idVenda, siOK);
+
+      LValorTaxa := 0;
+      LIgnorarTaxa := True;
+      if LVenda.tipoVenda in [tvMesa, tvComanda] then
+      begin
+        // Sem taxa para escolher na tela, conserva a dispensa ja registrada.
+        LIgnorarTaxa := LVenda.ignorarTaxaGarcom;
+        if LVenda.valorTaxaServicoDisponivel > 0 then
+        begin
+          LIgnorarTaxa := not FPatch.CobrarTaxaGarcom;
+          if not LIgnorarTaxa then
+            LValorTaxa := LVenda.valorTaxaServicoDisponivel;
+        end;
+      end;
+
+      LVendaDAO.AtualizarTotalVenda(LVenda.idEmpresa, LVenda.idVenda, LVenda.TotalItens,
+        LValorTaxa, LVenda.percentualTaxaServico, LIgnorarTaxa);
+    finally
+      LVenda.Free;
+    end;
+    FDAO.Commit;
+  except
+    FDAO.Rollback;
+    raise;
+  end;
 end;
 
 function TAPIRPCheffServiceVendaPreFechamento.Patch(const AValue: TAPIRPCheffEntityVendaPatchPreFechamento): TAPIRPCheffServiceVendaPreFechamento;
 begin
   Result := Self;
   FPatch := AValue;
-end;
-
-procedure TAPIRPCheffServiceVendaPreFechamento.ValidarVenda;
-begin
-  if not Assigned(FVenda) then
-    raise Exception.CreateFmt('Venda %d nao encontrada.', [FPatch.idVenda]);
-
-  if FVenda.situacao <> svPendente then
-    raise EConflictError.CreateFmt(
-      'Venda %d nao pode ser pre-fechada porque esta com situacao %s.',
-      [FPatch.idVenda, FVenda.situacao.Description]
-    );
 end;
 
 end.

@@ -63,6 +63,9 @@ const parseInteger = (value: string): number => {
   return Number.isFinite(rounded) ? Math.max(0, rounded) : 0;
 };
 
+const getAvailableServiceTax = (sale: Sale | null): number =>
+  sale?.valorTaxaServicoDisponivel ?? sale?.valorTaxaServico ?? 0;
+
 const formatMoney = (value?: number): string => `R$ ${(value || 0).toFixed(2)}`;
 const formatDiscountInput = (value: number): string => {
   if (!Number.isFinite(value) || value <= 0) {
@@ -123,6 +126,7 @@ const isSaleStateConflictMessage = (message: string): boolean => {
     normalized.includes('nao pode ser fechada') ||
     normalized.includes('ja esta finalizada') ||
     normalized.includes('ja foi fechada') ||
+    normalized.includes('taxa de servico mudou') ||
     normalized.includes('situacao finalizada') ||
     normalized.includes('situacao pre-fechamento')
   );
@@ -251,9 +255,7 @@ export const SaleClosureScreen: React.FC = () => {
   });
   const [companyCouvertConfig, setCompanyCouvertConfig] = useState({
     valorCouvertMasculino: 0,
-    valorCouvertFeminino: 0,
-    taxaServicoPct: 0,
-    utilizaTaxaServico: false
+    valorCouvertFeminino: 0
   });
   const [cobrarTaxaGarcom, setCobrarTaxaGarcom] = useState(false);
   const activePaymentTokenRef = useRef<string | null>(null);
@@ -300,12 +302,9 @@ export const SaleClosureScreen: React.FC = () => {
       setPartialPayments(mode === 'final' ? mergedPartialPayments : []);
       setCompanyCouvertConfig({
         valorCouvertMasculino: Number(currentCompanyConfig?.valorCouvertMasculino || 0),
-        valorCouvertFeminino: Number(currentCompanyConfig?.valorCouvertFeminino || 0),
-        taxaServicoPct: Number(currentCompanyConfig?.taxaServicoPct || 0),
-        utilizaTaxaServico:
-          Boolean((currentCompanyConfig as any)?.taxaAdicionalMesa) ||
-          Number(currentCompanyConfig?.taxaServicoPct || 0) > 0
+        valorCouvertFeminino: Number(currentCompanyConfig?.valorCouvertFeminino || 0)
       });
+      setCobrarTaxaGarcom(!saleLoaded?.ignorarTaxaGarcom && getAvailableServiceTax(saleLoaded) > 0);
       if (saleLoaded) {
         const totalVenda = saleLoaded.valorTotal ?? saleLoaded.valor ?? 0;
         const valorDesconto = saleLoaded.valorDesconto || 0;
@@ -316,11 +315,6 @@ export const SaleClosureScreen: React.FC = () => {
         setDescontoValor(formatDiscountInput(valorDesconto));
         setDescontoPercentual(formatDiscountInput(percentualDesconto));
         setDiscountInputMode('value');
-        setCobrarTaxaGarcom(
-          Number(saleLoaded.valorTaxaServico || 0) > 0 ||
-            Boolean((currentCompanyConfig as any)?.taxaAdicionalMesa) ||
-            Number(currentCompanyConfig?.taxaServicoPct || 0) > 0
-        );
       }
       logSyncDiagnostic(
         `fluxo fechamento carregar fim idVenda=${idVenda} modo=${mode} itens=${saleLoaded?.itens?.length || 0} pagamentos=${mergedPartialPayments.length} em ${Date.now() - startedAt}ms`
@@ -385,7 +379,8 @@ export const SaleClosureScreen: React.FC = () => {
   };
   const originalMascCouvertTotal = Number(sale?.valorCouvertMasculino || 0);
   const originalFemCouvertTotal = Number(sale?.valorCouvertFeminino || 0);
-  const originalTaxaServico = Number(sale?.valorTaxaServico || 0);
+  const originalTaxaServico = sale?.valorTaxaServico ?? 0;
+  const availableTaxaServico = getAvailableServiceTax(sale);
   const activeTableSaleId = Number(activeTable?.idVenda || activeTable?.venda?.idVenda || 0);
   const activeTablePartialPaid =
     activeTableSaleId === Number(idVenda)
@@ -407,7 +402,7 @@ export const SaleClosureScreen: React.FC = () => {
   const currentCouvertTotal =
     parseInteger(masc) * unitMascCouvert +
     parseInteger(fem) * unitFemCouvert;
-  const effectiveTaxaServico = cobrarTaxaGarcom ? originalTaxaServico : 0;
+  const effectiveTaxaServico = cobrarTaxaGarcom ? availableTaxaServico : 0;
   const total = Math.max(0, saleTotal - originalCouvertTotal - originalTaxaServico + currentCouvertTotal + effectiveTaxaServico);
   const partialPaidFromList = partialPayments.reduce((acc, item) => acc + Number(item.valor || 0), 0);
   const partialPaid = Math.max(
@@ -457,10 +452,7 @@ export const SaleClosureScreen: React.FC = () => {
   const allowSave = mode === 'pre' ? isPreCloseAllowed : isFinalCloseAllowed;
   const isMachinePaymentRunning = paymentProcessingVisible || Boolean(activePaymentTokenRef.current);
   const canToggleServiceTax = Boolean(user?.permiteAlterarTaxa10);
-  const shouldShowServiceTaxToggle =
-    companyCouvertConfig.utilizaTaxaServico ||
-    companyCouvertConfig.taxaServicoPct > 0 ||
-    originalTaxaServico > 0;
+  const shouldShowServiceTaxToggle = availableTaxaServico > 0;
 
   useEffect(() => {
     if (configuredPaymentProvider !== 'pagbank') {

@@ -36,6 +36,9 @@ type
     FvalorCouvertMasculino   : Currency;
     FvalorCouvertFeminino    : Currency;
     FvalorTaxaServico        : Currency;
+    FValorTaxaServicoDisponivel: Currency;
+    FPercentualTaxaServico: Currency;
+    FIgnorarTaxaGarcom: Boolean;
     FnumeroCupom             : Integer;
     FvalorEntrada            : Currency;
 
@@ -85,6 +88,9 @@ type
     property valorCouvertMasculino  : Currency read FvalorCouvertMasculino write FvalorCouvertMasculino;
     property valorCouvertFeminino   : Currency read FvalorCouvertFeminino write FvalorCouvertFeminino;
     property valorTaxaServico       : Currency read FvalorTaxaServico write FvalorTaxaServico;
+    property valorTaxaServicoDisponivel: Currency read FValorTaxaServicoDisponivel write FValorTaxaServicoDisponivel;
+    property percentualTaxaServico: Currency read FPercentualTaxaServico write FPercentualTaxaServico;
+    property ignorarTaxaGarcom: Boolean read FIgnorarTaxaGarcom write FIgnorarTaxaGarcom;
     property valorEntrada           : Currency read FvalorEntrada write FvalorEntrada;
     property valorTotal             : Currency read GetValorTotal;
     property totalCredito           : Currency read GetTotalCredito;
@@ -293,7 +299,12 @@ begin
   begin
     Result := RoundTo(Fvalor + FvalorCouvertFeminino + FvalorCouvertMasculino + FvalorTaxaServico, -2);
     if Fcliente.id > 0 then
-      Result := RoundTo(Fvalor + FvalorEntrada, -2);
+    begin
+      Result := Fvalor + FvalorEntrada;
+      if FtipoVenda in [tvMesa, tvComanda] then
+        Result := Result + FvalorTaxaServico;
+      Result := RoundTo(Result, -2);
+    end;
   end;
 end;
 

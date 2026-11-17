@@ -50,11 +50,7 @@ begin
     AMesa.venda.situacao := svReservada;
 end;
 
-// Performance: carrega as vendas de TODAS as mesas em 2 queries (antes eram
-// 2 por mesa aberta - N+1 no GET /mesa). Mesmas entidades, mesmos valores:
-// BuscarLote usa o mesmo Select do Buscar e SomarTaxaGarcomLote a mesma
-// query da taxa agrupada; venda duplicada (juncao de mesas) ou ausente cai
-// no CarregarVenda original.
+// Carrega as vendas e suas taxas em uma unica consulta para a grade.
 procedure TAPIRPCheffServiceMesaConsulta.CarregarVendasEmLote(AMesas: TObjectList<TAPIRPCheffEntityMesa>);
 var
   LIds: TArray<Integer>;
@@ -62,9 +58,7 @@ var
   LMesa: TAPIRPCheffEntityMesa;
   LVendas: TObjectList<TAPIRPCheffEntityVenda>;
   LVendaPorId: TDictionary<Integer, TAPIRPCheffEntityVenda>;
-  LTaxas: TDictionary<Integer, Currency>;
   LVenda: TAPIRPCheffEntityVenda;
-  LTaxa: Currency;
 begin
   SetLength(LIds, AMesas.Count);
   LCount := 0;
@@ -85,16 +79,11 @@ begin
   end;
 
   LVendas := nil;
-  LTaxas := nil;
   LVendaPorId := TDictionary<Integer, TAPIRPCheffEntityVenda>.Create;
   try
     LVendas := FDAO.VendaDAO.BuscarLote(LIds);
-    // dicionario populado ANTES da query de taxa: se ela falhar, o finally
-    // libera as entidades ja carregadas (a lista LVendas nao e dona delas)
     for LVenda in LVendas do
       LVendaPorId.AddOrSetValue(LVenda.idVenda, LVenda);
-
-    LTaxas := FDAO.VendaItemDAO.SomarTaxaGarcomLote(LIds);
 
     for LMesa in AMesas do
     begin
@@ -113,9 +102,7 @@ begin
         // (dona da venda) e liberada pelo except do chamador - sem leak
         LVendaPorId[LMesa.idVenda] := nil;
         LMesa.venda := LVenda;
-        if not LTaxas.TryGetValue(LMesa.idVenda, LTaxa) then
-          LTaxa := 0;
-        FServiceVendaConsulta.AplicarValoresDeTaxasComValor(LMesa.venda, LTaxa);
+        FServiceVendaConsulta.AplicarValoresDeTaxas(LMesa.venda);
         if (LMesa.situacao = smReservada) and Assigned(LMesa.venda) then
           LMesa.venda.situacao := svReservada;
       end
@@ -128,7 +115,6 @@ begin
     for LVenda in LVendaPorId.Values do
       LVenda.Free;
     FreeAndNil(LVendaPorId);
-    FreeAndNil(LTaxas);
     FreeAndNil(LVendas);
   end;
 end;

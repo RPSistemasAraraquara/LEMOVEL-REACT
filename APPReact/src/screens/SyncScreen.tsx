@@ -20,6 +20,7 @@ const tasks: SyncTask[] = [
   { label: 'Catálogo', key: 'catalogo', subtitle: 'Atualiza categorias e produtos' },
   { label: 'Produtos', key: 'produtos', subtitle: 'Atualiza produtos e opcionais' },
   { label: 'Mesas', key: 'mesas', subtitle: 'Atualização específica' },
+  { label: 'Comandas', key: 'comandas', subtitle: 'Atualização específica' },
   { label: 'Formas de pagamento', key: 'formas', subtitle: 'Atualização específica' },
   { label: 'Configurações', key: 'configuracoes', subtitle: 'Atualização específica' },
   { label: 'Usuários', key: 'usuarios', subtitle: 'Atualização específica' }

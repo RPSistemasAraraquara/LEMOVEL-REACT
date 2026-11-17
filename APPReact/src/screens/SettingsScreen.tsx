@@ -11,6 +11,7 @@ import {
   Switch,
   Text,
   TextInput,
+  type TextInputProps,
   View
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -54,6 +55,7 @@ type DisplayMode = 'mesa' | 'comanda' | 'mesaComanda';
 type SettingsState = {
   servidor: string;
   terminalImpressao: string;
+  terminalAbertura: string;
   numeroMaquina: string;
   salvarLoginSenha: boolean;
   utilizaCatraca: boolean;
@@ -247,6 +249,7 @@ const withConnectionCheckTimeout = (
 const toSettingsState = (settings: MobileAppSettings): SettingsState => ({
   servidor: settings.baseUrl,
   terminalImpressao: settings.terminalImpressao,
+  terminalAbertura: settings.terminalAbertura,
   numeroMaquina: settings.numeroMaquina,
   salvarLoginSenha: settings.salvarLoginSenha,
   utilizaCatraca: settings.utilizaCatraca,
@@ -291,6 +294,7 @@ const toMobileAppSettings = (
   baseUrl: values.servidor.trim(),
   empresaId: parseInt(empresa, 10) || existing.empresaId,
   terminalImpressao: values.terminalImpressao.trim(),
+  terminalAbertura: values.terminalAbertura.trim(),
   numeroMaquina: values.numeroMaquina.trim(),
   salvarLoginSenha: values.salvarLoginSenha,
   utilizaCatraca: values.utilizaCatraca,
@@ -902,6 +906,14 @@ export const SettingsScreen: React.FC = () => {
           placeholder="Terminal/porta da impressão"
         />
         <FieldInput
+          label="Terminal de abertura"
+          value={settingMemo.terminalAbertura}
+          onChangeText={(text) => setValue('terminalAbertura', text)}
+          placeholder="Nome cadastrado no RP Cheff"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <FieldInput
           label="Número da máquina"
           value={settingMemo.numeroMaquina}
           onChangeText={(text) => setValue('numeroMaquina', text)}
@@ -1325,7 +1337,9 @@ const FieldInput: React.FC<{
   onChangeText: (text: string) => void;
   placeholder?: string;
   keyboardType?: 'default' | 'numeric' | 'number-pad';
-}> = ({ label, value, onChangeText, placeholder, keyboardType = 'default' }) => (
+} & Pick<TextInputProps, 'autoCapitalize' | 'autoCorrect'>> = ({
+  label, value, onChangeText, placeholder, keyboardType = 'default', autoCapitalize, autoCorrect
+}) => (
   <View style={styles.field}>
     <Text style={styles.label}>{label}</Text>
     <TextInput
@@ -1335,6 +1349,8 @@ const FieldInput: React.FC<{
       placeholder={placeholder}
       placeholderTextColor={Colors.textMuted}
       keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      autoCorrect={autoCorrect}
     />
   </View>
 );

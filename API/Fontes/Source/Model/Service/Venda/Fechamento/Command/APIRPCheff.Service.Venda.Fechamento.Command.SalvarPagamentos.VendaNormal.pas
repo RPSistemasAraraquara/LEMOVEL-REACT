@@ -22,6 +22,7 @@ type
     FValorPendente: Currency;
     FValorPago: Currency;
     FValorTroco: Currency;
+    FValorTrocoDinheiro: Currency;
     FNumeroItem: Integer;
 
     procedure CarregarAntecipados;
@@ -33,7 +34,7 @@ type
     procedure ProcessaPagamentos;
 
     procedure InserirEncerraVendaItem(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento;
-      const AHashTerminal, AAutorizacao, AAcquirerDocument: string);
+      const AHashTerminal, AAutorizacao, AAcquirerDocument: string; AAntecipado: Boolean = False);
     procedure GravarCaixaItem(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento; Item: Integer; AAntecipado: Boolean = False);
     procedure GravarControleCartao(AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento);
   public
@@ -52,8 +53,14 @@ var
    LValor: Double;
 begin
   FIdFormaTroco := 0;
-  LValor := FFechamento.ValorPagamento - FValorPendente - FFechamento.ValorTaxaServico;
-  FValorTroco := Trunc(LValor * 100) / 100;
+  FValorTrocoDinheiro := 0;
+  if FParent.Venda.tipoVenda in [tvMesa, tvComanda] then
+    FValorTroco := SimpleRoundTo(FFechamento.ValorPagamento - FValorPendente, -2)
+  else
+  begin
+    LValor := FFechamento.ValorPagamento - FValorPendente - FFechamento.ValorTaxaServico;
+    FValorTroco := Trunc(LValor * 100) / 100;
+  end;
 
   if FValorTroco < 0.001 then
     FValorTroco := 0;
@@ -70,6 +77,15 @@ begin
     (FFechamento.ValorPagoEmDinheiro < FValorTroco) and
     (not FParent.ConfiguracaoMesa.permiteTrocoTodasAsFormas) then
     raise Exception.Create('N'#227'o '#233' possivel devolver troco pois o valor recebido em dinheiro '#233' insuficiente!');
+
+  if FParent.Venda.tipoVenda in [tvMesa, tvComanda] then
+  begin
+    if FValorTroco > FFechamento.ValorPagamento then
+      raise Exception.Create('N'#227'o '#233' possivel devolver troco em nenhuma forma de pagamento informada!');
+    FValorTrocoDinheiro := Min(FValorTroco, FFechamento.ValorPagoEmDinheiro);
+    FValorTroco := FValorTroco - FValorTrocoDinheiro;
+    Exit;
+  end;
 
   for I := 0 to Pred(FFechamento.pagamentos.Count) do
     if FFechamento.pagamentos[I].formaPagamento.Dinheiro then
@@ -231,10 +247,11 @@ end;
 
 procedure TAPIRPCheffServiceVendaFechamentoCommandSalvarPagamentosVendaNormal.InserirEncerraVendaItem(
   AValor: Currency; AForma: TAPIRPCheffEntityFormaPagamento;
-  const AHashTerminal, AAutorizacao, AAcquirerDocument: string);
+  const AHashTerminal, AAutorizacao, AAcquirerDocument: string; AAntecipado: Boolean);
 var
   LEncerraVendaItem: TAPIRPCheffEntityEncerraVendaItem;
   LDAO: TAPIRPCheffDAOEncerraVendaItem;
+  LTrocoItem: Currency;
 begin
   LDAO := FParent.DAO.EncerraVendaItemDAO;
   LDAO.ManagerTransaction(False);
@@ -253,11 +270,29 @@ begin
     if not AForma.cortesia then
       LEncerraVendaItem.valor := AValor;
 
-    if AForma.codigo = FIdFormaTroco then
+    LTrocoItem := 0;
+    if FParent.Venda.tipoVenda in [tvMesa, tvComanda] then
     begin
-      LEncerraVendaItem.trocoDinheiro := FValorTroco;
-      LEncerraVendaItem.valor := LEncerraVendaItem.valor - FValorTroco;
-    end;
+      // Antecipacoes ja registradas entram pelo valor integral.
+      if not AAntecipado then
+      begin
+        if AForma.Dinheiro then
+        begin
+          LTrocoItem := Min(FValorTrocoDinheiro, LEncerraVendaItem.valor);
+          FValorTrocoDinheiro := FValorTrocoDinheiro - LTrocoItem;
+        end
+        else
+        begin
+          LTrocoItem := Min(FValorTroco, LEncerraVendaItem.valor);
+          FValorTroco := FValorTroco - LTrocoItem;
+        end;
+      end;
+    end
+    else if AForma.codigo = FIdFormaTroco then
+      LTrocoItem := FValorTroco;
+
+    LEncerraVendaItem.trocoDinheiro := LTrocoItem;
+    LEncerraVendaItem.valor := LEncerraVendaItem.valor - LTrocoItem;
 
     LDAO.Inserir(LEncerraVendaItem);
   finally
@@ -280,7 +315,7 @@ begin
       LValor := FAntecipados[I].valor;
       LForma := FAntecipados[I].formaPagamento;
       InserirEncerraVendaItem(LValor, LForma, FAntecipados[I].hash_terminal,
-        FAntecipados[I].autorizacao, FAntecipados[I].acquirerdocument);
+        FAntecipados[I].autorizacao, FAntecipados[I].acquirerdocument, True);
       GravarCaixaItem(LValor, LForma, FContext^.ProximoIdCaixaItem, True);
       GravarControleCartao(LValor, LForma);
     end;

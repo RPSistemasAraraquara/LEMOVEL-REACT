@@ -356,7 +356,7 @@ begin
   LServiceConsulta := TAPIRPCheffServiceVendaConsulta.Create;
   try
     LServiceConsulta.DAO(FDAO);
-    FVenda := LServiceConsulta.AplicarTaxaServico(False).Buscar(FIdVenda, False);
+    FVenda := LServiceConsulta.Buscar(FIdVenda, False);
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FIdVenda]);
 

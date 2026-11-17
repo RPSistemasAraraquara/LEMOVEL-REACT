@@ -90,7 +90,7 @@ begin
   FreeAndNil(FVenda);
   LServiceConsultaVenda := TAPIRPCheffServiceVendaConsulta.Create;
   try
-    LServiceConsultaVenda.DAO(FDAO).AplicarTaxaServico(False);
+    LServiceConsultaVenda.DAO(FDAO);
     FVenda     := LServiceConsultaVenda.Buscar(FFechamento.idVenda, False);
     if not Assigned(FVenda) then
       raise Exception.CreateFmt('Venda %d n'#227'o encontrada.', [FFechamento.idVenda]);
@@ -104,7 +104,20 @@ begin
     FreeAndNil(FVendaItens);
 
     FVenda.valorTaxaServico := 0;
-    if FFechamento.CobrarTaxaGarcom then
+    if FVenda.tipoVenda in [tvMesa, tvComanda] then
+    begin
+      if FFechamento.CobrarTaxaGarcom then
+      begin
+        if FVenda.valorTaxaServicoDisponivel > 0 then
+          FVenda.valorTaxaServico := FVenda.valorTaxaServicoDisponivel;
+        if (FFechamento.valorTaxaServico > 0) and
+          (FFechamento.valorTaxaServico <> FVenda.valorTaxaServico) then
+          raise EConflictError.Create(
+            'A taxa de servi'#231'o mudou. Consulte a venda novamente antes de fechar.');
+      end;
+      FFechamento.valorTaxaServico := FVenda.valorTaxaServico;
+    end
+    else if FFechamento.CobrarTaxaGarcom then
       FVenda.valorTaxaServico := FFechamento.valorTaxaServico;
 
     FreeAndNil(FVenda.itens);
@@ -174,10 +187,10 @@ end;
 procedure TAPIRPCheffServiceVendaFechamento.Execute;
 begin
   InicializarValores;
-  CarregarVenda;
   FDAO.StartTransaction;
   try
     BloquearVendaParaFechamento;
+    CarregarVenda;
     ExecuteCommands;
     FDAO.Commit;
   except

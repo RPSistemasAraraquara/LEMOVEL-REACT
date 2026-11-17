@@ -23,7 +23,10 @@ type
     procedure AtualizarCouvert(ACouvert: TAPIRPCheffEntityVendaPatchCouvert);
     procedure AtualizarNomeMesaComanda(AIdVenda: Integer; ANome: string);
     procedure AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer); overload;
-    procedure AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer; AValor, AValorTaxa, APercentualTaxa: Currency); overload;
+    procedure AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer; AValor, AValorTaxa, APercentualTaxa: Currency;
+      AIgnorarTaxaGarcom: Boolean); overload;
+    // Requer transacao ativa do chamador para manter o bloqueio da venda.
+    procedure PersistirTaxaGarcom(AIdEmpresa, AIdVenda: Integer);
     procedure BloquearVendaParaFechamento(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
     procedure FinalizarVenda(AFechamento: TAPIRPCheffEntityVendaPostFechamento);
     function AtualizarNumeroCupom(AIdVenda: Integer): Integer;
@@ -50,6 +53,34 @@ implementation
 
 uses
   APIRPCheff.DAO.Factory;
+
+const
+  // Mesmo criterio da V37406, com a taxa disponivel separada da dispensa.
+  SQLTaxaGarcom = '''
+    left join public.terminal t on t.id_empresa = venda.emp_001
+      and t.terminal = nullif(btrim(venda.terminal_abertura), '')
+      and venda.ven_024 in ('M', 'C') and venda.sit_001 in (8, 21)
+    left join public.configuracao_mesa cm on venda.ven_024 = 'M'
+      and cm.id_empresa = t.id_empresa and cm.id_terminal = t.id_terminal
+    left join public.configuracao_comanda cc on venda.ven_024 = 'C'
+      and cc.id_empresa = t.id_empresa and cc.id_terminal = t.id_terminal
+    cross join lateral (
+      select coalesce(case
+        when cm.id_terminal is not null then case when cm.utiliza_taxa_servico_garcom
+          then coalesce(cm.taxa_servico_garcom_percentual, 0) else 0 end
+        when cc.id_terminal is not null then case when cc.utiliza_taxa_servico_garcom
+          then coalesce(cc.taxa_servico_garcom_percentual, 0) else 0 end
+      end, venda.taxa_percentual_garcom, 0) as percentual
+    ) taxa
+    left join lateral (
+      select round(coalesce(sum(vi.ite_005), 0) * taxa.percentual / 100.0, 2) as valor
+        from public.vendaitem vi
+        join public.materiais m on m.emp_001 = vi.emp_001 and m.mat_001 = vi.mat_001
+       where vi.emp_001 = venda.emp_001 and vi.ven_001 = venda.ven_001
+         and vi.sit_001 = 4 and not coalesce(m.b_nao_taxa, false)
+         and taxa.percentual <> 0 and venda.ven_024 in ('M', 'C') and venda.sit_001 in (8, 21)
+    ) calculo on true
+    ''';
 
 procedure TAPIRPCheffDAOVenda.AtualizarCouvert(ACouvert: TAPIRPCheffEntityVendaPatchCouvert);
 begin
@@ -196,9 +227,7 @@ begin
   end;
 end;
 
-procedure TAPIRPCheffDAOVenda.AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer; AValor, AValorTaxa, APercentualTaxa: Currency);
-var
-  LPercentual: Double;
+procedure TAPIRPCheffDAOVenda.AtualizarTotalVenda(AIdEmpresa, AIdVenda: Integer; AValor, AValorTaxa, APercentualTaxa: Currency; AIgnorarTaxaGarcom: Boolean);
 begin
   StartTransaction;
   try
@@ -210,8 +239,8 @@ begin
       .ParamAsCurrency('valorTaxa', AValorTaxa)
       .ParamAsInteger('idVenda', AIdVenda)
       .ParamAsInteger('idEmpresa', AIdEmpresa)
-      .ParamAsFloat('percentualTaxa', APercentualTaxa)
-      .ParamAsBoolean('ignorartaxa', APercentualTaxa <= 0)
+      .ParamAsCurrency('percentualTaxa', APercentualTaxa)
+      .ParamAsBoolean('ignorartaxa', AIgnorarTaxaGarcom)
       .ExecSQL;
     Commit;
   except
@@ -374,11 +403,44 @@ begin
       .ParamAsInteger('idVenda', AIdVenda)
       .ParamAsInteger('idEmpresa', AIdEmpresa)
       .ExecSQL;
+    PersistirTaxaGarcom(AIdEmpresa, AIdVenda);
     Commit;
   except
     Rollback;
     raise;
   end;
+end;
+
+procedure TAPIRPCheffDAOVenda.PersistirTaxaGarcom(AIdEmpresa, AIdVenda: Integer);
+var
+  LDataSet: TDataSet;
+begin
+  // Bloqueia em um comando separado para calcular com o snapshot posterior ao bloqueio.
+  LDataSet := Query.SQL('select 1 from public.venda')
+    .SQL('where emp_001 = :idEmpresa and ven_001 = :idVenda')
+    .SQL('for no key update')
+    .ParamAsInteger('idVenda', AIdVenda)
+    .ParamAsInteger('idEmpresa', AIdEmpresa)
+    .OpenDataSet;
+  LDataSet.Free;
+
+  Query.SQL('with taxa_atual as (')
+    .SQL('  select venda.emp_001, venda.ven_001, taxa.percentual,')
+    .SQL('    case when venda.ignorar_taxa_garcom then 0 else coalesce(calculo.valor, 0) end as valor')
+    .SQL('  from public.venda venda')
+    .SQL(SQLTaxaGarcom)
+    .SQL('  where venda.emp_001 = :idEmpresa and venda.ven_001 = :idVenda')
+    .SQL('    and venda.ven_024 in (''M'', ''C'') and venda.sit_001 in (8, 21)')
+    .SQL('  for no key update of venda')
+    .SQL(')')
+    .SQL('update public.venda v')
+    .SQL('set taxa_percentual_garcom = taxa_atual.percentual, taxa_valor_garcom = taxa_atual.valor')
+    .SQL('from taxa_atual where v.emp_001 = taxa_atual.emp_001 and v.ven_001 = taxa_atual.ven_001')
+    .SQL('  and (v.taxa_percentual_garcom, v.taxa_valor_garcom)')
+    .SQL('      is distinct from (taxa_atual.percentual, taxa_atual.valor)')
+    .ParamAsInteger('idVenda', AIdVenda)
+    .ParamAsInteger('idEmpresa', AIdEmpresa)
+    .ExecSQL;
 end;
 
 function TAPIRPCheffDAOVenda.Buscar(AIdVenda: Integer): TAPIRPCheffEntityVenda;
@@ -475,7 +537,10 @@ begin
       Result.idEmpresa                    := ADataSet.FieldByName('emp_001').AsInteger;
       Result.idVenda                      := ADataSet.FieldByName('ven_001').AsInteger;
       Result.data                         := ADataSet.FieldByName('ven_004').AsDateTime;
-      Result.valorTaxaServico             := ADataSet.FieldByName('ven_008').AsCurrency;
+      Result.valorTaxaServico             := ADataSet.FieldByName('valor_taxa_servico').AsCurrency;
+      Result.valorTaxaServicoDisponivel   := ADataSet.FieldByName('valor_taxa_disponivel').AsCurrency;
+      Result.percentualTaxaServico        := ADataSet.FieldByName('percentual_taxa_servico').AsCurrency;
+      Result.ignorarTaxaGarcom            := ADataSet.FieldByName('ignorar_taxa_garcom').AsBoolean;
       Result.valor                        := ADataSet.FieldByName('ven_009').AsCurrency;
       Result.dataAbertura                 := ADataSet.FieldByName('dat_001_1').AsDateTime;
       Result.idCliente                    := ADataSet.FieldByName('cli_001').AsInteger;
@@ -644,7 +709,12 @@ end;
 
 procedure TAPIRPCheffDAOVenda.Select;
 begin
-  Query.SQL('select venda.emp_001, venda.ven_001,  venda.ven_004, venda.ven_008,')
+  Query.SQL('select venda.emp_001, venda.ven_001, venda.ven_004,')
+    .SQL(' coalesce(venda.ignorar_taxa_garcom, false) as ignorar_taxa_garcom,')
+    .SQL(' taxa.percentual as percentual_taxa_servico, coalesce(calculo.valor, 0) as valor_taxa_disponivel,')
+    .SQL(' case when venda.ven_024 in (''M'', ''C'') and venda.sit_001 in (8, 21) then')
+    .SQL('   case when venda.ignorar_taxa_garcom then 0 else coalesce(calculo.valor, 0) end')
+    .SQL(' else venda.ven_008 end as valor_taxa_servico,')
     .SQL(' venda.ven_009, venda.dat_001_1, venda.cli_001, venda.total_pre,')
     .SQL(' venda.sit_001, venda.usu_001_1, venda.id_caixa_abertura, venda.terminal_abertura,')
     .SQL(' venda.ven_015, venda.ven_024, venda.ven_025, venda.ven_026, venda.ven_029, venda.ven_038,')
@@ -654,7 +724,8 @@ begin
     .SQL(' venda.imprimir_prefechamento_mobile, venda.nome_mesa_comanda,')
     .SQL(' clientes.cli_002, clientes.cli_004')
     .SQL(' from venda')
-    .SQL(' left join clientes on venda.cli_001 = clientes.cli_001 and venda.emp_001 = clientes.emp_001');
+    .SQL(' left join clientes on venda.cli_001 = clientes.cli_001 and venda.emp_001 = clientes.emp_001')
+    .SQL(SQLTaxaGarcom);
 
 end;
 

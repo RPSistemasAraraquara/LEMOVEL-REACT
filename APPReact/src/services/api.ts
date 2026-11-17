@@ -231,6 +231,8 @@ export type Sale = {
   valorCouvertMasculino?: number;
   valorCouvertFeminino?: number;
   valorTaxaServico?: number;
+  valorTaxaServicoDisponivel?: number;
+  ignorarTaxaGarcom?: boolean;
   valorEntrada?: number;
   valorPagamentoAntecipado?: number;
   valorDesconto?: number;
@@ -416,8 +418,6 @@ export type UserProfile = {
 export type CompanyConfig = {
   idEmpresa?: number;
   usaVendaPorTamanho?: boolean;
-  taxaAdicionalMesa?: boolean;
-  taxaServicoPct?: number;
   couvertAtivo?: boolean;
   couvertMascFemObrigatorio?: boolean;
   valorCouvertMasculino?: number;
@@ -439,6 +439,7 @@ export type MobileAppSettings = {
   baseUrl: string;
   empresaId: number;
   terminalImpressao: string;
+  terminalAbertura: string;
   // Identificacao da maquininha na venda/consulta fiscal: "<numero> (Stone)".
   numeroMaquina: string;
   salvarLoginSenha: boolean;
@@ -582,6 +583,7 @@ export const defaultMobileSettings: MobileAppSettings = {
   baseUrl: 'https://mobile.rpfood.com.br',
   empresaId: 1,
   terminalImpressao: 'PB3S249E76533',
+  terminalAbertura: '',
   numeroMaquina: '1',
   salvarLoginSenha: true,
   utilizaCatraca: false,
@@ -620,6 +622,7 @@ const CATALOG_STORAGE_VERSION = 5;
 const CATALOG_PRODUCT_WRITE_BATCH_SIZE = 80;
 const PRODUCT_CATALOG_TIMEOUT_MS = 60000;
 const SYNC_PRODUCT_CATALOG_TIMEOUT_MS = 30000;
+const SYNC_SCOPE_CHANGED_MESSAGE = 'Servidor ou empresa alterados durante a sincronização.';
 // Timeout dedicado para a busca de produtos na sincronizacao: catalogos grandes
 // podem levar bem mais que os 30s usados nas demais etapas (ex.: categorias).
 const SYNC_PRODUCT_FETCH_TIMEOUT_MS = 180000;
@@ -1343,6 +1346,8 @@ function normalizeMobileSettings(payload: unknown): MobileAppSettings {
       defaultMobileSettings.empresaId
     ),
     terminalImpressao: sanitizeText(value.terminalImpressao, defaultMobileSettings.terminalImpressao),
+    terminalAbertura:
+      typeof value.terminalAbertura === 'string' ? value.terminalAbertura.trim() : defaultMobileSettings.terminalAbertura,
     numeroMaquina: sanitizeText(value.numeroMaquina, defaultMobileSettings.numeroMaquina),
     salvarLoginSenha,
     utilizaCatraca: parseBoolean(value.utilizaCatraca, defaultMobileSettings.utilizaCatraca),
@@ -2555,11 +2560,6 @@ function parseCompanyConfig(value: any): CompanyConfig {
   return {
     idEmpresa: parseNumber(value?.idEmpresa, parseNumber(value?.id, 0)),
     usaVendaPorTamanho: parseBoolean(value?.usaVendaPorTamanho ?? value?.vendaPorTamanho, false),
-    taxaAdicionalMesa: parseBoolean(
-      value?.taxaAdicionalMesa ?? value?.taxa_adicional_mesa ?? value?.taxaAdicional,
-      false
-    ),
-    taxaServicoPct: parseNumber(value?.taxaServicoPct ?? value?.taxaServico ?? value?.taxa_servico, 0),
     couvertAtivo: parseBoolean(value?.couvertMesa ?? value?.couvertAtivo, false),
     couvertMascFemObrigatorio: parseBoolean(
       value?.couvertObrigatorioMesa ?? value?.couvertObrigatorio ?? value?.couvertMascFemObrigatorio,
@@ -2712,6 +2712,7 @@ function parseSalePayment(value: any): SalePayment {
 }
 
 function parseSale(value: any): Sale {
+  const valorTaxaServicoDisponivel = resolveField(value, ['valorTaxaServicoDisponivel', 'valor_taxa_servico_disponivel']);
   return {
     idVenda: parseNumber(value?.idVenda, 0),
     idUsuario: parseNumber(resolveField(value, ['idUsuario', 'id_usuario', 'usu_001']), 0),
@@ -2749,6 +2750,9 @@ function parseSale(value: any): Sale {
       0
     ),
     valorTaxaServico: parseNumber(resolveField(value, ['valorTaxaServico', 'valor_taxa_servico', 'ven_008']), 0),
+    valorTaxaServicoDisponivel:
+      valorTaxaServicoDisponivel == null ? undefined : parseNumber(valorTaxaServicoDisponivel, 0),
+    ignorarTaxaGarcom: parseBoolean(resolveField(value, ['ignorarTaxaGarcom', 'ignorar_taxa_garcom']), false),
     valorEntrada: parseNumber(resolveField(value, ['valorEntrada', 'valor_entrada']), 0),
     valorPagamentoAntecipado: parseNumber(
       resolveField(value, ['valorPagamentoAntecipado', 'valor_pagamento_antecipado', 'valorPagoAntecipado']),
@@ -3036,6 +3040,8 @@ export class ApiClient {
   private catalogSchemaReadyKey: string | null = null;
   private productCatalogLoadSeq = 0;
   private syncAllInFlight: Promise<SyncResult> | null = null;
+  private scopeGeneration = 0;
+  private integracaoNfceWrite: Promise<void> = Promise.resolve();
 
   constructor(private baseUrl: string, private idEmpresa = 1) {}
 
@@ -3044,17 +3050,33 @@ export class ApiClient {
   }
 
   setBaseUrl(value: string) {
+    if (buildAbsoluteUrl(value, '') === buildAbsoluteUrl(this.baseUrl, '')) {
+      return;
+    }
     this.baseUrl = value;
+    this.invalidateScope();
+  }
+
+  setEmpresa(value: number) {
+    if (value === this.idEmpresa) {
+      return;
+    }
+    this.idEmpresa = value;
+    this.invalidateScope();
+  }
+
+  private invalidateScope() {
+    this.scopeGeneration += 1;
+    this.syncAllInFlight = null;
     this.clearAllGetCache();
     this.inFlightGet.clear();
     this.clearCatalogMemoryCache();
   }
 
-  setEmpresa(value: number) {
-    this.idEmpresa = value;
-    this.clearAllGetCache();
-    this.inFlightGet.clear();
-    this.clearCatalogMemoryCache();
+  private assertCurrentScope(scopeGeneration: number) {
+    if (scopeGeneration !== this.scopeGeneration) {
+      throw new Error(SYNC_SCOPE_CHANGED_MESSAGE);
+    }
   }
 
   private async resolveTerminalName(): Promise<string> {
@@ -3072,9 +3094,13 @@ export class ApiClient {
   // "Numero da maquina" das configuracoes e a marca do tipo de integracao.
   // A impressao de producao continua usando resolveTerminalName puro para nao
   // quebrar o roteamento por terminal (COPA/DELIVERY/etc).
-  private async resolveTerminalDisplayName(): Promise<string> {
+  private async resolveTerminalDisplayName(useOpeningTerminal = false): Promise<string> {
     try {
       const settings = await loadMobileSettings();
+      if (useOpeningTerminal && settings.terminalAbertura) {
+        return settings.terminalAbertura;
+      }
+
       const base =
         sanitizeText(settings.numeroMaquina, '') ||
         sanitizeText(settings.terminalImpressao, '').toUpperCase() ||
@@ -3258,7 +3284,10 @@ export class ApiClient {
       return products;
     }
 
-    const imageDirectory = buildCatalogImageDirectory(this.baseUrl, this.idEmpresa);
+    const scopeGeneration = this.scopeGeneration;
+    const baseUrl = this.baseUrl;
+    const idEmpresa = this.idEmpresa;
+    const imageDirectory = buildCatalogImageDirectory(baseUrl, idEmpresa);
     const canPersistFileImages = Platform.OS !== 'web' && Boolean(imageDirectory);
     if (Platform.OS !== 'web' && !canPersistFileImages) {
       return products.map((item) => stripInlineProductImage(item));
@@ -3287,6 +3316,7 @@ export class ApiClient {
     const prefetchCandidates: Array<{ index: number; product: MenuItem; productId: number }> = [];
 
     for (let index = 0; index < products.length; index += 1) {
+      this.assertCurrentScope(scopeGeneration);
       const product = products[index];
       const productId = Number(product.idProduto || product.id || 0);
       const previousProduct = previousProductsById.get(productId);
@@ -3362,6 +3392,7 @@ export class ApiClient {
       }
     }
 
+    this.assertCurrentScope(scopeGeneration);
     if (prefetchCandidates.length > 0) {
       // Downloads em paralelo (deduplicados por produto), limitados pela fila
       // runProductImageDownload dentro de cacheProductImageOnDemand. A resolucao
@@ -3371,7 +3402,7 @@ export class ApiClient {
         if (!downloadsByProductId.has(productId)) {
           downloadsByProductId.set(
             productId,
-            cacheProductImageOnDemand(this.baseUrl, this.idEmpresa, productId).catch(() => undefined)
+            cacheProductImageOnDemand(baseUrl, idEmpresa, productId).catch(() => undefined)
           );
         }
       });
@@ -3477,6 +3508,7 @@ export class ApiClient {
   }
 
   private async ensureCatalogStorageSchema() {
+    const scopeGeneration = this.scopeGeneration;
     const schemaKey = this.getCatalogSchemaKey();
     if (this.catalogSchemaReadyKey === schemaKey) {
       return;
@@ -3484,9 +3516,12 @@ export class ApiClient {
 
     try {
       const storedVersion = Number((await AsyncStorage.getItem(schemaKey)) || 0);
+      this.assertCurrentScope(scopeGeneration);
       if (storedVersion !== CATALOG_STORAGE_VERSION) {
         await this.pruneLegacyCatalogStorage();
+        this.assertCurrentScope(scopeGeneration);
         const existingIds = await this.readCachedProductIds();
+        this.assertCurrentScope(scopeGeneration);
         const keysToRemove = [
           this.getCatalogCategoriesKey(),
           this.getCatalogProductIdsKey(),
@@ -3496,12 +3531,14 @@ export class ApiClient {
         if (keysToRemove.length > 0) {
           await AsyncStorage.multiRemove(keysToRemove);
         }
+        this.assertCurrentScope(scopeGeneration);
         await AsyncStorage.setItem(schemaKey, String(CATALOG_STORAGE_VERSION));
       }
     } catch {
       // Falha de storage nao pode invalidar dados carregados da API.
     }
 
+    this.assertCurrentScope(scopeGeneration);
     this.catalogSchemaReadyKey = schemaKey;
   }
 
@@ -3510,10 +3547,13 @@ export class ApiClient {
       return this.cachedCatalogCategories;
     }
 
+    const scopeGeneration = this.scopeGeneration;
     await this.ensureCatalogStorageSchema();
+    this.assertCurrentScope(scopeGeneration);
 
     try {
       const raw = await AsyncStorage.getItem(this.getCatalogCategoriesKey());
+      this.assertCurrentScope(scopeGeneration);
       if (!raw) {
         this.cachedCatalogCategories = [];
         return this.cachedCatalogCategories;
@@ -3533,13 +3573,16 @@ export class ApiClient {
         .filter((item) => item.id > 0 && item.descricao);
       return this.cachedCatalogCategories;
     } catch {
+      this.assertCurrentScope(scopeGeneration);
       this.cachedCatalogCategories = [];
       return this.cachedCatalogCategories;
     }
   }
 
   private async saveCachedCategories(categories: Category[]) {
+    const scopeGeneration = this.scopeGeneration;
     await this.ensureCatalogStorageSchema();
+    this.assertCurrentScope(scopeGeneration);
 
     const normalized = [...categories]
       .filter((item) => Number(item.id || 0) > 0)
@@ -3553,7 +3596,9 @@ export class ApiClient {
     try {
       await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
     } catch {
+      this.assertCurrentScope(scopeGeneration);
       await this.pruneLegacyCatalogStorage();
+      this.assertCurrentScope(scopeGeneration);
       try {
         await AsyncStorage.setItem(this.getCatalogCategoriesKey(), JSON.stringify(normalized));
       } catch {
@@ -3570,7 +3615,9 @@ export class ApiClient {
       return this.cachedCatalogProducts;
     }
 
+    const scopeGeneration = this.scopeGeneration;
     await this.ensureCatalogStorageSchema();
+    this.assertCurrentScope(scopeGeneration);
 
     const parseRows = (rows: string[]) =>
       rows
@@ -3591,6 +3638,7 @@ export class ApiClient {
       if (options.compact) {
         const summaryStartedAt = Date.now();
         const summaryRows = await loadStoredCatalogProductSummaries(this.getCatalogStoragePrefix());
+        this.assertCurrentScope(scopeGeneration);
         if (summaryRows.length > 0) {
           this.cachedCatalogProductSummaries = summaryRows.map(parseCatalogSummaryItem);
           logSyncDiagnostic(
@@ -3603,6 +3651,7 @@ export class ApiClient {
       const sqliteRows = await loadStoredCatalogProducts(this.getCatalogStoragePrefix(), {
         compact: options.compact
       });
+      this.assertCurrentScope(scopeGeneration);
       if (sqliteRows.length > 0) {
         const products = parseRows(sqliteRows);
         if (options.compact) {
@@ -3610,9 +3659,11 @@ export class ApiClient {
           return this.cachedCatalogProductSummaries;
         }
 
+        const fingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix());
+        this.assertCurrentScope(scopeGeneration);
         this.cachedCatalogProducts = products;
         this.cachedCatalogProductSummaries = products.map(toCatalogListMenuItem);
-        this.cachedCatalogProductsFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix());
+        this.cachedCatalogProductsFingerprint = fingerprint;
         this.rememberCatalogSqliteSummaryState(this.cachedCatalogProductsFingerprint, products.length);
         return this.cachedCatalogProducts;
       }
@@ -3620,8 +3671,10 @@ export class ApiClient {
       // AsyncStorage antigo segue como fallback.
     }
 
+    this.assertCurrentScope(scopeGeneration);
     try {
       const ids = await this.readCachedProductIds();
+      this.assertCurrentScope(scopeGeneration);
       if (!ids.length) {
         this.cachedCatalogProducts = [];
         this.cachedCatalogProductSummaries = [];
@@ -3634,10 +3687,12 @@ export class ApiClient {
         const batchEntries = await AsyncStorage.multiGet(
           productKeys.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE)
         );
+        this.assertCurrentScope(scopeGeneration);
         batchEntries.forEach(([key, value]) => entries.push([key, value]));
       }
       const products = parseRows(entries.map(([, raw]) => raw || ''));
       const fingerprint = await AsyncStorage.getItem(this.getCatalogProductFingerprintKey()).catch(() => null);
+      this.assertCurrentScope(scopeGeneration);
       this.cachedCatalogProducts = products;
       this.cachedCatalogProductSummaries = products.map(toCatalogListMenuItem);
       this.cachedCatalogProductsFingerprint = fingerprint;
@@ -3648,11 +3703,13 @@ export class ApiClient {
           buildCatalogPersistItems(products),
           fingerprint
         );
+        this.assertCurrentScope(scopeGeneration);
         this.rememberCatalogSqliteSummaryState(fingerprint, products.length);
       }
 
       return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
     } catch {
+      this.assertCurrentScope(scopeGeneration);
       this.cachedCatalogProducts = [];
       this.cachedCatalogProductSummaries = [];
       return options.compact ? this.cachedCatalogProductSummaries : this.cachedCatalogProducts;
@@ -3696,12 +3753,14 @@ export class ApiClient {
   }
 
   private async syncCatalogProductCount(): Promise<number> {
+    const scopeGeneration = this.scopeGeneration;
     const startedAt = Date.now();
     const productPath = `rpCheff/v1/empresa/${this.idEmpresa}/produto?exibirImagem=false`;
     const { response, payload, rawText } = await this.request(productPath, {
       preferNativeHttp: Platform.OS === 'android',
       timeoutMs: SYNC_PRODUCT_FETCH_TIMEOUT_MS
     });
+      this.assertCurrentScope(scopeGeneration);
     if (!response.ok) {
       throw new Error(`Falha ao consultar ${productPath}: ${response.status}`);
     }
@@ -3717,12 +3776,14 @@ export class ApiClient {
     let knownFingerprint = this.cachedCatalogProductsFingerprint;
     if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
       knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+      this.assertCurrentScope(scopeGeneration);
     }
 
     if (remoteFingerprint && knownFingerprint === remoteFingerprint) {
       // Fast-path barato: conta imagens pendentes direto no SQLite, sem carregar
       // o catalogo inteiro em memoria. null = SQLite indisponivel (cai no fluxo atual).
       const missingImageCount = await countProductsMissingImage(this.getCatalogStoragePrefix());
+      this.assertCurrentScope(scopeGeneration);
       if (missingImageCount === 0) {
         this.cachedCatalogProductsFingerprint = remoteFingerprint;
         logSyncDiagnostic(`produtos prontos inalterado count=${payload.length} em ${Date.now() - startedAt}ms`);
@@ -3731,12 +3792,14 @@ export class ApiClient {
     }
 
     const cachedProducts = await this.loadCachedProducts();
+    this.assertCurrentScope(scopeGeneration);
     if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
       // loadCachedProducts pode reidratar o fingerprint (ex.: cache legado migrado do
       // AsyncStorage); reavalia com as mesmas fontes do fluxo original.
       knownFingerprint = this.cachedCatalogProductsFingerprint;
       if (!knownFingerprint || knownFingerprint !== remoteFingerprint) {
         knownFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+        this.assertCurrentScope(scopeGeneration);
       }
     }
 
@@ -3751,9 +3814,11 @@ export class ApiClient {
     const products = await this.materializeProductImages(mergedProducts, cachedProducts, {
       prefetchMissingRemote: true
     });
+      this.assertCurrentScope(scopeGeneration);
     await this.saveCachedProducts(products, {
       fingerprint: remoteFingerprint
     });
+      this.assertCurrentScope(scopeGeneration);
     logSyncDiagnostic(`produtos prontos count=${products.length} compact=false em ${Date.now() - startedAt}ms`);
     return products.length;
   }
@@ -3764,7 +3829,9 @@ export class ApiClient {
     staleKeys: string[],
     fingerprint: string
   ) {
+    const scopeGeneration = this.scopeGeneration;
     for (let index = 0; index < pairs.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+      this.assertCurrentScope(scopeGeneration);
       const batch = pairs.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE);
       if (batch.length > 0) {
         await AsyncStorage.multiSet(batch);
@@ -3772,9 +3839,11 @@ export class ApiClient {
     }
 
     for (let index = 0; index < staleKeys.length; index += CATALOG_PRODUCT_WRITE_BATCH_SIZE) {
+      this.assertCurrentScope(scopeGeneration);
       await AsyncStorage.multiRemove(staleKeys.slice(index, index + CATALOG_PRODUCT_WRITE_BATCH_SIZE));
     }
 
+    this.assertCurrentScope(scopeGeneration);
     await AsyncStorage.multiSet([
       [this.getCatalogProductIdsKey(), JSON.stringify(nextIds)],
       [this.getCatalogProductFingerprintKey(), fingerprint]
@@ -3810,7 +3879,9 @@ export class ApiClient {
 
   private async saveCachedProducts(products: MenuItem[], options: { fingerprint?: string | null } = {}) {
     const startedAt = Date.now();
+    const scopeGeneration = this.scopeGeneration;
     await this.ensureCatalogStorageSchema();
+    this.assertCurrentScope(scopeGeneration);
 
     const uniqueById = new Map<number, MenuItem>();
     products.forEach((item) => {
@@ -3835,15 +3906,19 @@ export class ApiClient {
     const sqliteFingerprint = verifiedSqliteSummary
       ? fingerprint
       : await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+    this.assertCurrentScope(scopeGeneration);
     let previousFingerprint =
       this.cachedCatalogProductsFingerprint ||
       sqliteFingerprint ||
       (await AsyncStorage.getItem(this.getCatalogProductFingerprintKey()).catch(() => null));
+    this.assertCurrentScope(scopeGeneration);
     if (!previousFingerprint) {
       const previousIds = await this.readCachedProductIds();
+      this.assertCurrentScope(scopeGeneration);
       previousFingerprint = await this.readCachedProductStorageFingerprint(previousIds);
     }
 
+    this.assertCurrentScope(scopeGeneration);
     this.cachedCatalogProducts = normalized;
     this.cachedCatalogProductSummaries = normalized.map(toCatalogListMenuItem);
     if (previousFingerprint === fingerprint) {
@@ -3853,6 +3928,7 @@ export class ApiClient {
         : sqliteFingerprint
           ? await countStoredCatalogProductSummaries(this.getCatalogStoragePrefix()).catch(() => 0)
           : 0;
+      this.assertCurrentScope(scopeGeneration);
       if (!shouldRefreshAsyncStorage && sqliteFingerprint && sqliteSummaryCount >= normalized.length) {
         this.cachedCatalogProductsFingerprint = fingerprint;
         this.rememberCatalogSqliteSummaryState(fingerprint, sqliteSummaryCount);
@@ -3861,6 +3937,7 @@ export class ApiClient {
       }
 
       const previousIds = shouldRefreshAsyncStorage ? await this.readCachedProductIds() : [];
+      this.assertCurrentScope(scopeGeneration);
       const nextIdSet = shouldRefreshAsyncStorage ? new Set(nextIds) : null;
       const staleKeys =
         shouldRefreshAsyncStorage && nextIdSet
@@ -3885,6 +3962,7 @@ export class ApiClient {
             ? saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
             : Promise.resolve()
         ]);
+        this.assertCurrentScope(scopeGeneration);
         this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
       }
       this.cachedCatalogProductsFingerprint = fingerprint;
@@ -3893,6 +3971,7 @@ export class ApiClient {
     }
 
     const previousIds = await this.readCachedProductIds();
+    this.assertCurrentScope(scopeGeneration);
     const nextIdSet = new Set(nextIds);
     const staleKeys = previousIds.filter((id) => !nextIdSet.has(id)).map((id) => this.getCatalogProductKey(id));
     const productJsonList = normalized.map((item) => JSON.stringify(toStoredMenuItem(item)));
@@ -3909,18 +3988,22 @@ export class ApiClient {
         this.persistCachedProducts(pairs, nextIds, staleKeys, fingerprint),
         saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
       ]);
+      this.assertCurrentScope(scopeGeneration);
       this.cachedCatalogProductsFingerprint = fingerprint;
       this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
       logSyncDiagnostic(
         `cache produtos salvo count=${normalized.length} stale=${staleKeys.length} em ${Date.now() - startedAt}ms`
       );
     } catch {
+      this.assertCurrentScope(scopeGeneration);
       await this.pruneLegacyCatalogStorage();
+      this.assertCurrentScope(scopeGeneration);
       try {
         await Promise.all([
           this.persistCachedProducts(pairs, nextIds, staleKeys, fingerprint),
           saveStoredCatalogProducts(this.getCatalogStoragePrefix(), persistItems, fingerprint)
         ]);
+        this.assertCurrentScope(scopeGeneration);
         this.cachedCatalogProductsFingerprint = fingerprint;
         this.rememberCatalogSqliteSummaryState(fingerprint, persistItems.length);
         logSyncDiagnostic(
@@ -4100,8 +4183,10 @@ export class ApiClient {
   }
 
   private async requestJson(path: string, init: ApiRequestInit = {}): Promise<unknown> {
+    const scopeGeneration = this.scopeGeneration;
     if (!this.shouldCacheGet(path, init)) {
       const { response, payload } = await this.request(path, init);
+      this.assertCurrentScope(scopeGeneration);
       if (!response.ok) {
         throw new Error(`Falha ao consultar ${path}: ${response.status}`);
       }
@@ -4132,6 +4217,7 @@ export class ApiClient {
       if (payload === null || payload === undefined) {
         throw new Error(`Resposta inválida em ${path}`);
       }
+      this.assertCurrentScope(scopeGeneration);
       this.setGetCache(cacheKey, payload, path);
       return payload;
     })();
@@ -4258,8 +4344,10 @@ export class ApiClient {
       return this.cachedUsers;
     }
 
+    const scopeGeneration = this.scopeGeneration;
     try {
       const payload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/usuario`);
+      this.assertCurrentScope(scopeGeneration);
       if (!Array.isArray(payload)) throw new Error('Resposta inválida da API');
       const users = payload.map(parseUserProfile);
       this.cachedUsers = users;
@@ -4269,20 +4357,29 @@ export class ApiClient {
         throw error;
       }
 
-      return this.cachedUsers || [];
+      return scopeGeneration === this.scopeGeneration ? this.cachedUsers || [] : [];
     }
   }
 
   async getCompanyConfig(): Promise<{ mesa: CompanyConfig | null; comanda: CompanyConfig | null }> {
+    const scopeGeneration = this.scopeGeneration;
+    const idEmpresa = this.idEmpresa;
+    const terminalAbertura = await this.resolveTerminalDisplayName(true);
+    this.assertCurrentScope(scopeGeneration);
+    const query = `?terminalAbertura=${encodeURIComponent(terminalAbertura)}`;
     const [mesa, comanda] = await Promise.allSettled([
-      this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/configuracaoMesa`),
-      this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/configuracaoComanda`)
+      this.requestJson(`rpCheff/v1/empresa/${idEmpresa}/configuracaoMesa${query}`, { headers: NO_CACHE_HEADERS }),
+      this.requestJson(`rpCheff/v1/empresa/${idEmpresa}/configuracaoComanda${query}`, { headers: NO_CACHE_HEADERS })
     ]);
 
-    return {
-      mesa: mesa.status === 'fulfilled' ? parseCompanyConfig(mesa.value) : null,
-      comanda: comanda.status === 'fulfilled' ? parseCompanyConfig(comanda.value) : null
+    this.assertCurrentScope(scopeGeneration);
+    const parseConfig = (result: PromiseSettledResult<unknown>): CompanyConfig | null => {
+      if (result.status !== 'fulfilled') return null;
+      const config = parseCompanyConfig(result.value);
+      return idEmpresa > 0 && config.idEmpresa === idEmpresa ? config : null;
     };
+
+    return { mesa: parseConfig(mesa), comanda: parseConfig(comanda) };
   }
 
   async getCompanyInfo(): Promise<CompanyInfo | null> {
@@ -4308,11 +4405,13 @@ export class ApiClient {
   }
 
   async syncPartial(task: string): Promise<SyncTaskResult> {
+    const scopeGeneration = this.scopeGeneration;
     const taskCode = String(task || '').toLowerCase();
 
     try {
       if (taskCode === 'catalogo') {
         const shouldShowImages = await this.resolveCatalogImagePreference();
+        this.assertCurrentScope(scopeGeneration);
         this.clearMenuGetCache();
         const [categories, productCount] = await Promise.all([
           this.listCategories({
@@ -4322,6 +4421,7 @@ export class ApiClient {
           }),
           this.syncCatalogProductCount()
         ]);
+        this.assertCurrentScope(scopeGeneration);
         return {
           key: task,
           status: categories.length > 0 || productCount > 0 ? 'ok' : 'skip',
@@ -4331,8 +4431,10 @@ export class ApiClient {
 
       if (taskCode === 'produtos' || taskCode === 'produto') {
         const shouldShowImages = await this.resolveCatalogImagePreference();
+        this.assertCurrentScope(scopeGeneration);
         this.clearProductGetCache();
         const productCount = await this.syncCatalogProductCount();
+        this.assertCurrentScope(scopeGeneration);
         return {
           key: task,
           status: productCount > 0 ? 'ok' : 'skip',
@@ -4347,6 +4449,7 @@ export class ApiClient {
           preferNativeHttp: Platform.OS === 'android',
           timeoutMs: SYNC_PRODUCT_CATALOG_TIMEOUT_MS
         });
+        this.assertCurrentScope(scopeGeneration);
         return {
           key: task,
           status: categories.length > 0 ? 'ok' : 'skip',
@@ -4355,20 +4458,20 @@ export class ApiClient {
       }
 
       if (taskCode === 'mesas' || taskCode === 'mesa' || taskCode === 'tabelas') {
-        this.clearTablesGetCache();
-        const responsePayload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/mesa`);
-        if (!Array.isArray(responsePayload)) {
-          throw new Error('Resposta inválida');
-        }
-        return {
-          key: task,
-          status: 'ok',
-          message: `${responsePayload.length} mesas atualizadas`
-        };
+        const mesas = await this.listTables();
+        this.assertCurrentScope(scopeGeneration);
+        return { key: task, status: 'ok', message: `${mesas.length} mesas atualizadas` };
+      }
+
+      if (taskCode === 'comandas' || taskCode === 'comanda') {
+        const comandas = await this.listComandas();
+        this.assertCurrentScope(scopeGeneration);
+        return { key: task, status: 'ok', message: `${comandas.length} comandas atualizadas` };
       }
 
       if (taskCode === 'formas' || taskCode === 'formasdepagamento' || taskCode === 'formaspagamento') {
         const responsePayload = await this.requestJson(`rpCheff/v1/empresa/${this.idEmpresa}/formaPagamento`);
+        this.assertCurrentScope(scopeGeneration);
         if (!Array.isArray(responsePayload)) {
           throw new Error('Resposta inválida');
         }
@@ -4381,6 +4484,7 @@ export class ApiClient {
 
       if (taskCode === 'usuarios') {
         const users = await this.listUsers({ requireRemote: true });
+        this.assertCurrentScope(scopeGeneration);
         return {
           key: task,
           status: 'ok',
@@ -4390,20 +4494,28 @@ export class ApiClient {
 
       if (taskCode === 'configuracoes' || taskCode === 'configuracao') {
         const config = await this.getCompanyConfig();
-        const total = Number(config.mesa !== null) + Number(config.comanda !== null);
-        if (total > 0) {
+        this.assertCurrentScope(scopeGeneration);
+        if (config.mesa || config.comanda) {
           // empresas.integracao_nfce vem nas configuracoes de mesa/comanda
           // (mesma linha de empresas); espelha no SQLite local para o app
           // saber offline se a emissao de NFC-e esta habilitada.
           const integracaoNfce = Boolean(config.mesa?.integracaoNfce ?? config.comanda?.integracaoNfce ?? false);
-          await saveStoredIntegracaoNfce(integracaoNfce);
+          // A espera também serializa execuções de escopos diferentes, pois
+          // o SQLite usa uma única linha para a configuração da maquininha.
+          const write = this.integracaoNfceWrite.then(async () => {
+            this.assertCurrentScope(scopeGeneration);
+            await saveStoredIntegracaoNfce(integracaoNfce, () => scopeGeneration === this.scopeGeneration);
+          });
+          this.integracaoNfceWrite = write.catch(() => undefined);
+          await write;
+          this.assertCurrentScope(scopeGeneration);
           logSyncDiagnostic(`configuracoes integracao_nfce=${integracaoNfce}`);
         }
-        return {
-          key: task,
-          status: total > 0 ? 'ok' : 'skip',
-          message: total > 0 ? 'Configurações de mesa/comanda carregadas' : 'Sem configuração disponível'
-        };
+        const missing = [!config.mesa && 'Mesa', !config.comanda && 'Comanda'].filter(Boolean).join(' e ');
+        if (missing) {
+          return { key: task, status: 'error', message: `Falha ao carregar configurações de ${missing}` };
+        }
+        return { key: task, status: 'ok', message: 'Configurações de Mesa e Comanda carregadas' };
       }
 
       return {
@@ -4415,7 +4527,10 @@ export class ApiClient {
       return {
         key: task,
         status: 'error',
-        message: error instanceof Error ? error.message : 'Falha na sincronização'
+        message:
+          scopeGeneration !== this.scopeGeneration
+            ? SYNC_SCOPE_CHANGED_MESSAGE
+            : error instanceof Error ? error.message : 'Falha na sincronização'
       };
     }
   }
@@ -4426,7 +4541,8 @@ export class ApiClient {
       return this.syncAllInFlight;
     }
 
-    const syncTask = this.runSyncAll(options);
+    const scopeGeneration = this.scopeGeneration;
+    const syncTask = Promise.resolve().then(() => this.runSyncAll(options, scopeGeneration));
     this.syncAllInFlight = syncTask;
     try {
       return await syncTask;
@@ -4437,13 +4553,20 @@ export class ApiClient {
     }
   }
 
-  private async runSyncAll(options: SyncAllOptions = {}): Promise<SyncResult> {
+  private async runSyncAll(options: SyncAllOptions, scopeGeneration: number): Promise<SyncResult> {
     const timestamp = new Date().toISOString();
-    const tasks = ['catalogo', 'mesas', 'formas', 'configuracoes', 'usuarios'];
+    const tasks = ['catalogo', 'mesas', 'comandas', 'formas', 'configuracoes', 'usuarios'];
     const details = new Array<SyncTaskResult>(tasks.length);
     const maxParallelTasks = 4;
     const syncStartedAt = Date.now();
     logSyncDiagnostic(`syncAll inicio tasks=${tasks.join(',')}`);
+
+    const scopeChanged = () => scopeGeneration !== this.scopeGeneration;
+    const cancelledResult = (task: string): SyncTaskResult => ({
+      key: task,
+      status: 'error',
+      message: SYNC_SCOPE_CHANGED_MESSAGE
+    });
 
     const runTask = async (task: string): Promise<SyncTaskResult> => {
       const startedAt = Date.now();
@@ -4454,10 +4577,18 @@ export class ApiClient {
         // Callback de UI nao pode interferir na sincronizacao.
       }
 
+      if (scopeChanged()) {
+        return cancelledResult(task);
+      }
+
       const result = {
         ...(await this.syncPartial(task)),
         durationMs: Date.now() - startedAt
       };
+
+      if (scopeChanged()) {
+        return cancelledResult(task);
+      }
 
       try {
         options.onTaskFinish?.(result);
@@ -4471,7 +4602,7 @@ export class ApiClient {
 
     let nextTaskIndex = 0;
     const workers = Array.from({ length: Math.min(maxParallelTasks, tasks.length) }, async () => {
-      while (nextTaskIndex < tasks.length) {
+      while (!scopeChanged() && nextTaskIndex < tasks.length) {
         const taskIndex = nextTaskIndex;
         nextTaskIndex += 1;
         details[taskIndex] = await runTask(tasks[taskIndex]);
@@ -4479,13 +4610,14 @@ export class ApiClient {
     });
 
     await Promise.all(workers);
-    const orderedDetails = details.filter((item): item is SyncTaskResult => Boolean(item));
+    const changed = scopeChanged();
+    const orderedDetails = changed ? tasks.map(cancelledResult) : details;
 
     const status: SyncResult['status'] =
       orderedDetails.every((item) => item.status === 'ok') ? 'ok' : 'partial';
 
     const summary = [
-      `Sincronização concluída em ${timestamp}.`,
+      changed ? SYNC_SCOPE_CHANGED_MESSAGE : `Sincronização concluída em ${timestamp}.`,
       ...orderedDetails.map((item) => item.message)
     ];
     logSyncDiagnostic(`syncAll fim status=${status} em ${Date.now() - syncStartedAt}ms`);
@@ -4499,7 +4631,9 @@ export class ApiClient {
   }
 
   async listCategories(options: CategoryListOptions = {}): Promise<Category[]> {
+    const scopeGeneration = this.scopeGeneration;
     const cachedCategories = await this.loadCachedCategories();
+    this.assertCurrentScope(scopeGeneration);
     if (options.preferCache && cachedCategories.length > 0) {
       return cachedCategories;
     }
@@ -4510,6 +4644,7 @@ export class ApiClient {
         preferNativeHttp: options.preferNativeHttp,
         timeoutMs: options.timeoutMs
       });
+      this.assertCurrentScope(scopeGeneration);
       if (!Array.isArray(payload)) throw new Error('Erro na API');
       logSyncDiagnostic(`categorias remoto count=${payload.length} em ${Date.now() - startedAt}ms`);
       const categories = payload.map((value: any) => ({
@@ -4518,8 +4653,10 @@ export class ApiClient {
         PermiteVendaAPP: parseBoolean((value as any)?.PermiteVendaAPP, true)
       }));
       await this.saveCachedCategories(categories);
+      this.assertCurrentScope(scopeGeneration);
       return categories;
     } catch (error) {
+      this.assertCurrentScope(scopeGeneration);
       if (options.requireRemote) {
         throw error;
       }
@@ -4528,6 +4665,7 @@ export class ApiClient {
   }
 
   async listProducts(exibirImagem = true, options: ProductListOptions = {}): Promise<MenuItem[]> {
+    const scopeGeneration = this.scopeGeneration;
     if (options.forceRemote) {
       this.clearProductGetCache();
     }
@@ -4535,6 +4673,7 @@ export class ApiClient {
     const preserveCachedImages = options.preserveCachedImages !== false;
     const shouldLoadCachedProducts = options.preferCache || preserveCachedImages || !options.requireRemote;
     const cachedProducts = shouldLoadCachedProducts ? await this.loadCachedProducts({ compact: options.compact }) : [];
+    this.assertCurrentScope(scopeGeneration);
     const cachedProductsHaveRestrictionMetadata =
       cachedProducts.length > 0 && cachedProducts.every(hasMenuItemRestrictionMetadata);
     if (options.preferCache && !options.forceRemote && cachedProducts.length > 0 && cachedProductsHaveRestrictionMetadata) {
@@ -4553,6 +4692,7 @@ export class ApiClient {
             ? options.timeoutMs
             : PRODUCT_CATALOG_TIMEOUT_MS
       });
+      this.assertCurrentScope(scopeGeneration);
       if (!response.ok) {
         throw new Error(`Falha ao consultar ${productPath}: ${response.status}`);
       }
@@ -4567,6 +4707,7 @@ export class ApiClient {
         (!knownCatalogFingerprint || knownCatalogFingerprint !== remoteFingerprint)
       ) {
         const storedFingerprint = await loadStoredCatalogFingerprint(this.getCatalogStoragePrefix()).catch(() => null);
+        this.assertCurrentScope(scopeGeneration);
         if (storedFingerprint) {
           this.cachedCatalogProductsFingerprint = storedFingerprint;
           knownCatalogFingerprint = storedFingerprint;
@@ -4604,15 +4745,18 @@ export class ApiClient {
         exibirImagem || preserveCachedImages
           ? await this.materializeProductImages(mergedProducts, cachedProducts)
           : stripInlineProductImages(mergedProducts);
+      this.assertCurrentScope(scopeGeneration);
       if (loadSeq === this.productCatalogLoadSeq) {
         await this.saveCachedProducts(products, {
           fingerprint: remoteFingerprint
         });
       }
+      this.assertCurrentScope(scopeGeneration);
       const resultProducts = options.compact ? products.map(toCatalogListMenuItem) : products;
       logSyncDiagnostic(`produtos prontos count=${resultProducts.length} compact=${Boolean(options.compact)} em ${Date.now() - startedAt}ms`);
       return resultProducts;
     } catch (error) {
+      this.assertCurrentScope(scopeGeneration);
       if (options.requireRemote) {
         throw error;
       }
@@ -4685,7 +4829,7 @@ export class ApiClient {
 
   async openTable(tableId: number, nomeMesaComanda?: string, idUsuario = 0): Promise<TableOrder> {
     try {
-      const terminal = await this.resolveTerminalDisplayName();
+      const terminal = await this.resolveTerminalDisplayName(true);
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
@@ -4729,7 +4873,7 @@ export class ApiClient {
     idUsuario = 0
   ): Promise<TableOrder> {
     try {
-      const terminal = await this.resolveTerminalDisplayName();
+      const terminal = await this.resolveTerminalDisplayName(true);
       const nomeInformado = String(nomeMesaComanda || '').trim();
       const body: Record<string, unknown> = {
         terminalAbertura: terminal
@@ -4833,6 +4977,7 @@ export class ApiClient {
   }
 
   async getSale(idVenda: number, listarItens = true): Promise<Sale | null> {
+    const scopeGeneration = this.scopeGeneration;
     const { response, payload } = await this.request(
       `rpCheff/v1/empresa/${this.idEmpresa}/venda/${idVenda}?_=${Date.now()}`,
       {
@@ -4842,6 +4987,7 @@ export class ApiClient {
         }
       }
     );
+    this.assertCurrentScope(scopeGeneration);
     if (!response.ok || !payload || typeof payload !== 'object') return null;
     return parseSale(payload);
   }

@@ -36,17 +36,21 @@ begin
 
   LValorPagoAntecipado := LDAO.GetValorPago(FParent.Venda.idVenda);
   LValorVenda := RoundTo(AFechamento.ValorPagamento + LValorPagoAntecipado, -2);
+  if FParent.Venda.tipoVenda in [tvMesa, tvComanda] then
+  begin
+    LValorTaxa := FParent.Venda.valorTaxaServico;
+    LPercentualTaxa := FParent.Venda.percentualTaxaServico;
+    LDAO.AtualizarTotalVenda(FParent.Venda.idEmpresa, FParent.Venda.idVenda,
+      LValorVenda, LValorTaxa, LPercentualTaxa, not AFechamento.CobrarTaxaGarcom);
+    Exit;
+  end;
+
   LValorTaxa := AFechamento.valorTaxaServico;
-
+  LPercentualTaxa := 0;
   if LValorVenda > 0 then
-    LPercentualTaxa := SimpleRoundTo((LValorTaxa / LValorVenda) * 100, -2)
-  else
-    LPercentualTaxa := 0;
-
-
-
+    LPercentualTaxa := SimpleRoundTo((LValorTaxa / LValorVenda) * 100, -2);
   LDAO.AtualizarTotalVenda(FParent.Venda.idEmpresa, FParent.Venda.idVenda,
-    LValorVenda, LValorTaxa, LPercentualTaxa);
+    LValorVenda, LValorTaxa, LPercentualTaxa, LPercentualTaxa <= 0);
 end;
 
 end.

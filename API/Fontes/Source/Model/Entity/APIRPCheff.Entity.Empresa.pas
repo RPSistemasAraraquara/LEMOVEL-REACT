@@ -11,14 +11,12 @@ type
     FidEmpresa                           : Integer;
     Fnome                                : string;
     FcasaNoturna                         : Boolean;
-    FtaxaAdicionalMesa                   : Boolean;
     FcouvertMesa                         : Boolean;
     FcouvertObrigatorioMesa              : Boolean;
     FconsumacaoMesa                      : Boolean;
     FvalorCouvertMasculinoMesa           : Currency;
     FvalorCouvertFemininoMesa            : Currency;
     FconsumacaoMinimaMesa                : Currency;
-    FtaxaAdicionalComanda                : Boolean;
     FcouvertComanda                      : Boolean;
     FcouvertObrigatorioComanda           : Boolean;
     FvalorCouvertMasculinoComanda        : Currency;
@@ -53,14 +51,12 @@ type
     property celular: string                              read Fcelular                                 write Fcelular;
     property casaNoturna: Boolean                         read FcasaNoturna                             write FcasaNoturna;
     property casaControle: TRPCheffTipoCasaControle       read FcasaControle                            write FcasaControle;
-    property taxaAdicionalMesa: Boolean                   read FtaxaAdicionalMesa                       write FtaxaAdicionalMesa;
     property couvertMesa: Boolean                         read FcouvertMesa                             write FcouvertMesa;
     property couvertObrigatorioMesa: Boolean              read FcouvertObrigatorioMesa                  write FcouvertObrigatorioMesa;
     property valorCouvertMasculinoMesa: Currency          read FvalorCouvertMasculinoMesa               write FvalorCouvertMasculinoMesa;
     property valorCouvertFemininoMesa: Currency           read FvalorCouvertFemininoMesa                write FvalorCouvertFemininoMesa;
     property consumacaoMesa: Boolean                      read FconsumacaoMesa                          write FconsumacaoMesa;
     property consumacaoMinimaMesa: Currency               read FconsumacaoMinimaMesa                    write FconsumacaoMinimaMesa;
-    property taxaAdicionalComanda: Boolean                read FtaxaAdicionalComanda                    write FtaxaAdicionalComanda;
     property couvertComanda: Boolean                      read FcouvertComanda                          write FcouvertComanda;
     property couvertObrigatorioComanda: Boolean           read FcouvertObrigatorioComanda               write FcouvertObrigatorioComanda;
     property valorCouvertMasculinoComanda: Currency       read FvalorCouvertMasculinoComanda            write FvalorCouvertMasculinoComanda;
@@ -86,11 +82,9 @@ implementation
 constructor TAPIRPCheffEntityEmpresa.Create;
 begin
   FcasaNoturna               := False;
-  FtaxaAdicionalMesa         := False;
   FcouvertMesa               := False;
   FcouvertObrigatorioMesa    := False;
   FconsumacaoMesa            := False;
-  FtaxaAdicionalComanda      := False;
   FcouvertComanda            := False;
   FcouvertObrigatorioComanda := False;
   FconsumacaoComanda         := False;

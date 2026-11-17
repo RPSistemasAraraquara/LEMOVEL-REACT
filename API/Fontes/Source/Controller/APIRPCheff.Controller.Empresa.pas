@@ -26,11 +26,13 @@ type
 
     [SwagGET('{idEmpresa}/configuracaoMesa', 'Configuracao mesa da empresa')]
     [SwagParamPath('idEmpresa', 'Id da empresa')]
+    [SwagParamQuery('terminalAbertura', 'Nome do terminal cadastrado')]
     [SwagResponse(200, TAPIRPCheffEntityConfiguracaoMesa)]
     procedure BuscarConfiguracaoMesa;
 
     [SwagGET('{idEmpresa}/configuracaoComanda', 'Configuracao comanda da empresa')]
     [SwagParamPath('idEmpresa', 'Id da empresa')]
+    [SwagParamQuery('terminalAbertura', 'Nome do terminal cadastrado')]
     [SwagResponse(200, TAPIRPCheffEntityConfiguracaoComanda)]
     procedure BuscarConfiguracaoComanda;
   end;
@@ -57,9 +59,13 @@ procedure TAPIRPCheffControllerEmpresa.BuscarConfiguracaoComanda;
 var
   LIdEmpresa: Integer;
   LConfiguracao: TAPIRPCheffEntityConfiguracaoComanda;
+  LTerminal: string;
 begin
   LIdEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
-  LConfiguracao := Controller.DAO.ConfiguracaoComandaDAO.Buscar(LIdEmpresa);
+  LTerminal := '';
+  if FRequest.Query.ContainsKey('terminalAbertura') then
+    LTerminal := FRequest.Query.Field('terminalAbertura').AsString;
+  LConfiguracao := Controller.DAO.ConfiguracaoComandaDAO.Buscar(LIdEmpresa, LTerminal);
   try
     Self.Response(LConfiguracao);
   finally
@@ -71,9 +77,13 @@ procedure TAPIRPCheffControllerEmpresa.BuscarConfiguracaoMesa;
 var
   LIdEmpresa: Integer;
   LConfiguracao: TAPIRPCheffEntityConfiguracaoMesa;
+  LTerminal: string;
 begin
   LIdEmpresa := FRequest.Params.Field('idEmpresa').AsInteger;
-  LConfiguracao := Controller.DAO.ConfiguracaoMesaDAO.Buscar(LIdEmpresa);
+  LTerminal := '';
+  if FRequest.Query.ContainsKey('terminalAbertura') then
+    LTerminal := FRequest.Query.Field('terminalAbertura').AsString;
+  LConfiguracao := Controller.DAO.ConfiguracaoMesaDAO.Buscar(LIdEmpresa, LTerminal);
   try
     Self.Response(LConfiguracao);
   finally
